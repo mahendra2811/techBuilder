@@ -50,6 +50,9 @@ function seed(): Store {
   const orgId = uuidv7();
   const ownerId = uuidv7();
   const sm = uuidv7();
+  const th = uuidv7();
+  const driver = uuidv7();
+  const worker = uuidv7();
   const site1 = uuidv7();
   const site2 = uuidv7();
   const truckType = uuidv7();
@@ -65,6 +68,9 @@ function seed(): Store {
     users: [
       { id: ownerId, orgId, personId: null, name: 'Acme Owner', username: 'acme_owner', phone: null, role: 'OWNER', mustChangePassword: false, assignedSiteId: null, crewId: null, allowedVehicleTypeIds: [], emergencyContact: null, active: true, ...a },
       { id: sm, orgId, personId: null, name: 'Site Manager 1', username: 'sm1', phone: null, role: 'SITE_MANAGER', mustChangePassword: false, assignedSiteId: site1, crewId: null, allowedVehicleTypeIds: [], emergencyContact: null, active: true, ...a },
+      { id: th, orgId, personId: null, name: 'Team Head 1 (Mistri)', username: 'th1', phone: null, role: 'TEAM_HEAD', mustChangePassword: false, assignedSiteId: site1, crewId: null, allowedVehicleTypeIds: [], emergencyContact: null, active: true, ...a },
+      { id: driver, orgId, personId: null, name: 'Driver 1', username: 'driver1', phone: null, role: 'DRIVER', mustChangePassword: false, assignedSiteId: site1, crewId: null, allowedVehicleTypeIds: [truckType], emergencyContact: null, active: true, ...a },
+      { id: worker, orgId, personId: people[0]!.id, name: 'Worker 1', username: 'worker1', phone: null, role: 'WORKER', mustChangePassword: false, assignedSiteId: site1, crewId: null, allowedVehicleTypeIds: [], emergencyContact: null, active: true, ...a },
     ],
     people,
     sites: [

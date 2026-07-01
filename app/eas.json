@@ -1,0 +1,33 @@
+{
+  "cli": {
+    "version": ">= 12.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": { "buildType": "apk" },
+      "channel": "development"
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": { "buildType": "apk" },
+      "channel": "preview",
+      "env": {
+        "EXPO_PUBLIC_ADAPTER": "rest"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "android": { "buildType": "app-bundle" },
+      "channel": "production",
+      "env": {
+        "EXPO_PUBLIC_ADAPTER": "rest"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

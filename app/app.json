@@ -6,10 +6,17 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "android": {
-      "package": "in.techbuilder.app"
+      "package": "in.techbuilder.app",
+      "versionCode": 1
     },
-    "plugins": ["expo-router", "expo-localization"]
+    "plugins": [
+      "expo-router",
+      "expo-localization",
+      "expo-sqlite"
+    ]
   }
 }
