@@ -1,0 +1,12 @@
+{
+  "app": { "name": "techBuilder" },
+  "common": { "save": "सेव करें", "cancel": "रद्द करें", "submit": "जमा करें", "loading": "लोड हो रहा है…", "empty": "अभी कुछ नहीं", "retry": "फिर से कोशिश करें", "offline": "आप ऑफ़लाइन हैं। बदलाव बाद में सिंक होंगे।" },
+  "auth": { "login": "लॉग इन करें", "username": "यूज़रनेम", "password": "पासवर्ड", "loginError": "ग़लत यूज़रनेम या पासवर्ड", "logout": "लॉग आउट", "changePassword": "पासवर्ड बदलें" },
+  "roles": { "OWNER": "मालिक", "SITE_MANAGER": "साइट मैनेजर", "TEAM_HEAD": "टीम हेड", "DRIVER": "ड्राइवर", "WORKER": "मज़दूर" },
+  "home": { "title": "होम", "today": "आज" },
+  "nav": { "dashboard": "डैशबोर्ड", "sites": "साइटें", "people": "लोग", "fleet": "वाहन" },
+  "kpi": { "sites": "चालू साइटें", "headcount": "आज हाज़िरी", "vehicles": "आज वाहन", "spend": "आज ख़र्च", "issues": "खुले मुद्दे", "approvals": "मंज़ूरी बाक़ी" },
+  "sites": { "add": "साइट जोड़ें", "name": "साइट का नाम", "code": "कोड" },
+  "people": { "add": "यूज़र जोड़ें", "name": "पूरा नाम", "username": "यूज़रनेम", "role": "भूमिका", "tempPassword": "अस्थायी पासवर्ड" },
+  "fleet": { "vehicles": "वाहन", "types": "वाहन प्रकार", "add": "वाहन जोड़ें", "regNo": "रजिस्ट्रेशन नं.", "vname": "नाम", "type": "प्रकार" }
+}

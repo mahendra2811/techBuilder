@@ -1,0 +1,41 @@
+{
+  "name": "@techbuilder/app",
+  "version": "0.1.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "description": "techBuilder Expo app (SDK 56) + engine. Engine core (adapters/config/sync) is framework-agnostic TS (typecheck-green here); the Expo/RN shell + screens run via the Expo toolchain on a dev machine.",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck:app": "tsc --noEmit -p tsconfig.app.json"
+  },
+  "dependencies": {
+    "@techbuilder/contracts": "*",
+    "expo": "~56.0.12",
+    "expo-camera": "~56.0.8",
+    "expo-constants": "*",
+    "expo-image": "~56.0.11",
+    "expo-linking": "*",
+    "expo-localization": "~56.0.6",
+    "expo-router": "~56.2.11",
+    "expo-sqlite": "~56.0.5",
+    "expo-status-bar": "*",
+    "i18next": "^26.3.4",
+    "nativewind": "^4.2.6",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "react-i18next": "^17.0.8",
+    "react-native": "0.86.0",
+    "react-native-safe-area-context": "*",
+    "react-native-screens": "*",
+    "uuidv7": "^1.0.2",
+    "zustand": "^5.0.14"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.0",
+    "@types/react": "~19.2.0",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.0"
+  }
+}

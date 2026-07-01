@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "moduleResolution": "node",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "declaration": false,
+    "removeComments": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "outDir": "./dist",
+    "baseUrl": ".",
+    "paths": {
+      "@techbuilder/contracts": ["../shared/src/index.ts"],
+      "@techbuilder/contracts/db/schema": ["../shared/src/db/schema.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "scripts/**/*.ts", "drizzle.config.ts", "../shared/src/**/*.ts"]
+}

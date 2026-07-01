@@ -1,0 +1,49 @@
+import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { z } from 'zod';
+import type { CreateVehicleInput } from '@techbuilder/contracts';
+import { VehiclesService } from './vehicles.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RbacGuard, RequireAction } from '../common/rbac.guard';
+import { ZodBody } from '../common/zod-body.pipe';
+import { CurrentUser, type Principal } from '../common/current-user.decorator';
+
+const CreateVehicleSchema = z.object({
+  id: z.string().uuid(),
+  vehicleTypeId: z.string().uuid(),
+  regNo: z.string().min(1),
+  name: z.string().optional(),
+  values: z.record(z.unknown()).optional(),
+  assignedSiteId: z.string().uuid().optional(),
+  assignedDriverPersonId: z.string().uuid().optional(),
+  status: z.enum(['ACTIVE', 'IDLE', 'MAINTENANCE']).optional(),
+  docs: z
+    .array(
+      z.object({
+        kind: z.enum(['RC', 'INSURANCE', 'PUC', 'FITNESS', 'PERMIT']),
+        mediaId: z.string().uuid().optional(),
+        expiry: z.string().optional(),
+      }),
+    )
+    .optional(),
+});
+
+@UseGuards(JwtAuthGuard, RbacGuard)
+@Controller('vehicles')
+export class VehiclesController {
+  constructor(private readonly vehicles: VehiclesService) {}
+
+  @RequireAction('vehicle.manage')
+  @Post()
+  create(
+    @CurrentUser() u: Principal,
+    @Body(new ZodBody(CreateVehicleSchema)) body: CreateVehicleInput,
+  ) {
+    return this.vehicles.create(u, body);
+  }
+
+  @RequireAction('view.all')
+  @Get()
+  list(@CurrentUser() u: Principal) {
+    return this.vehicles.list(u);
+  }
+}

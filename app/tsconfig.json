@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@techbuilder/contracts": ["../shared/src/index.ts"],
+      "@techbuilder/contracts/db/schema": ["../shared/src/db/schema.ts"]
+    }
+  },
+  "include": ["src/engine/**/*.ts", "../shared/src/**/*.ts"],
+  "exclude": ["src/engine/sync/sqlite-outbox-store.ts"]
+}

@@ -1,0 +1,12 @@
+{
+  "app": { "name": "techBuilder" },
+  "common": { "save": "Save", "cancel": "Cancel", "submit": "Submit", "loading": "Loading…", "empty": "Nothing yet", "retry": "Retry", "offline": "You are offline. Changes will sync later." },
+  "auth": { "login": "Log in", "username": "Username", "password": "Password", "loginError": "Invalid username or password", "logout": "Log out", "changePassword": "Change password" },
+  "roles": { "OWNER": "Owner", "SITE_MANAGER": "Site Manager", "TEAM_HEAD": "Team Head", "DRIVER": "Driver", "WORKER": "Worker" },
+  "home": { "title": "Home", "today": "Today" },
+  "nav": { "dashboard": "Dashboard", "sites": "Sites", "people": "People", "fleet": "Fleet" },
+  "kpi": { "sites": "Active sites", "headcount": "Headcount today", "vehicles": "Vehicles today", "spend": "Spend today", "issues": "Open issues", "approvals": "Pending approvals" },
+  "sites": { "add": "Add site", "name": "Site name", "code": "Code" },
+  "people": { "add": "Add user", "name": "Full name", "username": "Username", "role": "Role", "tempPassword": "Temp password" },
+  "fleet": { "vehicles": "Vehicles", "types": "Vehicle types", "add": "Add vehicle", "regNo": "Registration no.", "vname": "Name", "type": "Type" }
+}

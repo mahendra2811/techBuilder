@@ -1,0 +1,13 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "baseUrl": ".",
+    "paths": {
+      "@techbuilder/contracts": ["../shared/src/index.ts"],
+      "@techbuilder/contracts/db/schema": ["../shared/src/db/schema.ts"],
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "nativewind-env.d.ts", "../shared/src/**/*.ts"]
+}
