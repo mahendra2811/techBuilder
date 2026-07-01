@@ -1,17 +1,17 @@
 {
   "name": "@techbuilder/contracts",
-  "version": "1.0.0-frozen.1",
+  "version": "1.0.0-frozen.2",
   "private": true,
   "description": "techBuilder Contracts Pack — FROZEN single source of truth (enums, types, OrgConfig, DB schema + RLS, API contract, adapter interfaces). Consumed by backend + frontend engine. Do not edit without a version bump + cross-team sign-off.",
-  "type": "module",
-  "main": "src/index.ts",
-  "types": "src/index.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./db/schema": "./src/db/schema.ts"
+    ".": { "types": "./dist/index.d.ts", "source": "./src/index.ts", "default": "./dist/index.js" },
+    "./db/schema": { "types": "./dist/db/schema.d.ts", "source": "./src/db/schema.ts", "default": "./dist/db/schema.js" }
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json",
     "verify-freeze": "tsc --noEmit"
   },
   "dependencies": {

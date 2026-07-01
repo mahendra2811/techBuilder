@@ -41,6 +41,13 @@ export class AuthController {
     return { ok: true };
   }
 
+}
+
+/** `/me` is top-level per contract ENDPOINTS.me (NOT /auth/me), so it lives in a prefix-less controller. */
+@Controller()
+export class MeController {
+  constructor(private readonly auth: AuthService) {}
+
   @UseGuards(JwtAuthGuard)
   @Get('me')
   me(@CurrentUser() u: Principal) {

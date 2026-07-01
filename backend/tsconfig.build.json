@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "paths": {
+      "@techbuilder/contracts": ["../shared/dist/index.d.ts"],
+      "@techbuilder/contracts/db/schema": ["../shared/dist/db/schema.d.ts"]
+    }
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "scripts/**", "src/seed.ts", "**/*.spec.ts"]
+}

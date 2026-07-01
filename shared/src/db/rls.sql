@@ -11,7 +11,8 @@
 -- 2) Helper: read the per-transaction tenant GUC. The backend runs `SET LOCAL app.org_id = '<uuid>'`
 --    inside every request transaction (pooled connections reuse → MUST be per-transaction, never per-session).
 CREATE OR REPLACE FUNCTION app_current_org() RETURNS uuid
-  LANGUAGE sql STABLE AS $$ SELECT current_setting('app.org_id', true)::uuid $$;
+  LANGUAGE sql STABLE AS $$ SELECT nullif(current_setting('app.org_id', true), '')::uuid $$;
+-- nullif handles BOTH unset (NULL) and reverted-empty ('') GUC → NULL → policies deny (default-deny, no cast error).
 
 -- 3) Enable + FORCE RLS and a tenant-isolation policy on every tenant table.
 --    FORCE makes the policy apply even to the table owner (defense against owner-context leaks).
@@ -28,6 +29,7 @@ BEGIN
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY;', t);
     EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY;', t);
+    EXECUTE format('DROP POLICY IF EXISTS tenant_isolation ON %I;', t); -- idempotent re-apply
     EXECUTE format($f$
       CREATE POLICY tenant_isolation ON %I
         USING (org_id = app_current_org())
@@ -39,6 +41,7 @@ END $$;
 -- 4) orgs: a user may only see their own org row.
 ALTER TABLE orgs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE orgs FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS org_self ON orgs;
 CREATE POLICY org_self ON orgs USING (id = app_current_org()) WITH CHECK (id = app_current_org());
 
 -- 5) Reminder for any VIEWS added later: create with WITH (security_invoker = true) so RLS applies (PG15+).
