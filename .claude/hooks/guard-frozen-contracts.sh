@@ -9,7 +9,7 @@ case "$path" in
   */shared/src/*)
     echo "⚠️  FROZEN CONTRACTS: editing @techbuilder/contracts ($path)." >&2
     echo "    This is the single source of truth for backend + app. If this is a real change:" >&2
-    echo "    bump shared/package.json version, note it in PROJECT_AI_CONTEXT.md §0, then re-run" >&2
+    echo "    bump shared/package.json version, note it in docs/PROJECT_AI_CONTEXT.md §0, then re-run" >&2
     echo "    (cd shared && npm run typecheck) and re-typecheck backend. See .claude/rules/contracts-frozen.md" >&2
     ;;
 esac

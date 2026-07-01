@@ -1,0 +1,11 @@
+{
+  "name": "techbuilder",
+  "version": "1.0.0",
+  "private": true,
+  "description": "techBuilder monorepo — Phase 1. shared (frozen contracts) + backend (NestJS). app (Expo) added in STEP 2.",
+  "workspaces": [
+    "shared",
+    "backend",
+    "app"
+  ]
+}

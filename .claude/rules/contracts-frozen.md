@@ -4,7 +4,7 @@
 
 ## Rules
 - **Do not casually edit `shared/src/**`.** Enum/type/schema drift here breaks the whole build silently.
-- A real change requires: (1) bump `shared/package.json` version (`1.0.0-frozen.N` → `N+1`), (2) note the change in `PROJECT_AI_CONTEXT.md` §0, (3) re-run `(cd shared && npm run typecheck)`, (4) re-typecheck `backend` (and `app` once it exists).
+- A real change requires: (1) bump `shared/package.json` version (`1.0.0-frozen.N` → `N+1`), (2) note the change in `docs/PROJECT_AI_CONTEXT.md` §0, (3) re-run `(cd shared && npm run typecheck)`, (4) re-typecheck `backend` (and `app` once it exists).
 - **Never redefine** an enum/type/DTO/interface outside this package — import it.
 - The DB schema lives at `shared/src/db/schema.ts`; RLS policy DDL at `shared/src/db/rls.sql` (applied after drizzle migrations — drizzle-kit does not emit `FORCE`/role DDL).
 - Resolution-neutral on purpose: imports are **extensionless** (no `.js`) so both the CJS backend and the Metro/bundler frontend consume the source. Keep it that way.

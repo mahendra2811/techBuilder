@@ -1,6 +1,6 @@
 # Build Strategy — Contracts-first + 3 prompts + model tiers
 
-Full detail: `techBuilder-Roadmap.md`. Summary for quick recall:
+Full detail: `docs/techBuilder-Roadmap.md`. Summary for quick recall:
 
 ## The 8 steps
 0. **Contracts Pack** (FROZEN first) — ✅ done (`shared/`).

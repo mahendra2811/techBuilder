@@ -15,25 +15,28 @@ A **Hindi-first Android app** (Expo/React Native) for running an Indian construc
 - **5 roles:** Owner · Site Manager · Team Head (Mistri) · Driver · Worker (view-only). Account creation cascades Owner→SM→TH.
 
 ## 2. ⚡ Resume in 60 seconds
-1. Read **`PROJECT_AI_CONTEXT.md` §0** (current direction + the 26-row locked-decisions table + 🏗️ Build status).
-2. Skim **`techBuilder-Build-Readiness-Spec.md`** (the authoritative build contract).
-3. Check the **build status** below + `PROJECT_AI_CONTEXT.md` §0 "Build status".
+1. Read **[`docs/PROJECT_AI_CONTEXT.md`](docs/PROJECT_AI_CONTEXT.md) §0** (current direction + the 26-row locked-decisions table + 🏗️ Build status).
+2. Skim **[`docs/techBuilder-Build-Readiness-Spec.md`](docs/techBuilder-Build-Readiness-Spec.md)** (the authoritative build contract).
+3. Check the **build status** below + `docs/PROJECT_AI_CONTEXT.md` §0 "Build status".
 4. The auto-memory at `~/.claude/projects/.../memory/techbuilder-phase1-direction.md` has the running state.
 5. Invoke the **`resume-techbuilder`** skill for an automated re-orientation.
 
 ## 3. 📚 Doc map — which doc has what
+> All paths are relative to the repo root. Specs/plans live in [`docs/`](docs/); the cross-references *inside* those docs use bare filenames and stay valid because they all share the `docs/` folder.
+
 | Doc | Contents |
 |---|---|
-| `PROJECT_AI_CONTEXT.md` | **Master index.** §0 = current direction + locked-decisions table + reading order + build status. §§1–12 = original (superseded) research. |
-| `techBuilder-Build-Readiness-Spec.md` ⭐ | **Authoritative build contract** — final feature list, conventions, enums, data model, RBAC, OrgConfig, the Contracts-Pack + 3-prompt build plan. Wins on conflict. |
-| `techBuilder-Roadmap.md` | 8 named build steps (STEP 0 Contracts Pack → STEP 7 ship) + done-gates + **per-step model strategy** + "production-ready complete" gate. |
-| `techBuilder-Domain-Model-and-Permissions.md` | Data model + RBAC matrix + workflows (narrative; the Spec extends it for build details). |
-| `techBuilder-Engine-Onboarding-Plan.md` | Engine + single-app architecture, onboarding playbook, build order (§7 locked scope). |
-| `techBuilder-Phase1-Android-Screen-Plan.md` | Screen-by-screen product blueprint (§12 = authoritative revisions). |
-| `techBuilder-Tech-Stack.md` | Locked frontend toolchain + backend stack summary. |
-| `techBuilder-Backend-and-Database.md` | Backend + Postgres design, RLS, API surface, hosting/budget. |
-| `docs/research-prompt-1.md`, `research-prompt-2.md` | The research prompts given to web AIs. |
-| `docs/reserch_1_*`, `reserch_2_*` | The research results (market validation + build-readiness). |
+| [`docs/PROJECT_AI_CONTEXT.md`](docs/PROJECT_AI_CONTEXT.md) | **Master index.** §0 = current direction + locked-decisions table + reading order + build status. §§1–12 = original (superseded) research. |
+| [`docs/techBuilder-Build-Readiness-Spec.md`](docs/techBuilder-Build-Readiness-Spec.md) ⭐ | **Authoritative build contract** — final feature list, conventions, enums, data model, RBAC, OrgConfig, the Contracts-Pack + 3-prompt build plan. Wins on conflict. |
+| [`docs/techBuilder-Roadmap.md`](docs/techBuilder-Roadmap.md) | 8 named build steps (STEP 0 Contracts Pack → STEP 7 ship) + done-gates + **per-step model strategy** + "production-ready complete" gate. |
+| [`docs/techBuilder-Domain-Model-and-Permissions.md`](docs/techBuilder-Domain-Model-and-Permissions.md) | Data model + RBAC matrix + workflows (narrative; the Spec extends it for build details). |
+| [`docs/techBuilder-Engine-Onboarding-Plan.md`](docs/techBuilder-Engine-Onboarding-Plan.md) | Engine + single-app architecture, onboarding playbook, build order (§7 locked scope). |
+| [`docs/techBuilder-Phase1-Android-Screen-Plan.md`](docs/techBuilder-Phase1-Android-Screen-Plan.md) | Screen-by-screen product blueprint (§12 = authoritative revisions). |
+| [`docs/techBuilder-Tech-Stack.md`](docs/techBuilder-Tech-Stack.md) | Locked frontend toolchain + backend stack summary. |
+| [`docs/techBuilder-Backend-and-Database.md`](docs/techBuilder-Backend-and-Database.md) | Backend + Postgres design, RLS, API surface, hosting/budget. |
+| [`docs/research/`](docs/research/) `research-prompt-1.md`, `research-prompt-2.md` | The research prompts given to web AIs. |
+| [`docs/research/`](docs/research/) `reserch_1_*`, `reserch_2_*` | The research results (market validation + build-readiness). |
+| [`docs/reference/`](docs/reference/) | Original binary docs (architecture DOCX/PDF, frontend guide, tech-stack PDF, offline-photo-upload SVG). |
 
 ## 4. 🏗️ Build status (keep this current)
 - **STEP 0 — Contracts Pack: ✅ FROZEN & verified** at `shared/` (`@techbuilder/contracts@1.0.0-frozen.1`). 30 Drizzle tables + `rls.sql`, all enums, OrgConfig (zod), domain/dto types, REST `ENDPOINTS`, adapter interfaces, RBAC `can()`. `npm run typecheck` clean.
@@ -44,7 +47,12 @@ A **Hindi-first Android app** (Expo/React Native) for running an Indian construc
 ## 5. Repo structure
 ```
 techBuilder/
+  CLAUDE.md               # this file — the ONLY .md at root (Claude Code auto-loads it)
   package.json            # npm WORKSPACE root (workspaces: shared, backend; app added in STEP 2)
+  docs/                   # ALL project docs live here
+    *.md                  #   specs/plans (PROJECT_AI_CONTEXT + techBuilder-*)
+    research/             #   research prompts + web-AI results
+    reference/            #   original binary docs (PDF/DOCX/SVG)
   shared/                 # @techbuilder/contracts — FROZEN single source of truth (STEP 0)
     src/{common,enums,errors,config,domain,dto,api,adapters,permissions}.ts
     src/db/{schema.ts, rls.sql}
@@ -72,11 +80,11 @@ npm install                              # workspace install (hoists single driz
 ```
 
 ## 8. Hard rules
-- **Editing `shared/src/**` = editing the FROZEN contracts** → bump `shared/package.json` version + note in `PROJECT_AI_CONTEXT.md` §0. (A hook reminds you.)
+- **Editing `shared/src/**` = editing the FROZEN contracts** → bump `shared/package.json` version + note in `docs/PROJECT_AI_CONTEXT.md` §0. (A hook reminds you.)
 - **New backend module → copy the `sites/` pattern exactly** (`runInTenant`, idempotent UUID inserts, `mapXxx`, scoped RBAC, `ApiException`). See `.claude/rules/backend-modules.md` + the `new-backend-module` skill.
 - **Latest-stable + verify docs:** use `ctx7` before integrating any library (versions are pinned at use-time, not from training data).
-- **Model strategy** (token optimization): Opus for contracts/auth/RLS/wage/dashboards/recon/sync + reviews; Sonnet for mechanical CRUD (fan out as parallel subagents writing disjoint module folders, then wire `app.module.ts` + typecheck centrally); Haiku for trivial. See `techBuilder-Roadmap.md` "Model strategy".
-- **Keep `PROJECT_AI_CONTEXT.md` §0 build status + the auto-memory current** after each work session.
+- **Model strategy** (token optimization): Opus for contracts/auth/RLS/wage/dashboards/recon/sync + reviews; Sonnet for mechanical CRUD (fan out as parallel subagents writing disjoint module folders, then wire `app.module.ts` + typecheck centrally); Haiku for trivial. See `docs/techBuilder-Roadmap.md` "Model strategy".
+- **Keep `docs/PROJECT_AI_CONTEXT.md` §0 build status + the auto-memory current** after each work session.
 
 ## 9. .claude/ contents
 - `rules/` — `conventions.md`, `backend-modules.md`, `contracts-frozen.md`, `build-strategy.md`

@@ -8,8 +8,8 @@ description: Re-orient on the techBuilder project at the start of a session — 
 Goal: get fully oriented and tell the user exactly where the build is and what's next — without guessing.
 
 ## Steps
-1. Read **`CLAUDE.md`** (this repo root) and **`PROJECT_AI_CONTEXT.md` §0** (current direction + locked-decisions table + 🏗️ Build status). §§1–12 of PROJECT_AI_CONTEXT are superseded research — skim only if needed.
-2. Read **`techBuilder-Build-Readiness-Spec.md`** (authoritative build contract) and **`techBuilder-Roadmap.md`** (8 steps + model strategy).
+1. Read **`CLAUDE.md`** (this repo root) and **`docs/PROJECT_AI_CONTEXT.md` §0** (current direction + locked-decisions table + 🏗️ Build status). §§1–12 of PROJECT_AI_CONTEXT are superseded research — skim only if needed.
+2. Read **`docs/techBuilder-Build-Readiness-Spec.md`** (authoritative build contract) and **`docs/techBuilder-Roadmap.md`** (8 steps + model strategy).
 3. Verify current state with cheap checks (do NOT rebuild):
    - `(cd shared && npm run typecheck)` — contracts still green?
    - `(cd backend && npm run typecheck)` — backend still green?
@@ -20,4 +20,4 @@ Goal: get fully oriented and tell the user exactly where the build is and what's
 ## Guardrails
 - Do not edit `shared/src/**` without following `.claude/rules/contracts-frozen.md`.
 - For any new backend module, follow `.claude/rules/backend-modules.md` (the `sites/` pattern).
-- Keep the build status in `PROJECT_AI_CONTEXT.md` §0 + the auto-memory current after working.
+- Keep the build status in `docs/PROJECT_AI_CONTEXT.md` §0 + the auto-memory current after working.
