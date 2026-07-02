@@ -100,6 +100,8 @@ Every table: `id uuid` (UUIDv7), `org_id uuid` (FK + RLS), `created_at/updated_a
 - **Material reconciliation:** running balance = opening + IN − CONSUME − DISPATCH + RECEIVE; warn on negative; two-sided transfer with mismatch flag.
 - **Kiosk mode:** device-bound org session (org-PIN + select-person), **attendance-only scope**, no settings/export.
 - **Same-day correction:** creator may edit own record until business-day +1; edits audited. Attendance correction overwrites + audits.
+- **Backdated-correction policy (attendance — WP-4, research-3):** **Team Head** may correct **own-crew** attendance up to **48 h (2 business days)** back · **Site Manager** may correct **own-site** attendance up to **7 days** back · **older than 7 days: Owner only** (audited override) · future business dates are rejected. All corrections are audited (`marked_by`, `updated_by`, `version` bump) and **flagged in Excel exports** (corrected = `version > 1`).
+- **Entry business date:** an entry made after the org EOD cutoff (default 20:00 Asia/Kolkata) belongs to the **next** business date.
 - **Headcount:** derived from attendance; manual override flagged.
 
 ## 6. OrgConfig (zod-validated at boot + backend org-load; config is data, not code)

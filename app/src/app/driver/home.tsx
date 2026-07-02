@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ScrollView, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import type { Vehicle, VehicleType } from '@techbuilder/contracts';
 import { useSession } from '../../stores/session';
@@ -29,7 +29,7 @@ export default function DriverHome() {
     });
   }, [clients]);
 
-  useEffect(load, [load]);
+  useFocusEffect(load);
 
   return (
     <Screen>

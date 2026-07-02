@@ -49,7 +49,7 @@ Sentry monitoring (frontend + backend); automated backups; finalized EAS build/r
 
 ## "Production-ready complete" — the final gate (all true)
 - ✅ `build` + `lint` + `test` green (frontend + backend); RLS cross-tenant tests pass.
-- ✅ Works **100% offline**; syncs reliably (UUIDv7, idempotent, LWW, no data loss) on a low-end Android phone.
+- ✅ **Honest offline posture (WP-6, research-3):** the three loss-critical writes (**attendance, expense, fuel**) queue offline and sync idempotently (UUIDv7, LWW, backoff, poison-event cap); all other writes require connectivity with a graceful offline notice; reads refresh on screen focus. Verified on a low-end Android phone. *Server change-feed (`/sync/pull`) is a Phase-2 addition — Phase 1 has no push sync.*
 - ✅ Every locked feature works E2E for all 5 roles; wage/cost summary + reconciliation + completeness + export all correct.
 - ✅ One real construction company **onboarded, live, and trusting the data** — daily use, monitored (Sentry), backed up.
 - ✅ Engine/app boundary clean → **next merchant = config + assets + EAS build**, no code fork.

@@ -1,11 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { desc, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, isNull, sql, type SQL } from 'drizzle-orm';
 import * as schema from '@techbuilder/contracts/db/schema';
 import type { CreateVehicleInput, Vehicle } from '@techbuilder/contracts';
 import type { VehicleDoc } from '@techbuilder/contracts';
 import { DbService } from '../db/db.service';
 import { ApiException } from '../common/api-exception';
 import type { Principal } from '../common/current-user.decorator';
+import { forbidScope, inSet, loadScope } from '../common/scope.util';
 
 @Injectable()
 export class VehiclesService {
@@ -13,6 +14,13 @@ export class VehiclesService {
 
   async create(u: Principal, input: CreateVehicleInput): Promise<Vehicle> {
     return this.dbs.runInTenant(u.orgId, async (tx) => {
+      const ctx = await loadScope(tx, u);
+      // WP-1: an SM may only add vehicles to their own site (Owner: anywhere).
+      if (ctx.role === 'SITE_MANAGER') {
+        if (!input.assignedSiteId || !ctx.siteIds.includes(input.assignedSiteId)) {
+          forbidScope('Site managers may only add vehicles assigned to their own site');
+        }
+      }
       const [row] = await tx
         .insert(schema.vehicles)
         .values({
@@ -45,10 +53,17 @@ export class VehiclesService {
 
   async list(u: Principal): Promise<Vehicle[]> {
     return this.dbs.runInTenant(u.orgId, async (tx) => {
+      const ctx = await loadScope(tx, u);
+      // WP-1: Owner sees all; SM their site's fleet; Driver their assigned vehicle(s);
+      // TH/Worker have no vehicle scope → empty list.
+      let scope: SQL | undefined;
+      if (ctx.role === 'SITE_MANAGER') scope = inSet(schema.vehicles.assignedSiteId, ctx.siteIds);
+      else if (ctx.role === 'DRIVER') scope = inSet(schema.vehicles.id, ctx.vehicleIds);
+      else if (ctx.role !== 'OWNER') scope = sql`false`;
       const rows = await tx
         .select()
         .from(schema.vehicles)
-        .where(isNull(schema.vehicles.deletedAt))
+        .where(and(isNull(schema.vehicles.deletedAt), scope))
         .orderBy(desc(schema.vehicles.createdAt));
       return rows.map(mapVehicle);
     });

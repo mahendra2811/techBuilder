@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { uuidv7 } from 'uuidv7';
 import { useTranslation } from 'react-i18next';
 import type { ExpenseCategory } from '@techbuilder/contracts';
@@ -38,7 +38,7 @@ export default function ExpenseScreen() {
     });
   }, [clients]);
 
-  useEffect(load, [load]);
+  useFocusEffect(load);
 
   async function save(): Promise<void> {
     if (!amount || !site) return;

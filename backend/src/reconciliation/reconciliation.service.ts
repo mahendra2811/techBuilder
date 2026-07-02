@@ -10,6 +10,7 @@ import {
 } from '@techbuilder/contracts';
 import { DbService } from '../db/db.service';
 import type { Principal } from '../common/current-user.decorator';
+import { forbidScope, inSet, loadScope } from '../common/scope.util';
 
 const FUEL_VARIANCE_FLAG = 0.15; // 15%
 
@@ -19,14 +20,31 @@ export class ReconciliationService {
 
   async getReconciliation(p: Principal, window: DateWindow): Promise<Reconciliation> {
     return this.dbs.runInTenant(p.orgId, async (tx) => {
+      // WP-1: reconciliation is an org/site oversight surface — Owner org-wide, SM their
+      // site(s); crew/vehicle/self-scoped roles are denied.
+      const ctx = await loadScope(tx, p);
+      if (ctx.role !== 'OWNER' && ctx.role !== 'SITE_MANAGER') {
+        forbidScope(`Role ${ctx.role} has no reconciliation view`);
+      }
+      const siteIds = ctx.role === 'OWNER' ? undefined : ctx.siteIds;
+
       const inWindow = (col: AnyColumn) => and(gte(col, window.from), lte(col, window.to));
 
       // ---- material reconciliation: opening + IN − CONSUME − DISPATCH + RECEIVE ----
-      const balances = await tx.select().from(schema.materialBalances);
+      const balances = await tx
+        .select()
+        .from(schema.materialBalances)
+        .where(siteIds ? inSet(schema.materialBalances.siteId, siteIds) : undefined);
       const txns = await tx
         .select()
         .from(schema.materialTxns)
-        .where(and(isNull(schema.materialTxns.deletedAt), inWindow(schema.materialTxns.businessDate)));
+        .where(
+          and(
+            isNull(schema.materialTxns.deletedAt),
+            inWindow(schema.materialTxns.businessDate),
+            siteIds ? inSet(schema.materialTxns.siteId, siteIds) : undefined,
+          ),
+        );
 
       const key = (siteId: string, materialId: string) => `${siteId}::${materialId}`;
       const mat = new Map<string, MaterialReconRow>();
@@ -63,17 +81,35 @@ export class ReconciliationService {
         const n = fuelNorms[vt.name] ?? fuelNorms[vt.name.toLowerCase()];
         if (typeof n === 'number') normOf.set(vt.id, n);
       }
-      const vehicles = await tx.select().from(schema.vehicles).where(isNull(schema.vehicles.deletedAt));
+      const vehicles = await tx
+        .select()
+        .from(schema.vehicles)
+        .where(
+          and(isNull(schema.vehicles.deletedAt), siteIds ? inSet(schema.vehicles.assignedSiteId, siteIds) : undefined),
+        );
       const typeOfVehicle = new Map(vehicles.map((v) => [v.id, v.vehicleTypeId]));
+      const scopedVehicleIds = vehicles.map((v) => v.id);
 
       const fuelRows = await tx
         .select()
         .from(schema.fuelLogs)
-        .where(and(isNull(schema.fuelLogs.deletedAt), inWindow(schema.fuelLogs.businessDate)));
+        .where(
+          and(
+            isNull(schema.fuelLogs.deletedAt),
+            inWindow(schema.fuelLogs.businessDate),
+            siteIds ? inSet(schema.fuelLogs.vehicleId, scopedVehicleIds) : undefined,
+          ),
+        );
       const logRows = await tx
         .select()
         .from(schema.vehicleLogs)
-        .where(and(isNull(schema.vehicleLogs.deletedAt), inWindow(schema.vehicleLogs.businessDate)));
+        .where(
+          and(
+            isNull(schema.vehicleLogs.deletedAt),
+            inWindow(schema.vehicleLogs.businessDate),
+            siteIds ? inSet(schema.vehicleLogs.vehicleId, scopedVehicleIds) : undefined,
+          ),
+        );
 
       const actual = new Map<string, number>();
       for (const f of fuelRows) actual.set(f.vehicleId, (actual.get(f.vehicleId) ?? 0) + f.litres);

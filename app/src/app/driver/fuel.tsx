@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ScrollView, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { uuidv7 } from 'uuidv7';
 import { useTranslation } from 'react-i18next';
 import type { Vehicle } from '@techbuilder/contracts';
@@ -26,7 +26,7 @@ export default function FuelScreen() {
     void clients.records.listVehicles().then((res) => setVehicle(res.items[0] ?? null));
   }, [clients]);
 
-  useEffect(load, [load]);
+  useFocusEffect(load);
 
   // Auto-computed cost per litre (display only)
   const costPerLitre: string | null =

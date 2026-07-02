@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ScrollView } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { uuidv7 } from 'uuidv7';
 import { useTranslation } from 'react-i18next';
 import type { Vehicle, Person } from '@techbuilder/contracts';
@@ -28,7 +28,7 @@ export default function EndDayScreen() {
     void clients.records.listPeople().then((res) => setDriverPerson(res.items[0] ?? null));
   }, [clients]);
 
-  useEffect(load, [load]);
+  useFocusEffect(load);
 
   async function save(): Promise<void> {
     setError('');

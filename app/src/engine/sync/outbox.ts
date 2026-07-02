@@ -47,6 +47,30 @@ export class InMemoryOutboxStore implements OutboxStore {
   }
 }
 
+/**
+ * Store facade whose backing implementation can be swapped at boot — the session creates the
+ * Outbox synchronously (in-memory), then the RN shell upgrades to the persistent
+ * expo-sqlite store once native modules are available.
+ */
+export class DelegatingOutboxStore implements OutboxStore {
+  constructor(private target: OutboxStore = new InMemoryOutboxStore()) {}
+  swap(target: OutboxStore): void {
+    this.target = target;
+  }
+  add(rec: OutboxRecord): Promise<void> {
+    return this.target.add(rec);
+  }
+  duePending(now: number): Promise<OutboxRecord[]> {
+    return this.target.duePending(now);
+  }
+  update(outboxId: string, patch: Partial<OutboxRecord>): Promise<void> {
+    return this.target.update(outboxId, patch);
+  }
+  counts(): Promise<{ pending: number; failed: number; synced: number }> {
+    return this.target.counts();
+  }
+}
+
 const MAX_ATTEMPTS = 8;
 const backoffMs = (attempts: number): number => Math.min(5_000 * 2 ** attempts, 5 * 60_000);
 

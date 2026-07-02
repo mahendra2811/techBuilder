@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { and, desc, eq, gte, isNull, lte, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, isNull, lte, or, sql, type SQL } from 'drizzle-orm';
+import type { PgTable } from 'drizzle-orm/pg-core';
 import * as schema from '@techbuilder/contracts/db/schema';
+import { can, type Action } from '@techbuilder/contracts';
 import type {
   CreateProgressNoteInput,
   CreateExpenseInput,
@@ -17,9 +19,74 @@ import type {
   MaterialTxn,
   Issue,
 } from '@techbuilder/contracts';
-import { DbService } from '../db/db.service';
+import { DbService, type Tx } from '../db/db.service';
 import { ApiException } from '../common/api-exception';
 import type { Principal } from '../common/current-user.decorator';
+import {
+  assertSiteInScope,
+  assertVehicleInScope,
+  forbidScope,
+  inSet,
+  loadScope,
+  vehicleReadFilter,
+  type ScopeContext,
+} from '../common/scope.util';
+import { businessDateNow, daysBetween } from '../common/business-date';
+import { loadEodCutoff } from '../common/org-config.util';
+
+type RecordEntityType = 'progress' | 'expense' | 'fuel' | 'vehicle-log' | 'trip' | 'material-txn' | 'issue';
+
+const TABLES: Record<RecordEntityType, PgTable> = {
+  progress: schema.progressNotes,
+  expense: schema.expenses,
+  fuel: schema.fuelLogs,
+  'vehicle-log': schema.vehicleLogs,
+  trip: schema.trips,
+  'material-txn': schema.materialTxns,
+  issue: schema.issues,
+};
+
+/** Which RBAC action governs each record family (drivers hold vehicleLog.enter, not record.enter). */
+const ACTION_FOR: Record<RecordEntityType, Action> = {
+  progress: 'record.enter',
+  expense: 'record.enter',
+  'material-txn': 'record.enter',
+  issue: 'record.enter',
+  fuel: 'vehicleLog.enter',
+  'vehicle-log': 'vehicleLog.enter',
+  trip: 'vehicleLog.enter',
+};
+
+function entityTypeOf(raw: string): RecordEntityType {
+  if (raw in TABLES) return raw as RecordEntityType;
+  throw new ApiException('NOT_FOUND', `Unknown entity type: ${raw}`);
+}
+
+/** Fields a PATCH may never rewrite (attribution, identity, window-evasion). */
+const IMMUTABLE_PATCH_FIELDS = new Set([
+  'id',
+  'orgId',
+  'org_id',
+  'createdBy',
+  'created_by',
+  'createdAt',
+  'created_at',
+  'enteredBy',
+  'entered_by',
+  'markedBy',
+  'marked_by',
+  'version',
+  'deletedAt',
+  'deleted_at',
+  'businessDate', // date moves would reopen/evade the edit window — void + re-create instead
+  'business_date',
+]);
+
+function sanitizePatch(patch: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(patch)) if (!IMMUTABLE_PATCH_FIELDS.has(k)) out[k] = v;
+  return out;
+}
 
 @Injectable()
 export class RecordsService {
@@ -28,6 +95,8 @@ export class RecordsService {
   // ---- createProgressNote ----
   async createProgressNote(p: Principal, input: CreateProgressNoteInput): Promise<ProgressNote> {
     return this.dbs.runInTenant(p.orgId, async (tx) => {
+      const ctx = await loadScope(tx, p);
+      assertSiteInScope(ctx, 'record.enter', input.siteId);
       const [row] = await tx
         .insert(schema.progressNotes)
         .values({
@@ -58,6 +127,8 @@ export class RecordsService {
   // ---- createExpense ----
   async createExpense(p: Principal, input: CreateExpenseInput): Promise<Expense> {
     return this.dbs.runInTenant(p.orgId, async (tx) => {
+      const ctx = await loadScope(tx, p);
+      assertSiteInScope(ctx, 'record.enter', input.siteId);
       const [row] = await tx
         .insert(schema.expenses)
         .values({
@@ -92,6 +163,8 @@ export class RecordsService {
   // ---- createFuelLog ----
   async createFuelLog(p: Principal, input: CreateFuelLogInput): Promise<FuelLog> {
     return this.dbs.runInTenant(p.orgId, async (tx) => {
+      const ctx = await loadScope(tx, p);
+      await assertVehicleInScope(tx, ctx, 'vehicleLog.enter', input.vehicleId);
       const [row] = await tx
         .insert(schema.fuelLogs)
         .values({
@@ -123,6 +196,12 @@ export class RecordsService {
   // ---- createVehicleLog ----
   async createVehicleLog(p: Principal, input: CreateVehicleLogInput): Promise<VehicleLog> {
     return this.dbs.runInTenant(p.orgId, async (tx) => {
+      const ctx = await loadScope(tx, p);
+      await assertVehicleInScope(tx, ctx, 'vehicleLog.enter', input.vehicleId);
+      // A driver logs for themselves — the attributed driver must be their own person.
+      if (ctx.role === 'DRIVER' && input.driverPersonId !== ctx.personId) {
+        forbidScope('Drivers may only log for their own person');
+      }
       if (input.endReading != null && input.endReading < input.startReading) {
         throw new ApiException('VALIDATION_FAILED', 'end reading must be >= start', {
           endReading: 'end reading must be >= start reading',
@@ -163,6 +242,8 @@ export class RecordsService {
   // ---- createTrip ----
   async createTrip(p: Principal, input: CreateTripInput): Promise<Trip> {
     return this.dbs.runInTenant(p.orgId, async (tx) => {
+      const ctx = await loadScope(tx, p);
+      await assertVehicleInScope(tx, ctx, 'vehicleLog.enter', input.vehicleId);
       const [row] = await tx
         .insert(schema.trips)
         .values({
@@ -194,6 +275,8 @@ export class RecordsService {
   // ---- createMaterialTxn ----
   async createMaterialTxn(p: Principal, input: CreateMaterialTxnInput): Promise<MaterialTxn> {
     return this.dbs.runInTenant(p.orgId, async (tx) => {
+      const ctx = await loadScope(tx, p);
+      assertSiteInScope(ctx, 'record.enter', input.siteId);
       const [row] = await tx
         .insert(schema.materialTxns)
         .values({
@@ -228,6 +311,9 @@ export class RecordsService {
   // ---- createIssue ----
   async createIssue(p: Principal, input: CreateIssueInput): Promise<Issue> {
     return this.dbs.runInTenant(p.orgId, async (tx) => {
+      const ctx = await loadScope(tx, p);
+      if (input.siteId) assertSiteInScope(ctx, 'record.enter', input.siteId);
+      else if (input.vehicleId) await assertVehicleInScope(tx, ctx, 'record.enter', input.vehicleId);
       const [row] = await tx
         .insert(schema.issues)
         .values({
@@ -257,156 +343,75 @@ export class RecordsService {
     });
   }
 
+  /**
+   * WP-3 guard (shared by update + void): action per entity family; only the CREATOR may
+   * edit/void, and only until end of business-day +1 (org EOD cutoff). Owner override is
+   * allowed any time (audited via updatedBy/version).
+   */
+  private async assertEditAllowed(tx: Tx, ctx: ScopeContext, et: RecordEntityType, id: string): Promise<void> {
+    const table = TABLES[et];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const t = table as any;
+    const [row] = (await tx
+      .select({ createdBy: t.createdBy, businessDate: t.businessDate, deletedAt: t.deletedAt })
+      .from(table)
+      .where(eq(t.id, id))) as Array<{ createdBy: string | null; businessDate: string; deletedAt: Date | null }>;
+    if (!row || row.deletedAt) throw new ApiException('NOT_FOUND', `${et} record not found`);
+    if (ctx.role === 'OWNER') return; // audited override
+
+    const action = ACTION_FOR[et];
+    if (!can(ctx.role, action)) forbidScope(`Role ${ctx.role} cannot ${action}`);
+    if (row.createdBy !== ctx.userId) {
+      forbidScope('Only the creator may edit/void this record (Owner override required)');
+    }
+    const today = businessDateNow(new Date(), await loadEodCutoff(tx));
+    if (daysBetween(row.businessDate, today) > 1) {
+      forbidScope('Edit window closed (creator may edit until business-day +1; Owner override required)');
+    }
+  }
+
   // ---- updateRecord ----
   async updateRecord(p: Principal, entityType: string, id: string, patch: Record<string, unknown>): Promise<void> {
+    const et = entityTypeOf(entityType);
     return this.dbs.runInTenant(p.orgId, async (tx) => {
-      switch (entityType) {
-        case 'progress': {
-          await tx
-            .update(schema.progressNotes)
-            .set({
-              ...(patch as Partial<typeof schema.progressNotes.$inferInsert>),
-              updatedBy: p.userId,
-              updatedAt: new Date(),
-              version: sql`${schema.progressNotes.version} + 1`,
-            })
-            .where(and(eq(schema.progressNotes.id, id), isNull(schema.progressNotes.deletedAt)));
-          break;
-        }
-        case 'expense': {
-          await tx
-            .update(schema.expenses)
-            .set({
-              ...(patch as Partial<typeof schema.expenses.$inferInsert>),
-              updatedBy: p.userId,
-              updatedAt: new Date(),
-              version: sql`${schema.expenses.version} + 1`,
-            })
-            .where(and(eq(schema.expenses.id, id), isNull(schema.expenses.deletedAt)));
-          break;
-        }
-        case 'fuel': {
-          await tx
-            .update(schema.fuelLogs)
-            .set({
-              ...(patch as Partial<typeof schema.fuelLogs.$inferInsert>),
-              updatedBy: p.userId,
-              updatedAt: new Date(),
-              version: sql`${schema.fuelLogs.version} + 1`,
-            })
-            .where(and(eq(schema.fuelLogs.id, id), isNull(schema.fuelLogs.deletedAt)));
-          break;
-        }
-        case 'vehicle-log': {
-          await tx
-            .update(schema.vehicleLogs)
-            .set({
-              ...(patch as Partial<typeof schema.vehicleLogs.$inferInsert>),
-              updatedBy: p.userId,
-              updatedAt: new Date(),
-              version: sql`${schema.vehicleLogs.version} + 1`,
-            })
-            .where(and(eq(schema.vehicleLogs.id, id), isNull(schema.vehicleLogs.deletedAt)));
-          break;
-        }
-        case 'trip': {
-          await tx
-            .update(schema.trips)
-            .set({
-              ...(patch as Partial<typeof schema.trips.$inferInsert>),
-              updatedBy: p.userId,
-              updatedAt: new Date(),
-              version: sql`${schema.trips.version} + 1`,
-            })
-            .where(and(eq(schema.trips.id, id), isNull(schema.trips.deletedAt)));
-          break;
-        }
-        case 'material-txn': {
-          await tx
-            .update(schema.materialTxns)
-            .set({
-              ...(patch as Partial<typeof schema.materialTxns.$inferInsert>),
-              updatedBy: p.userId,
-              updatedAt: new Date(),
-              version: sql`${schema.materialTxns.version} + 1`,
-            })
-            .where(and(eq(schema.materialTxns.id, id), isNull(schema.materialTxns.deletedAt)));
-          break;
-        }
-        case 'issue': {
-          await tx
-            .update(schema.issues)
-            .set({
-              ...(patch as Partial<typeof schema.issues.$inferInsert>),
-              updatedBy: p.userId,
-              updatedAt: new Date(),
-              version: sql`${schema.issues.version} + 1`,
-            })
-            .where(and(eq(schema.issues.id, id), isNull(schema.issues.deletedAt)));
-          break;
-        }
-        default:
-          throw new ApiException('NOT_FOUND', `Unknown entity type: ${entityType}`);
-      }
+      const ctx = await loadScope(tx, p);
+      await this.assertEditAllowed(tx, ctx, et, id);
+      const safePatch = sanitizePatch(patch);
+      const table = TABLES[et];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const t = table as any;
+      await tx
+        .update(table)
+        .set({
+          ...safePatch,
+          updatedBy: p.userId,
+          updatedAt: new Date(),
+          version: sql`${t.version} + 1`,
+        } as never)
+        .where(and(eq(t.id, id), isNull(t.deletedAt)));
     });
   }
 
   // ---- voidRecord ----
   async voidRecord(p: Principal, entityType: string, id: string): Promise<void> {
+    const et = entityTypeOf(entityType);
     return this.dbs.runInTenant(p.orgId, async (tx) => {
-      switch (entityType) {
-        case 'progress': {
-          await tx
-            .update(schema.progressNotes)
-            .set({ deletedAt: new Date(), updatedBy: p.userId, updatedAt: new Date(), version: sql`${schema.progressNotes.version} + 1` })
-            .where(eq(schema.progressNotes.id, id));
-          break;
-        }
-        case 'expense': {
-          await tx
-            .update(schema.expenses)
-            .set({ deletedAt: new Date(), void: true, updatedBy: p.userId, updatedAt: new Date(), version: sql`${schema.expenses.version} + 1` })
-            .where(eq(schema.expenses.id, id));
-          break;
-        }
-        case 'fuel': {
-          await tx
-            .update(schema.fuelLogs)
-            .set({ deletedAt: new Date(), updatedBy: p.userId, updatedAt: new Date(), version: sql`${schema.fuelLogs.version} + 1` })
-            .where(eq(schema.fuelLogs.id, id));
-          break;
-        }
-        case 'vehicle-log': {
-          await tx
-            .update(schema.vehicleLogs)
-            .set({ deletedAt: new Date(), updatedBy: p.userId, updatedAt: new Date(), version: sql`${schema.vehicleLogs.version} + 1` })
-            .where(eq(schema.vehicleLogs.id, id));
-          break;
-        }
-        case 'trip': {
-          await tx
-            .update(schema.trips)
-            .set({ deletedAt: new Date(), updatedBy: p.userId, updatedAt: new Date(), version: sql`${schema.trips.version} + 1` })
-            .where(eq(schema.trips.id, id));
-          break;
-        }
-        case 'material-txn': {
-          await tx
-            .update(schema.materialTxns)
-            .set({ deletedAt: new Date(), updatedBy: p.userId, updatedAt: new Date(), version: sql`${schema.materialTxns.version} + 1` })
-            .where(eq(schema.materialTxns.id, id));
-          break;
-        }
-        case 'issue': {
-          await tx
-            .update(schema.issues)
-            .set({ deletedAt: new Date(), updatedBy: p.userId, updatedAt: new Date(), version: sql`${schema.issues.version} + 1` })
-            .where(eq(schema.issues.id, id));
-          break;
-        }
-        default:
-          throw new ApiException('NOT_FOUND', `Unknown entity type: ${entityType}`);
-      }
+      const ctx = await loadScope(tx, p);
+      await this.assertEditAllowed(tx, ctx, et, id);
+      const table = TABLES[et];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const t = table as any;
+      const set: Record<string, unknown> = {
+        deletedAt: new Date(),
+        updatedBy: p.userId,
+        updatedAt: new Date(),
+        version: sql`${t.version} + 1`,
+      };
+      if (et === 'expense') set['void'] = true; // financial entries carry an explicit void flag
+      await tx
+        .update(table)
+        .set(set as never)
+        .where(eq(t.id, id));
     });
   }
 
@@ -418,8 +423,25 @@ export class RecordsService {
     from: string,
     to: string,
   ): Promise<unknown[]> {
+    const et = entityTypeOf(entityType);
     return this.dbs.runInTenant(p.orgId, async (tx) => {
-      switch (entityType) {
+      const ctx = await loadScope(tx, p);
+
+      /** Role-scope filter for site-stamped records; `financial` narrows TH to own entries. */
+      const siteScope = (siteCol: import('drizzle-orm').AnyColumn, enteredByCol: import('drizzle-orm').AnyColumn, financial: boolean): SQL | undefined => {
+        switch (ctx.role) {
+          case 'OWNER':
+            return undefined;
+          case 'SITE_MANAGER':
+            return inSet(siteCol, ctx.siteIds);
+          case 'TEAM_HEAD':
+            return financial ? (eq(enteredByCol, ctx.userId) as SQL) : inSet(siteCol, ctx.siteIds);
+          default:
+            return eq(enteredByCol, ctx.userId) as SQL; // DRIVER / WORKER → own entries only
+        }
+      };
+
+      switch (et) {
         case 'progress': {
           const rows = await tx
             .select()
@@ -428,6 +450,7 @@ export class RecordsService {
               and(
                 isNull(schema.progressNotes.deletedAt),
                 siteId ? eq(schema.progressNotes.siteId, siteId) : undefined,
+                siteScope(schema.progressNotes.siteId, schema.progressNotes.enteredBy, false),
                 gte(schema.progressNotes.businessDate, from),
                 lte(schema.progressNotes.businessDate, to),
               ),
@@ -443,6 +466,7 @@ export class RecordsService {
               and(
                 isNull(schema.expenses.deletedAt),
                 siteId ? eq(schema.expenses.siteId, siteId) : undefined,
+                siteScope(schema.expenses.siteId, schema.expenses.enteredBy, true),
                 gte(schema.expenses.businessDate, from),
                 lte(schema.expenses.businessDate, to),
               ),
@@ -457,6 +481,7 @@ export class RecordsService {
             .where(
               and(
                 isNull(schema.fuelLogs.deletedAt),
+                vehicleReadFilter(tx, ctx, 'view.all', schema.fuelLogs.vehicleId),
                 gte(schema.fuelLogs.businessDate, from),
                 lte(schema.fuelLogs.businessDate, to),
               ),
@@ -471,6 +496,7 @@ export class RecordsService {
             .where(
               and(
                 isNull(schema.vehicleLogs.deletedAt),
+                vehicleReadFilter(tx, ctx, 'view.all', schema.vehicleLogs.vehicleId),
                 gte(schema.vehicleLogs.businessDate, from),
                 lte(schema.vehicleLogs.businessDate, to),
               ),
@@ -485,6 +511,7 @@ export class RecordsService {
             .where(
               and(
                 isNull(schema.trips.deletedAt),
+                vehicleReadFilter(tx, ctx, 'view.all', schema.trips.vehicleId),
                 gte(schema.trips.businessDate, from),
                 lte(schema.trips.businessDate, to),
               ),
@@ -500,6 +527,7 @@ export class RecordsService {
               and(
                 isNull(schema.materialTxns.deletedAt),
                 siteId ? eq(schema.materialTxns.siteId, siteId) : undefined,
+                siteScope(schema.materialTxns.siteId, schema.materialTxns.createdBy, false),
                 gte(schema.materialTxns.businessDate, from),
                 lte(schema.materialTxns.businessDate, to),
               ),
@@ -508,6 +536,11 @@ export class RecordsService {
           return rows.map(mapMaterialTxn);
         }
         case 'issue': {
+          // Issues may be site-stamped OR vehicle-stamped — in-scope site OR own entries.
+          const issueScope: SQL | undefined =
+            ctx.role === 'OWNER'
+              ? undefined
+              : or(inSet(schema.issues.siteId, ctx.siteIds), eq(schema.issues.createdBy, ctx.userId));
           const rows = await tx
             .select()
             .from(schema.issues)
@@ -515,6 +548,7 @@ export class RecordsService {
               and(
                 isNull(schema.issues.deletedAt),
                 siteId ? eq(schema.issues.siteId, siteId) : undefined,
+                issueScope,
                 gte(schema.issues.businessDate, from),
                 lte(schema.issues.businessDate, to),
               ),
@@ -522,8 +556,6 @@ export class RecordsService {
             .orderBy(desc(schema.issues.createdAt));
           return rows.map(mapIssue);
         }
-        default:
-          throw new ApiException('NOT_FOUND', `Unknown entity type: ${entityType}`);
       }
     });
   }

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { Completeness, OwnerDashboard } from '@techbuilder/contracts';
@@ -27,7 +28,7 @@ export default function SiteManagerDashboard() {
     void clients.records.getCompleteness(lastNDays(1)).then(setCompleteness);
   }, [clients]);
 
-  useEffect(load, [load]);
+  useFocusEffect(load);
 
   if (!dashboard) {
     return (

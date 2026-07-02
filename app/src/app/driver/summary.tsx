@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { Vehicle, VehicleLog, FuelLog } from '@techbuilder/contracts';
@@ -56,7 +57,7 @@ export default function SummaryScreen() {
     });
   }, [clients]);
 
-  useEffect(load, [load]);
+  useFocusEffect(load);
 
   const today = new Date().toISOString().slice(0, 10);
 

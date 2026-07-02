@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { Pressable, ScrollView, View } from 'react-native';
 import { uuidv7 } from 'uuidv7';
 import { useTranslation } from 'react-i18next';
@@ -25,7 +26,7 @@ export default function RequestsScreen() {
     void clients.records.listRequests('PENDING').then(setPending);
   }, [clients]);
 
-  useEffect(loadPending, [loadPending]);
+  useFocusEffect(loadPending);
 
   async function submit(): Promise<void> {
     if (!note.trim()) return;

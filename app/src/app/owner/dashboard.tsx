@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ScrollView, View } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import type { OwnerDashboard } from '@techbuilder/contracts';
 import { useSession } from '../../stores/session';
@@ -13,9 +14,10 @@ export default function OwnerDashboardScreen() {
   const clients = useSession((s) => s.clients);
   const [data, setData] = useState<OwnerDashboard | null>(null);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     void clients.records.getOwnerDashboard(lastNDays(7)).then(setData);
   }, [clients]);
+  useFocusEffect(load);
 
   if (!data) {
     return (

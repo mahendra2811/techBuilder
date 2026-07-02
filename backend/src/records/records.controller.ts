@@ -159,7 +159,9 @@ export class RecordsController {
     return this.records.createIssue(u, body);
   }
 
-  @RequireAction('record.enter')
+  // No @RequireAction here: the action depends on the entity family (fuel/vehicle-log/trip →
+  // vehicleLog.enter, else record.enter). The service enforces action + creator + edit-window
+  // (WP-3) — a fixed decorator would wrongly deny drivers editing their own fuel logs.
   @Patch(':entityType/:id')
   updateRecord(
     @CurrentUser() u: Principal,
@@ -170,7 +172,7 @@ export class RecordsController {
     return this.records.updateRecord(u, entityType, id, body);
   }
 
-  @RequireAction('record.enter')
+  // No @RequireAction — same reason as updateRecord; WP-3 guard in the service is authoritative.
   @Post(':entityType/:id/void')
   voidRecord(
     @CurrentUser() u: Principal,

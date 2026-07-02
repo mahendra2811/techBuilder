@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { Pressable, ScrollView, View } from 'react-native';
 import { uuidv7 } from 'uuidv7';
 import { useTranslation } from 'react-i18next';
@@ -42,7 +43,7 @@ export default function CrewAttendanceScreen() {
     });
   }, [clients]);
 
-  useEffect(load, [load]);
+  useFocusEffect(load);
 
   function setStatus(personId: string, status: AttendanceStatus): void {
     setRows((prev) => prev.map((r) => (r.personId === personId ? { ...r, status } : r)));

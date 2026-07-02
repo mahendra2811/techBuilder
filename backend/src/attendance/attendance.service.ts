@@ -1,10 +1,20 @@
 import { Injectable } from '@nestjs/common';
-import { and, eq, gte, lte } from 'drizzle-orm';
+import { and, eq, gte, isNull, lte, sql } from 'drizzle-orm';
 import * as schema from '@techbuilder/contracts/db/schema';
 import type { Attendance, MarkAttendanceInput } from '@techbuilder/contracts';
 import { DbService } from '../db/db.service';
 import { ApiException } from '../common/api-exception';
 import type { Principal } from '../common/current-user.decorator';
+import { assertPersonInScope, assertSiteInScope, forbidScope, loadScope, personReadFilter } from '../common/scope.util';
+import { businessDateNow, daysBetween } from '../common/business-date';
+import { loadEodCutoff } from '../common/org-config.util';
+
+/** WP-4 backdating policy: how many days back each role may (re)mark attendance. */
+const BACKDATE_LIMIT_DAYS: Partial<Record<string, number>> = {
+  TEAM_HEAD: 2, // ≤48h
+  SITE_MANAGER: 7,
+  // OWNER: unlimited (audited override)
+};
 
 @Injectable()
 export class AttendanceService {
@@ -12,6 +22,29 @@ export class AttendanceService {
 
   async mark(p: Principal, input: MarkAttendanceInput): Promise<Attendance[]> {
     return this.dbs.runInTenant(p.orgId, async (tx) => {
+      const ctx = await loadScope(tx, p);
+
+      // WP-1 scope: the site must be in scope; crew-scoped markers (TH) are additionally
+      // bound to their own crew's persons. SM scope is the site itself (persons at the site
+      // may legitimately be outside any crew), so the site assert suffices for SM.
+      assertSiteInScope(ctx, 'attendance.mark', input.siteId);
+      if (ctx.role === 'TEAM_HEAD') {
+        for (const row of input.rows) assertPersonInScope(ctx, 'attendance.mark', row.personId);
+      }
+
+      // WP-4 backdating window (business date per org EOD cutoff, Asia/Kolkata).
+      const today = businessDateNow(new Date(), await loadEodCutoff(tx));
+      const back = daysBetween(input.businessDate, today); // >0 = past, <0 = future
+      if (back < 0) {
+        throw new ApiException('VALIDATION_FAILED', 'Cannot mark attendance for a future business date', {
+          businessDate: 'future date',
+        });
+      }
+      const limit = BACKDATE_LIMIT_DAYS[ctx.role];
+      if (ctx.role !== 'OWNER' && limit !== undefined && back > limit) {
+        forbidScope(`Backdated correction window exceeded (${ctx.role} may correct up to ${limit} day(s) back; Owner override required)`);
+      }
+
       const results: Attendance[] = [];
       for (const row of input.rows) {
         const [upserted] = await tx
@@ -37,6 +70,7 @@ export class AttendanceService {
               markedBy: p.userId,
               updatedBy: p.userId,
               updatedAt: new Date(),
+              version: sql`${schema.attendance.version} + 1`, // corrections bump version → export "corrected" flag
             },
           })
           .returning();
@@ -49,12 +83,24 @@ export class AttendanceService {
 
   async list(p: Principal, siteId: string, from: string, to: string): Promise<Attendance[]> {
     return this.dbs.runInTenant(p.orgId, async (tx) => {
+      const ctx = await loadScope(tx, p);
+      // Site-scoped roles must stay inside their site; crew/self-scoped roles additionally
+      // only see their crew's / their own person rows (SM sees the whole site).
+      if (ctx.role === 'SITE_MANAGER' || ctx.role === 'TEAM_HEAD') {
+        if (!ctx.siteIds.includes(siteId)) forbidScope('Site out of scope');
+      }
+      const personFilter =
+        ctx.role === 'OWNER' || ctx.role === 'SITE_MANAGER'
+          ? undefined
+          : personReadFilter(ctx, 'view.all', schema.attendance.personId);
       const rows = await tx
         .select()
         .from(schema.attendance)
         .where(
           and(
+            isNull(schema.attendance.deletedAt),
             eq(schema.attendance.siteId, siteId),
+            personFilter,
             gte(schema.attendance.businessDate, from),
             lte(schema.attendance.businessDate, to),
           ),

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { Pressable, ScrollView, View } from 'react-native';
 import { uuidv7 } from 'uuidv7';
 import { useTranslation } from 'react-i18next';
@@ -50,7 +51,7 @@ export default function AttendanceScreen() {
     });
   }, [clients, selectedSiteId]);
 
-  useEffect(load, [load]);
+  useFocusEffect(load);
 
   function setStatus(personId: string, status: AttendanceStatus) {
     setStatuses((prev) => ({ ...prev, [personId]: status }));

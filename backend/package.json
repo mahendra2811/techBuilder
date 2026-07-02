@@ -6,11 +6,15 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "start": "node --env-file=.env dist/main.js",
+    "start:prod": "node dist/main.js",
     "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:rls": "node --import tsx scripts/apply-sql.ts ../shared/src/db/rls.sql sql/auth.sql",
-    "seed": "node --import tsx src/seed.ts"
+    "seed": "node --import tsx src/seed.ts",
+    "seed:merchant": "node --env-file=.env --import tsx scripts/seed-merchant.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.0",
@@ -36,6 +40,7 @@
     "@types/pg": "^8.11.0",
     "drizzle-kit": "^0.31.0",
     "tsx": "^4.19.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.9"
   }
 }

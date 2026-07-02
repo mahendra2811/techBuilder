@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { Pressable, ScrollView, View } from 'react-native';
 import { uuidv7 } from 'uuidv7';
 import { useTranslation } from 'react-i18next';
@@ -30,7 +31,7 @@ export default function MaterialScreen() {
     });
   }, [clients]);
 
-  useEffect(loadSite, [loadSite]);
+  useFocusEffect(loadSite);
 
   async function save(): Promise<void> {
     const parsedQty = parseFloat(qty);

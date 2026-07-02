@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { uuidv7 } from 'uuidv7';
 import { useTranslation } from 'react-i18next';
 import type { IssueSeverity } from '@techbuilder/contracts';
@@ -39,7 +39,7 @@ export default function IssueScreen() {
     void clients.records.listVehicles().then((res) => setVehicle(res.items[0] ?? null));
   }, [clients]);
 
-  useEffect(load, [load]);
+  useFocusEffect(load);
 
   async function save(): Promise<void> {
     if (!description.trim() || !vehicle) return;

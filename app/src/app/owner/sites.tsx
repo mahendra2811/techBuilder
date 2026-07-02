@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { ScrollView, View } from 'react-native';
 import { uuidv7 } from 'uuidv7';
 import { useTranslation } from 'react-i18next';
@@ -21,7 +22,7 @@ export default function SitesScreen() {
   const load = useCallback(() => {
     void clients.records.listSites().then((p) => setSites(p.items));
   }, [clients]);
-  useEffect(load, [load]);
+  useFocusEffect(load);
 
   async function add(): Promise<void> {
     if (!name || !code) return;

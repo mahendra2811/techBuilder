@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { ApprovalRequest } from '@techbuilder/contracts';
@@ -22,7 +23,7 @@ export default function ApprovalsScreen() {
     });
   }, [clients]);
 
-  useEffect(load, [load]);
+  useFocusEffect(load);
 
   async function decide(id: string, approve: boolean): Promise<void> {
     setDeciding(id);

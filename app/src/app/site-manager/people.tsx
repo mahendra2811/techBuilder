@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { ScrollView } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { Person } from '@techbuilder/contracts';
@@ -22,7 +23,7 @@ export default function SiteManagerPeople() {
     });
   }, [clients]);
 
-  useEffect(load, [load]);
+  useFocusEffect(load);
 
   if (loading) {
     return (

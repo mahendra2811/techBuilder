@@ -5,6 +5,7 @@ import type { CreateLeaveInput, Leave } from '@techbuilder/contracts';
 import { DbService } from '../db/db.service';
 import { ApiException } from '../common/api-exception';
 import type { Principal } from '../common/current-user.decorator';
+import { assertPersonInScope, loadScope } from '../common/scope.util';
 
 @Injectable()
 export class LeaveService {
@@ -12,6 +13,10 @@ export class LeaveService {
 
   async create(p: Principal, input: CreateLeaveInput): Promise<Leave> {
     return this.dbs.runInTenant(p.orgId, async (tx) => {
+      const ctx = await loadScope(tx, p);
+      // WP-1: leave is set FOR a person — that person must be inside the setter's scope
+      // (TH: own crew; SM: persons in crews at their sites; Owner: anyone).
+      assertPersonInScope(ctx, 'attendance.mark', input.personId);
       const [row] = await tx
         .insert(schema.leaves)
         .values({

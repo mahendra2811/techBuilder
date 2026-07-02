@@ -5,6 +5,7 @@ import type { CreateSiteInput, Site } from '@techbuilder/contracts';
 import { DbService } from '../db/db.service';
 import { ApiException } from '../common/api-exception';
 import type { Principal } from '../common/current-user.decorator';
+import { forbidScope, inSet, loadScope } from '../common/scope.util';
 
 /** Reference module: the tenant+scope+CRUD pattern every resource module follows. */
 @Injectable()
@@ -44,7 +45,10 @@ export class SitesService {
 
   async list(p: Principal): Promise<Site[]> {
     return this.dbs.runInTenant(p.orgId, async (tx) => {
-      const scope = p.role === 'SITE_MANAGER' ? eq(schema.sites.siteManagerId, p.userId) : undefined;
+      const ctx = await loadScope(tx, p);
+      // WP-1: everyone below Owner sees only the sites in their scope
+      // (SM: assigned+managed; TH: crew sites; Driver: own vehicles' sites; Worker: assigned).
+      const scope = ctx.role === 'OWNER' ? undefined : inSet(schema.sites.id, ctx.siteIds);
       const rows = await tx
         .select()
         .from(schema.sites)
@@ -56,6 +60,8 @@ export class SitesService {
 
   async get(p: Principal, id: string): Promise<Site> {
     return this.dbs.runInTenant(p.orgId, async (tx) => {
+      const ctx = await loadScope(tx, p);
+      if (ctx.role !== 'OWNER' && !ctx.siteIds.includes(id)) forbidScope('Site out of scope');
       const [row] = await tx.select().from(schema.sites).where(and(eq(schema.sites.id, id), isNull(schema.sites.deletedAt)));
       if (!row) throw new ApiException('NOT_FOUND', 'Site not found');
       return mapSite(row);

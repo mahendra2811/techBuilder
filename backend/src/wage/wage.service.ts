@@ -9,11 +9,12 @@ import {
   type SetWageRateInput,
   type WageRate,
   type WageSummary,
-  type WageSummaryRow,
 } from '@techbuilder/contracts';
 import { DbService, type Tx } from '../db/db.service';
 import { ApiException } from '../common/api-exception';
 import type { Principal } from '../common/current-user.decorator';
+import { forbidScope, inSet, loadScope } from '../common/scope.util';
+import { computeWageRows } from './wage-calc';
 
 @Injectable()
 export class WageService {
@@ -45,6 +46,16 @@ export class WageService {
 
   async createAdvance(p: Principal, input: CreateAdvanceInput): Promise<Advance> {
     return this.dbs.runInTenant(p.orgId, async (tx) => {
+      // WP-1: an SM gives advances only to persons/crews inside their site scope.
+      const ctx = await loadScope(tx, p);
+      if (ctx.role === 'SITE_MANAGER') {
+        if (input.personId && !ctx.crewPersonIds.includes(input.personId)) {
+          forbidScope('Person is outside your site scope');
+        }
+        if (input.crewId && !ctx.crewIds.includes(input.crewId)) {
+          forbidScope('Crew is outside your site scope');
+        }
+      }
       const [row] = await tx
         .insert(schema.advances)
         .values({
@@ -74,12 +85,19 @@ export class WageService {
     return this.dbs.runInTenant(p.orgId, async (tx) => {
       const otMultiplier = await loadOtMultiplier(tx, p.orgId);
 
+      // WP-1: the summary aggregates from attendance, which is site-stamped — an SM's
+      // summary is therefore their site(s) only. Owner sees the org.
+      const ctx = await loadScope(tx, p);
+      const siteScope =
+        ctx.role === 'OWNER' ? undefined : inSet(schema.attendance.siteId, ctx.siteIds);
+
       const att = await tx
         .select()
         .from(schema.attendance)
         .where(
           and(
             isNull(schema.attendance.deletedAt),
+            siteScope,
             gte(schema.attendance.businessDate, window.from),
             lte(schema.attendance.businessDate, window.to),
           ),
@@ -100,64 +118,9 @@ export class WageService {
           ),
         );
 
-      const nameOf = new Map(people.map((x) => [x.id, x.name]));
-      const defaultRateOf = new Map(people.map((x) => [x.id, x.defaultWagePaise]));
-      // latest effective rate per person (effectiveFrom <= window.to)
-      const rateOf = new Map<string, number>();
-      const rateAsOf = new Map<string, string>();
-      for (const r of rates) {
-        const prev = rateAsOf.get(r.personId);
-        if (!prev || r.effectiveFrom > prev) {
-          rateAsOf.set(r.personId, r.effectiveFrom);
-          rateOf.set(r.personId, r.dailyPaise);
-        }
-      }
-      const advanceOf = new Map<string, number>();
-      for (const a of advs) {
-        if (!a.personId) continue; // crew-level advances are not allocated per-person in this summary
-        advanceOf.set(a.personId, (advanceOf.get(a.personId) ?? 0) + a.amountPaise);
-      }
-
-      type Agg = { present: number; half: number; ot: number; siteId: string; crewId: string | null };
-      const agg = new Map<string, Agg>();
-      for (const a of att) {
-        const cur = agg.get(a.personId) ?? { present: 0, half: 0, ot: 0, siteId: a.siteId, crewId: a.crewId };
-        if (a.status === 'PRESENT') cur.present += 1;
-        else if (a.status === 'HALF_DAY') cur.half += 1;
-        cur.ot += a.otHours ?? 0;
-        cur.siteId = a.siteId;
-        cur.crewId = a.crewId;
-        agg.set(a.personId, cur);
-      }
-
-      const rows: WageSummaryRow[] = [];
-      let grossT = 0;
-      let advT = 0;
-      for (const [personId, x] of agg) {
-        const rate = rateOf.get(personId) ?? defaultRateOf.get(personId) ?? 0;
-        const base = Math.round(rate * (x.present + 0.5 * x.half));
-        const otPay = Math.round(x.ot * (rate / 8) * otMultiplier);
-        const gross = base + otPay;
-        const advance = advanceOf.get(personId) ?? 0;
-        const net = gross - advance;
-        grossT += gross;
-        advT += advance;
-        rows.push({
-          personId,
-          personName: nameOf.get(personId) ?? '(unknown)',
-          crewId: x.crewId,
-          siteId: x.siteId,
-          presentDays: x.present,
-          halfDays: x.half,
-          otHours: x.ot,
-          ratePaise: rate,
-          grossPayablePaise: gross,
-          advancePaise: advance,
-          netPayablePaise: net,
-        });
-      }
-      rows.sort((a, b) => a.personName.localeCompare(b.personName));
-      return { window, rows, totals: { grossPaise: grossT, advancePaise: advT, netPaise: grossT - advT } };
+      // Pure math lives in wage-calc.ts (WP-5: unit-tested against hand-computed fixtures).
+      const { rows, totals } = computeWageRows(att, people, rates, advs, otMultiplier);
+      return { window, rows, totals };
     });
   }
 }

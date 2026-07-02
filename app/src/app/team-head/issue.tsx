@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { Pressable, ScrollView, View } from 'react-native';
 import { uuidv7 } from 'uuidv7';
 import { useTranslation } from 'react-i18next';
@@ -29,7 +30,7 @@ export default function IssueScreen() {
     });
   }, [clients]);
 
-  useEffect(loadSite, [loadSite]);
+  useFocusEffect(loadSite);
 
   async function save(): Promise<void> {
     if (!description.trim()) return;

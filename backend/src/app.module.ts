@@ -20,8 +20,10 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { MediaModule } from './media/media.module';
 import { AllExceptionsFilter } from './common/all-exceptions.filter';
 import { TransformInterceptor } from './common/transform.interceptor';
+import { HealthController } from './health.controller';
 
 @Module({
+  controllers: [HealthController],
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     DbModule,

@@ -1,0 +1,15 @@
+{
+  "name": "Example Constructions Pvt Ltd",
+  "code": "example",
+  "config": {
+    "brand": { "name": "Example Constructions Pvt Ltd", "primaryColor": "#1A5276" },
+    "locale": {},
+    "roles": { "enabled": ["OWNER", "SITE_MANAGER", "TEAM_HEAD", "DRIVER", "WORKER"] },
+    "records": { "enabled": ["progress", "expense", "fuel", "attendance", "leave", "vehicleStartEnd"] },
+    "features": {},
+    "vehicleTypes": [],
+    "wage": {},
+    "reconciliation": {},
+    "completion": {}
+  }
+}

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { ScrollView } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { Notification } from '@techbuilder/contracts';
@@ -16,7 +17,7 @@ export default function NotificationsScreen() {
     void clients.records.listNotifications().then(setNotifications);
   }, [clients]);
 
-  useEffect(load, [load]);
+  useFocusEffect(load);
 
   async function markRead(id: string): Promise<void> {
     await clients.records.markNotificationRead(id);

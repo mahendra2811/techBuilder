@@ -1,0 +1,7 @@
+name,username,role,phone,site,crew,personName,tempPassword
+Owner Sahab,owner,OWNER,9810000001,,,,changeme123
+SM Greenfield,sm_gf,SITE_MANAGER,9810000002,GF,,,changeme123
+SM Sunrise,sm_st,SITE_MANAGER,9810000003,ST,,,changeme123
+Mistri GF One,th_gf1,TEAM_HEAD,9810000004,GF,,,changeme123
+Dinesh Driver,driver1,DRIVER,9800000004,GF,,Dinesh Driver,changeme123
+Ramu Yadav,worker1,WORKER,,GF,Crew GF-1,Ramu Yadav,changeme123

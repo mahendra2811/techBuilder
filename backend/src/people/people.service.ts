@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, isNull, sql, type SQL } from 'drizzle-orm';
 import * as schema from '@techbuilder/contracts/db/schema';
 import type { CreatePersonInput, Person } from '@techbuilder/contracts';
 import { DbService } from '../db/db.service';
 import { ApiException } from '../common/api-exception';
 import type { Principal } from '../common/current-user.decorator';
+import { inSet, loadScope } from '../common/scope.util';
 
 @Injectable()
 export class PeopleService {
@@ -38,10 +39,18 @@ export class PeopleService {
 
   async list(p: Principal): Promise<Person[]> {
     return this.dbs.runInTenant(p.orgId, async (tx) => {
+      const ctx = await loadScope(tx, p);
+      // WP-1: Owner + SM see the org labour master (allocation needs the full list);
+      // TH sees own crew; Driver/Worker see only their own person row.
+      let scope: SQL | undefined;
+      if (ctx.role === 'TEAM_HEAD') scope = inSet(schema.people.id, ctx.crewPersonIds);
+      else if (ctx.role === 'DRIVER' || ctx.role === 'WORKER') {
+        scope = ctx.personId ? (eq(schema.people.id, ctx.personId) as SQL) : sql`false`;
+      }
       const rows = await tx
         .select()
         .from(schema.people)
-        .where(isNull(schema.people.deletedAt))
+        .where(and(isNull(schema.people.deletedAt), scope))
         .orderBy(desc(schema.people.createdAt));
       return rows.map(mapPerson);
     });
