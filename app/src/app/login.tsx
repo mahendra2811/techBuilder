@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { TextInput } from 'react-native';
+import { TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useSession } from '../stores/session';
@@ -49,6 +49,14 @@ export default function Login() {
       />
       {error ? <Text className="mb-3 text-danger">{error}</Text> : null}
       <Button label={t('auth.login')} onPress={onLogin} disabled={busy} />
+      {/* DEV-only shortcut — remove before the pilot. See dev-role-picker.tsx. */}
+      <View className="mt-3">
+        <Button
+          label="DEV: choose a role instead"
+          onPress={() => router.push('/dev-role-picker')}
+          variant="secondary"
+        />
+      </View>
     </Screen>
   );
 }

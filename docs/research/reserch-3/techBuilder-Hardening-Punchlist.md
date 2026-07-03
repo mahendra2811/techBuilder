@@ -78,9 +78,10 @@
 Deploy NestJS to **Railway or Render** (free/hobby tier); env per `TESTING-AND-SETUP.md` (`DATABASE_URL` app-role non-superuser non-BYPASSRLS, JWT secrets, `R2_*`, `SENTRY_DSN`). Accept Neon scale-to-zero ⇒ ~1–2 s first-morning wake (document it, don't fight it).
 **Acceptance:** all E2E green against the hosted URL from a phone **off** your WiFi.
 
-### WP-8. Backups (Review B9.5)
+### WP-8. Backups (Review B9.5) — ⏸️ PAUSED 2026-07-03, resume before pilot (see `docs/PENDING-AND-DEFERRED.md`)
 Nightly `pg_dump` of Neon → Cloudflare R2 (scheduled job on the host or GitHub Actions cron), 14-day retention; **one documented restore drill actually performed once.** Add a short "Backups" paragraph to `techBuilder-Backend-and-Database.md`.
 **Acceptance:** a dump exists in R2 from the scheduler (not run by hand); restore drill produced a working DB copy.
+**Status:** script (`backend/scripts/backup-db.sh`) + workflow (`.github/workflows/backup.yml`) built, Docker-based (`postgres:18` image) to sidestep apt/PGDG version drift. Still failing in CI as of pause — full diagnostic trail + exact next steps in `docs/PENDING-AND-DEFERRED.md`. Not blocking local functional development; revisit before the real pilot.
 
 ### WP-9. EAS APK as the ONLY pilot channel (Review A3/B9.3)
 `eas build -p android --profile preview` with `EXPO_PUBLIC_API_URL` in the profile env → hosted backend (config already in `eas.json`, projectId in `app.json`). **Expo Go is banned for the pilot** (single-SDK auto-update breakage) — note this in `TESTING-AND-SETUP.md`.

@@ -1,0 +1,15 @@
+name,username,role,phone,site,crew,personName,tempPassword
+Owner Sahab,owner,OWNER,9810000001,,,,changeme123
+Rajesh Site Manager,sm1,SITE_MANAGER,9810000002,GF,,,changeme123
+Mistri Greenfield,th1,TEAM_HEAD,9810000003,GF,,,changeme123
+Mistri Sunrise,th2,TEAM_HEAD,9810000004,ST,,,changeme123
+Dinesh Driver,driver1,DRIVER,9800000007,GF,,Dinesh Driver,changeme123
+Ramesh Driver,driver2,DRIVER,9800000008,GF,,Ramesh Driver,changeme123
+Suraj Driver,driver3,DRIVER,9800000009,ST,,Suraj Driver,changeme123
+Manoj Driver,driver4,DRIVER,9800000010,ST,,Manoj Driver,changeme123
+Ramu Yadav,worker1,WORKER,,GF,Crew GF,Ramu Yadav,changeme123
+Shyam Kumar,worker2,WORKER,,GF,Crew GF,Shyam Kumar,changeme123
+Mangal Singh,worker3,WORKER,,GF,Crew GF,Mangal Singh,changeme123
+Suresh Prasad,worker4,WORKER,,ST,Crew ST,Suresh Prasad,changeme123
+Vikram Rathore,worker5,WORKER,,ST,Crew ST,Vikram Rathore,changeme123
+Ajay Kumar,worker6,WORKER,,ST,Crew ST,Ajay Kumar,changeme123
