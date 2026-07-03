@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # WP-8 — nightly Neon backup to Cloudflare R2.
-# Requires: pg_dump (matching or newer than the server's major version) + aws-cli.
+# Requires: Docker (runs pg_dump via the official `postgres` image — always an EXACT major-version
+#           match to Neon, no apt/PGDG/PATH version-mismatch fragility) + aws-cli.
 # Env required: DATABASE_URL_ADMIN (BYPASSRLS role — captures ALL orgs, not RLS-filtered),
 #               R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET
+#               PG_MAJOR (optional, default 18 — bump when Neon upgrades its Postgres major version)
 set -euo pipefail
 
 for v in DATABASE_URL_ADMIN R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_BUCKET; do
@@ -11,13 +13,19 @@ for v in DATABASE_URL_ADMIN R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY 
     exit 1
   fi
 done
+PG_MAJOR="${PG_MAJOR:-18}"
 
 TIMESTAMP=$(date -u +%Y-%m-%dT%H-%M-%SZ)
 FILE="techbuilder-${TIMESTAMP}.dump"
 KEY="backups/${FILE}"
 
-echo "→ Dumping database (custom format, compressed)..."
-pg_dump "$DATABASE_URL_ADMIN" --format=custom --no-owner --no-privileges --file="$FILE"
+echo "→ Dumping database via postgres:${PG_MAJOR} image (custom format)..."
+# Runs as the image's default (root) user — passing --user <host-uid> breaks pg_dump's
+# internal getpwuid() lookup (for ~/.pgpass) when that uid has no /etc/passwd entry in the
+# container. The resulting file is root-owned but world-readable (default umask) and
+# deletable regardless (unlink only needs write access to the containing directory).
+docker run --rm -v "$(pwd)":/workdir -w /workdir "postgres:${PG_MAJOR}" \
+  pg_dump "$DATABASE_URL_ADMIN" --format=custom --no-owner --no-privileges --file="$FILE"
 SIZE=$(du -h "$FILE" | cut -f1)
 echo "✅ Dump complete: $FILE ($SIZE)"
 

@@ -11,11 +11,14 @@
 # string as --target. Never point this at the primary/production branch.
 #
 # Env required: R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET
+# Requires: Docker (runs pg_restore via the official `postgres` image — exact version match, no
+#           local install needed). PG_MAJOR env optional, default 18.
 set -euo pipefail
 
 KEY=""
 TARGET=""
 ASSUME_YES=0
+PG_MAJOR="${PG_MAJOR:-18}"
 while [ $# -gt 0 ]; do
   case "$1" in
     --key) KEY="$2"; shift 2 ;;
@@ -47,16 +50,17 @@ if [ "$ASSUME_YES" -ne 1 ]; then
   fi
 fi
 
-FILE="/tmp/$(basename "$KEY")"
+FILE="$(basename "$KEY")"
 echo "→ Downloading from R2..."
 AWS_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID" \
 AWS_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY" \
 AWS_DEFAULT_REGION=auto \
-aws s3 cp "s3://${R2_BUCKET}/${KEY}" "$FILE" \
+aws s3 cp "s3://${R2_BUCKET}/${KEY}" "./${FILE}" \
   --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
 
-echo "→ Restoring into target..."
-pg_restore --dbname="$TARGET" --clean --if-exists --no-owner --no-privileges "$FILE"
+echo "→ Restoring into target via postgres:${PG_MAJOR} image..."
+docker run --rm -v "$(pwd)":/workdir -w /workdir "postgres:${PG_MAJOR}" \
+  pg_restore --dbname="$TARGET" --clean --if-exists --no-owner --no-privileges "$FILE"
 
 rm -f "$FILE"
 echo "✅ Restore drill complete. Verify row counts / spot-check data in the target DB now."

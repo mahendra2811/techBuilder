@@ -12,15 +12,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install postgresql-client 18 (matches Neon's server version)
-        run: |
-          sudo install -d /usr/share/postgresql-common/pgdg
-          sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
-            --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc
-          sudo sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client-18
-
+      # No apt/PGDG install step needed — backup-db.sh runs pg_dump via the official
+      # `postgres` Docker image (pinned to Neon's major version), which GitHub-hosted
+      # runners already have Docker for. Avoids apt package-availability/PATH fragility.
       - name: Run backup
         env:
           DATABASE_URL_ADMIN: ${{ secrets.DATABASE_URL_ADMIN }}
