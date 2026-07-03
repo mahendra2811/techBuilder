@@ -298,6 +298,42 @@ describe.skipIf(!HAS_DB)('scope enforcement acceptance (live DB, RLS app role)',
     expect(corrected[0]!.status).toBe('HALF_DAY');
   });
 
+  // ---- Phase 4: record-CREATION backdating windows (gap found by web Phase 3A) ----
+  it('record creation obeys role windows: TH ≤2d, SM ≤7d, DRIVER ≤2d, future rejected', async () => {
+    const mkExpense = (p: Principal, businessDate: string) =>
+      records.createExpense(p, { id: uuidv7(), siteId: siteA, category: 'MISC', amountPaise: 500, businessDate });
+
+    await expect(mkExpense(TH(), addDays(TODAY, -1))).resolves.toBeDefined();
+    await expect(mkExpense(TH(), addDays(TODAY, -3))).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(mkExpense(SM_A(), addDays(TODAY, -5))).resolves.toBeDefined();
+    await expect(mkExpense(SM_A(), addDays(TODAY, -10))).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(mkExpense(SM_A(), addDays(TODAY, 1))).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+
+    const mkFuel = (businessDate: string) =>
+      records.createFuelLog(DRIVER(), {
+        id: uuidv7(),
+        vehicleId: vehicleV1,
+        amountPaise: 100,
+        litres: 1,
+        reading: 200,
+        businessDate,
+      });
+    await expect(mkFuel(addDays(TODAY, -1))).resolves.toBeDefined();
+    await expect(mkFuel(addDays(TODAY, -3))).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+
+  it('sync CREATE events obey the same record window', async () => {
+    const results = await sync.pushBatch(TH(), [
+      {
+        outboxId: 'ob-p4',
+        entityType: 'expense',
+        op: 'CREATE',
+        payload: { id: uuidv7(), siteId: siteA, category: 'MISC', amountPaise: 100, businessDate: addDays(TODAY, -3), void: false },
+      },
+    ]);
+    expect(results[0]).toMatchObject({ ok: false, errorCode: 'FORBIDDEN' });
+  });
+
   // ---- Sync bypass closed ----
   it('sync.pushBatch no longer accepts master-data writes and enforces action + scope', async () => {
     const results = await sync.pushBatch(WORKER(), [

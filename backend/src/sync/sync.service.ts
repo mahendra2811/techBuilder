@@ -16,6 +16,7 @@ import {
 } from '../common/scope.util';
 import { businessDateNow, daysBetween } from '../common/business-date';
 import { loadEodCutoff } from '../common/org-config.util';
+import { ATTENDANCE_BACKDATE_LIMIT_DAYS, RECORD_CREATE_BACKDATE_LIMIT_DAYS, assertBackdateWindow } from '../common/backdate.util';
 
 /**
  * WP-1/WP-6 — the outbox accepts FIELD RECORDS only. Master data (sites, vehicles,
@@ -47,8 +48,6 @@ const ACTION_OF: Record<string, Action> = {
   trip: 'vehicleLog.enter',
 };
 
-/** WP-4 backdating limits (days) — mirrors AttendanceService. */
-const ATTENDANCE_BACKDATE_LIMIT: Partial<Record<string, number>> = { TEAM_HEAD: 2, SITE_MANAGER: 7 };
 
 @Injectable()
 export class SyncService {
@@ -83,9 +82,16 @@ export class SyncService {
       await assertPayloadScope(tx, ctx, ev.entityType, action, payload);
 
       if (ev.op === 'CREATE') {
-        // WP-4: offline attendance obeys the same backdating window as the REST path.
-        if (ev.entityType === 'attendance' && typeof payload['businessDate'] === 'string') {
-          await assertAttendanceWindow(tx, ctx, payload['businessDate']);
+        // WP-4/Phase-4: queued creates obey the same backdating windows as the REST paths
+        // (attendance map for attendance; record map for every businessDate-stamped record —
+        // leave has no businessDate and is deliberately unwindowed).
+        if (typeof payload['businessDate'] === 'string') {
+          await assertBackdateWindow(
+            tx,
+            ctx.role,
+            payload['businessDate'],
+            ev.entityType === 'attendance' ? ATTENDANCE_BACKDATE_LIMIT_DAYS : RECORD_CREATE_BACKDATE_LIMIT_DAYS,
+          );
         }
         const attribution: Record<string, unknown> = { orgId: p.orgId, createdBy: p.userId, updatedBy: p.userId };
         if (ev.entityType === 'attendance') attribution['markedBy'] = p.userId;
@@ -182,13 +188,3 @@ async function assertEditAllowed(
   }
 }
 
-/** WP-4 (sync flavor): attendance backdating window per role. */
-async function assertAttendanceWindow(tx: Tx, ctx: ScopeContext, businessDate: string): Promise<void> {
-  const today = businessDateNow(new Date(), await loadEodCutoff(tx));
-  const back = daysBetween(businessDate, today);
-  if (back < 0) throw new ApiException('VALIDATION_FAILED', 'Cannot mark attendance for a future business date');
-  const limit = ATTENDANCE_BACKDATE_LIMIT[ctx.role];
-  if (ctx.role !== 'OWNER' && limit !== undefined && back > limit) {
-    forbidScope(`Backdated correction window exceeded (${ctx.role} may correct up to ${limit} day(s) back)`);
-  }
-}

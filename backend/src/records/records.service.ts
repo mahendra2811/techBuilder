@@ -33,6 +33,7 @@ import {
 } from '../common/scope.util';
 import { businessDateNow, daysBetween } from '../common/business-date';
 import { loadEodCutoff } from '../common/org-config.util';
+import { RECORD_CREATE_BACKDATE_LIMIT_DAYS, assertBackdateWindow } from '../common/backdate.util';
 
 type RecordEntityType = 'progress' | 'expense' | 'fuel' | 'vehicle-log' | 'trip' | 'material-txn' | 'issue';
 
@@ -97,6 +98,7 @@ export class RecordsService {
     return this.dbs.runInTenant(p.orgId, async (tx) => {
       const ctx = await loadScope(tx, p);
       assertSiteInScope(ctx, 'record.enter', input.siteId);
+      await assertBackdateWindow(tx, ctx.role, input.businessDate, RECORD_CREATE_BACKDATE_LIMIT_DAYS);
       const [row] = await tx
         .insert(schema.progressNotes)
         .values({
@@ -129,6 +131,7 @@ export class RecordsService {
     return this.dbs.runInTenant(p.orgId, async (tx) => {
       const ctx = await loadScope(tx, p);
       assertSiteInScope(ctx, 'record.enter', input.siteId);
+      await assertBackdateWindow(tx, ctx.role, input.businessDate, RECORD_CREATE_BACKDATE_LIMIT_DAYS);
       const [row] = await tx
         .insert(schema.expenses)
         .values({
@@ -165,6 +168,7 @@ export class RecordsService {
     return this.dbs.runInTenant(p.orgId, async (tx) => {
       const ctx = await loadScope(tx, p);
       await assertVehicleInScope(tx, ctx, 'vehicleLog.enter', input.vehicleId);
+      await assertBackdateWindow(tx, ctx.role, input.businessDate, RECORD_CREATE_BACKDATE_LIMIT_DAYS);
       const [row] = await tx
         .insert(schema.fuelLogs)
         .values({
@@ -202,6 +206,7 @@ export class RecordsService {
       if (ctx.role === 'DRIVER' && input.driverPersonId !== ctx.personId) {
         forbidScope('Drivers may only log for their own person');
       }
+      await assertBackdateWindow(tx, ctx.role, input.businessDate, RECORD_CREATE_BACKDATE_LIMIT_DAYS);
       if (input.endReading != null && input.endReading < input.startReading) {
         throw new ApiException('VALIDATION_FAILED', 'end reading must be >= start', {
           endReading: 'end reading must be >= start reading',
@@ -244,6 +249,7 @@ export class RecordsService {
     return this.dbs.runInTenant(p.orgId, async (tx) => {
       const ctx = await loadScope(tx, p);
       await assertVehicleInScope(tx, ctx, 'vehicleLog.enter', input.vehicleId);
+      await assertBackdateWindow(tx, ctx.role, input.businessDate, RECORD_CREATE_BACKDATE_LIMIT_DAYS);
       const [row] = await tx
         .insert(schema.trips)
         .values({
@@ -277,6 +283,7 @@ export class RecordsService {
     return this.dbs.runInTenant(p.orgId, async (tx) => {
       const ctx = await loadScope(tx, p);
       assertSiteInScope(ctx, 'record.enter', input.siteId);
+      await assertBackdateWindow(tx, ctx.role, input.businessDate, RECORD_CREATE_BACKDATE_LIMIT_DAYS);
       const [row] = await tx
         .insert(schema.materialTxns)
         .values({
@@ -314,6 +321,7 @@ export class RecordsService {
       const ctx = await loadScope(tx, p);
       if (input.siteId) assertSiteInScope(ctx, 'record.enter', input.siteId);
       else if (input.vehicleId) await assertVehicleInScope(tx, ctx, 'record.enter', input.vehicleId);
+      await assertBackdateWindow(tx, ctx.role, input.businessDate, RECORD_CREATE_BACKDATE_LIMIT_DAYS);
       const [row] = await tx
         .insert(schema.issues)
         .values({

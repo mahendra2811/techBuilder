@@ -6,7 +6,8 @@
   "workspaces": [
     "shared",
     "backend",
-    "app"
+    "app",
+    "web"
   ],
   "engines": {
     "node": "22.x"

@@ -6,15 +6,7 @@ import { DbService } from '../db/db.service';
 import { ApiException } from '../common/api-exception';
 import type { Principal } from '../common/current-user.decorator';
 import { assertPersonInScope, assertSiteInScope, forbidScope, loadScope, personReadFilter } from '../common/scope.util';
-import { businessDateNow, daysBetween } from '../common/business-date';
-import { loadEodCutoff } from '../common/org-config.util';
-
-/** WP-4 backdating policy: how many days back each role may (re)mark attendance. */
-const BACKDATE_LIMIT_DAYS: Partial<Record<string, number>> = {
-  TEAM_HEAD: 2, // ≤48h
-  SITE_MANAGER: 7,
-  // OWNER: unlimited (audited override)
-};
+import { ATTENDANCE_BACKDATE_LIMIT_DAYS, assertBackdateWindow } from '../common/backdate.util';
 
 @Injectable()
 export class AttendanceService {
@@ -33,17 +25,7 @@ export class AttendanceService {
       }
 
       // WP-4 backdating window (business date per org EOD cutoff, Asia/Kolkata).
-      const today = businessDateNow(new Date(), await loadEodCutoff(tx));
-      const back = daysBetween(input.businessDate, today); // >0 = past, <0 = future
-      if (back < 0) {
-        throw new ApiException('VALIDATION_FAILED', 'Cannot mark attendance for a future business date', {
-          businessDate: 'future date',
-        });
-      }
-      const limit = BACKDATE_LIMIT_DAYS[ctx.role];
-      if (ctx.role !== 'OWNER' && limit !== undefined && back > limit) {
-        forbidScope(`Backdated correction window exceeded (${ctx.role} may correct up to ${limit} day(s) back; Owner override required)`);
-      }
+      await assertBackdateWindow(tx, ctx.role, input.businessDate, ATTENDANCE_BACKDATE_LIMIT_DAYS);
 
       const results: Attendance[] = [];
       for (const row of input.rows) {

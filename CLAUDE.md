@@ -7,7 +7,16 @@
 ---
 
 ## 1. What this is (Phase 1)
-A **Hindi-first Android app** (Expo/React Native) for running an Indian construction SMB's **daily field operations** — a *records + visibility* logbook (NOT project-management/BIM/estimation). Field roles log simple end-of-day records; they roll **up** to an Owner dashboard with Excel export.
+
+> ### ⚠️ FRONTEND PIVOT (2026-07-03): Android/Expo → Next.js WEB PORTAL
+> **The `app/` Expo/React Native frontend is FROZEN — do not build on it further.** After a full day of native-tooling friction (Metro tunnel flakiness, `adb`/USB debugging-authorization resets, ngrok credential limits, a stray root `app.json` silently breaking bundling) with **zero actual bugs found in `backend/` or `shared/`** (31 unit + 19 integration tests green all day), the user — a web developer — decided to pivot the frontend to a **Next.js web portal** (mobile-first responsive, PWA later). This is a **final decision for Phase 1**, not a detour.
+> - **KEPT, untouched:** `backend/` (NestJS+Drizzle+Neon+RLS) and `shared/` (contracts) — proven solid, zero changes needed for the pivot.
+> - **FROZEN, not deleted:** `app/` — stays as a reference (screen logic, i18n keys, adapter patterns) but gets no more work.
+> - **NEW:** `web/` — 4th npm workspace, Next.js App Router + TS strict + Tailwind + shadcn/ui + TanStack Query + react-hook-form + zod (from `shared/`). httpOnly-cookie auth (not bearer-in-JS). See `docs/techBuilder-Web-Pivot-Plan.md` for the full phase plan (Phase 0 assessment already done and approved; Phase 1 scaffold delegated to a Fable-5 agent, in progress as of this note).
+> - **Still binding:** Build-Readiness Spec conventions, the Hardening Punchlist P0 backend work (platform-independent, already done), the Pilot Playbook's 7-screen build order (now the web screen build order too).
+> - Backend stays framework-as-is (NestJS) — evaluated switching to plain Node/Express, decided against it (zero problems traced to NestJS all session; switching = pure rework for no gain).
+
+A **Hindi-first web portal** (Next.js, pivoted from Android/Expo — see banner above) for running an Indian construction SMB's **daily field operations** — a *records + visibility* logbook (NOT project-management/BIM/estimation). Field roles log simple end-of-day records; they roll **up** to an Owner dashboard with Excel export.
 
 - **Model:** managed/**agency** — the developer onboards each company by hand (offline payment → create org + owner login → hand over). After that, everything is **self-service in-app**. No self-signup/OTP/payment this phase.
 - **Architecture:** one reusable **engine** + **one app codebase** (NOT per-merchant code forks — wrong for Android). Per-client = a config file + assets. **Adapter pattern:** screens call interfaces (`RecordsClient`/`AuthClient`/`SyncClient`), built on a `mock` adapter, swapped to `rest` with zero screen changes.
@@ -26,8 +35,9 @@ A **Hindi-first Android app** (Expo/React Native) for running an Indian construc
 
 | Doc | Contents |
 |---|---|
+| [`docs/techBuilder-Web-Pivot-Plan.md`](docs/techBuilder-Web-Pivot-Plan.md) ⭐🔜 | **CURRENT WORK ORDER (2026-07-03).** Frontend pivot Android/Expo → Next.js web. Phase 0 (assessment) done; Phase 1 (scaffold+auth) in progress. Read this + the pivot banner in §1 before anything else. |
 | [`docs/PROJECT_AI_CONTEXT.md`](docs/PROJECT_AI_CONTEXT.md) | **Master index.** §0 = current direction + locked-decisions table + reading order + build status. §§1–12 = original (superseded) research. |
-| [`docs/research/reserch-3/techBuilder-Hardening-Punchlist.md`](docs/research/reserch-3/techBuilder-Hardening-Punchlist.md) ⭐🔜 | **CURRENT WORK ORDER (research-3, 2026-07-02).** Pre-pilot fix list in tiers P0→P3 (RBAC scope, self-approval, edit windows, money-math tests, honest sync, hosted backend, backups, EAS APK, bulk seed, pilot surface, doc reconciliation). Execute top-to-bottom; wins on conflict with older docs. |
+| [`docs/research/reserch-3/techBuilder-Hardening-Punchlist.md`](docs/research/reserch-3/techBuilder-Hardening-Punchlist.md) | **Pre-pilot fix list (research-3, 2026-07-02), platform-independent.** Tiers P0→P3 (RBAC scope, self-approval, edit windows, money-math tests, honest sync, hosted backend, backups, EAS APK, bulk seed, pilot surface, doc reconciliation). P0 (WP-1→WP-6) done; P1 mobile-infra items (WP-7/8/9/11) PAUSED by the web pivot. |
 | [`docs/research/reserch-3/techBuilder-Pilot-Playbook.md`](docs/research/reserch-3/techBuilder-Pilot-Playbook.md) | **Pilot product spec (research-3).** ~8-screen pilot surface, 2-week plan, adoption tactics, hidden-feature flags, support runbook. |
 | [`docs/techBuilder-SecondOpinion-Review.md`](docs/techBuilder-SecondOpinion-Review.md) | Code-grounded critical review (2026-07-02) that produced research-3: RBAC scope holes (B5), sync overselling, missing backdating policy/backups/tests, pilot-surface cuts, stack verdicts. |
 | [`docs/techBuilder-NextSteps-and-LiveBackend-Plan.md`](docs/techBuilder-NextSteps-and-LiveBackend-Plan.md) | Milestone A plan (2026-07-01): flip to real backend over WiFi + roadmap B→F. Largely subsumed by the research-3 punchlist (WP-7/WP-10); still has the 5-role credentials + 3-terminal run steps. |
@@ -44,8 +54,10 @@ A **Hindi-first Android app** (Expo/React Native) for running an Indian construc
 
 ## 4. 🏗️ Build status (keep this current)
 
-> ### ▶ RESUME HERE (2026-07-02, evening)
-> **PUNCHLIST TIER P0 IS ✅ COMPLETE & PROVEN** (all of WP-1…WP-6 from [`docs/research/reserch-3/techBuilder-Hardening-Punchlist.md`](docs/research/reserch-3/techBuilder-Hardening-Punchlist.md)):
+> ### ▶ RESUME HERE (2026-07-03) — FRONTEND PIVOTED TO WEB, read the banner in §1 first
+> **Current work: Phase 1 of the web pivot** (Next.js `web/` workspace — scaffold + httpOnly-cookie auth + 5-role router), delegated to a Fable-5 agent per user instruction, plan in `docs/techBuilder-Web-Pivot-Plan.md`. Phase 0 (assessment) confirmed: backend/shared are 100% solid, zero real bugs found; every issue that day was Expo/Android native-tooling friction. **The mobile pilot-infra work below (WP-7 Railway/WP-8 backups/WP-9 EAS/WP-11 Sentry) is PAUSED, not abandoned** — irrelevant until/unless a native app is revisited post-web-pilot. Railway was torn down (deleted) to stop billing; redeploying later is a 2-minute job (`railway.json` + code all still committed). Local dev now: backend runs on the laptop (`(cd shared && npm run build) && (cd backend && npm run build && npm start)`), DB is real Neon via `backend/.env`, seeded org "DevCo Builders" (code `devco`) has the full 1 owner/2 sites/1 SM/2 TH/4 driver/6 worker shape (`backend/merchants/dev/`, all passwords `changeme123`, `mustChangePassword=true`).
+>
+> ### Earlier: PUNCHLIST TIER P0 IS ✅ COMPLETE & PROVEN (platform-independent — still valid post-pivot) (all of WP-1…WP-6 from [`docs/research/reserch-3/techBuilder-Hardening-Punchlist.md`](docs/research/reserch-3/techBuilder-Hardening-Punchlist.md)):
 > - **WP-1 RBAC scope**: new `backend/src/common/scope.util.ts` (`loadScope` derives site/crew/vehicle/self scope FRESH from DB) wired into ALL services (attendance, records, approvals, leave, wage, dashboards, reconciliation, sites, users, people, vehicles, **sync** — sync.pushBatch was a full RBAC bypass, now registry-trimmed to field records + per-type action+scope checks). Error code reused: `FORBIDDEN` (no contracts change).
 > - **WP-2 self-approval** (requester≠decider + decide scope + REJECT re-decide) · **WP-3 edit/void** creator-only until business-day+1, Owner override, patch sanitized (immutable attribution/businessDate) · **WP-4 backdating** TH≤2d/SM≤7d/Owner-any (+ policy folded into Build-Readiness-Spec §5; corrected flag = `version>1`) · new pure `backend/src/common/business-date.ts` (EOD cutoff: after 20:00 IST → NEXT business date).
 > - **WP-5 tests (vitest)**: `npm test` = **31 unit tests** (wage 3 hand-computed fixtures via extracted pure `wage-calc.ts`; completeness via pure `completeness-rule.ts`; business-date; RBAC matrix snapshot; scope asserts) + `npm run test:integration` = **19 integration tests vs LIVE Neon** (every review hole proven closed + RLS regression). Both green 2026-07-02.

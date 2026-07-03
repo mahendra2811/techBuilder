@@ -76,6 +76,12 @@ export class AuthService {
       if (!(await verifyPassword(input.currentPassword, u.passwordHash))) {
         throw new ApiException('VALIDATION_FAILED', 'Current password is incorrect', { currentPassword: 'incorrect' });
       }
+      // Phase-4: a forced change that keeps the same password defeats its purpose.
+      if (input.newPassword === input.currentPassword) {
+        throw new ApiException('VALIDATION_FAILED', 'New password must be different from the current password', {
+          newPassword: 'same as current',
+        });
+      }
       await tx
         .update(schema.users)
         .set({ passwordHash: await hashPassword(input.newPassword), mustChangePassword: false, updatedAt: new Date() })
