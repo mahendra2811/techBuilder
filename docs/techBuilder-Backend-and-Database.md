@@ -21,6 +21,15 @@
 | Files | **Cloudflare R2** (10 GB free, zero egress) | ₹0 |
 | **Total Phase 1** | | **~₹0–₹500/mo** |
 
+**Deployed (2026-07):** API hosted on **Railway** at `https://techbuilder-production.up.railway.app` (Nixpacks build, `railway.json` at repo root; healthcheck `GET /api/v1/health`). Env vars set directly in Railway (not `.env` — the container has no file, `start:prod` reads `process.env`).
+
+### Backups (WP-8)
+**Nightly `pg_dump` of Neon → Cloudflare R2**, run by a GitHub Actions cron (`.github/workflows/backup.yml`, `0 20 * * *` UTC = 01:30 IST) — decoupled from the Railway host so a backend outage can't also break backups. Uses `DATABASE_URL_ADMIN` (the BYPASSRLS role) so the dump captures **every org**, not just one tenant's RLS-visible rows. Custom-format dump (`pg_dump --format=custom`, directly restorable with `pg_restore`), uploaded to `s3://<bucket>/backups/techbuilder-<UTC-timestamp>.dump` via the R2 S3-compatible API.
+- **Retention:** a 14-day R2 **Lifecycle Rule** on the `backups/` prefix (configured once in the Cloudflare dashboard — not scripted, so cleanup can't silently break if a workflow run fails).
+- **Restore:** `backend/scripts/restore-db.sh --key <object-key> --target <postgres-url>` — deliberately has **no default target**; always pass a throwaway **Neon branch** connection string, never the primary branch, for a restore drill.
+- **Scripts:** `backend/scripts/backup-db.sh` (also runnable locally against `DATABASE_URL_ADMIN` for testing) and `backend/scripts/restore-db.sh`.
+- **Secrets live in GitHub** (Settings → Secrets and variables → Actions), **not** in Railway and **not** in git: `DATABASE_URL_ADMIN`, `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`.
+
 ---
 
 ## 3. Database schema (Postgres — every table: `id uuid pk`, `org_id`, `created_at`, `updated_at`, RLS by `org_id`)
