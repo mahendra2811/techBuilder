@@ -8,7 +8,7 @@
  */
 import type { User } from '@techbuilder/contracts';
 import { formatKolkataDateTime } from '@/lib/business-date';
-import { OWNER_UI } from '@/lib/messages';
+import { useMessages } from '@/lib/i18n/locale-context';
 
 export function AuditChip({
   row,
@@ -17,14 +17,15 @@ export function AuditChip({
   row: { version: number; updatedBy: string; updatedAt: string };
   users: User[] | undefined;
 }) {
+  const m = useMessages();
   if (row.version <= 1) return null;
-  const name = users?.find((u) => u.id === row.updatedBy)?.name ?? OWNER_UI.auditUnknownUser;
+  const name = users?.find((u) => u.id === row.updatedBy)?.name ?? m.OWNER_UI.auditUnknownUser;
   return (
     <span
       data-testid="audit-chip"
       className="inline-block w-fit shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[11px] text-amber-700 dark:text-amber-400"
     >
-      {OWNER_UI.auditCorrected} — {name} · {formatKolkataDateTime(row.updatedAt)}
+      {m.OWNER_UI.auditCorrected} — {name} · {formatKolkataDateTime(row.updatedAt)}
     </span>
   );
 }

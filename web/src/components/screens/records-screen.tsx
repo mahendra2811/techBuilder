@@ -27,12 +27,8 @@ import type {
 import { ApiClientError, api } from '@/lib/api-client';
 import { addDays, minEntryDate, todayKolkata } from '@/lib/business-date';
 import { uploadPhoto } from '@/lib/media-upload';
-import {
-  ENTRY_UI,
-  EXPENSE_CATEGORY_LABELS,
-  NOTHING_TO_REPORT_TEXT,
-  apiErrorMessage,
-} from '@/lib/messages';
+import { NOTHING_TO_REPORT_TEXT, apiErrorMessage, type Messages } from '@/lib/i18n/messages';
+import { useMessages } from '@/lib/i18n/locale-context';
 import { formatPaise, rupeesToPaise } from '@/lib/money';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -51,18 +47,20 @@ type EntryRole = 'SITE_MANAGER' | 'TEAM_HEAD';
 type Tab = 'expense' | 'progress';
 
 // Local FORM schema only (UX). The DTO shape comes from the frozen contracts;
-// the enum values are imported, never redefined.
-const ExpenseFormSchema = z.object({
-  amountRupees: z
-    .string()
-    .min(1, ENTRY_UI.amountInvalid)
-    .refine((v) => Number.isFinite(Number(v)) && Number(v) > 0, ENTRY_UI.amountInvalid),
-  category: z.enum(EXPENSE_CATEGORIES, { errorMap: () => ({ message: ENTRY_UI.categoryRequired }) }),
-  billNo: z.string().optional(),
-});
-type ExpenseForm = z.infer<typeof ExpenseFormSchema>;
+// the enum values are imported, never redefined. Built per-locale (messages).
+const makeExpenseFormSchema = (e: Messages['ENTRY_UI']) =>
+  z.object({
+    amountRupees: z
+      .string()
+      .min(1, e.amountInvalid)
+      .refine((v) => Number.isFinite(Number(v)) && Number(v) > 0, e.amountInvalid),
+    category: z.enum(EXPENSE_CATEGORIES, { errorMap: () => ({ message: e.categoryRequired }) }),
+    billNo: z.string().optional(),
+  });
+type ExpenseForm = z.infer<ReturnType<typeof makeExpenseFormSchema>>;
 
 export function RecordsScreen({ role }: { role: EntryRole }) {
+  const m = useMessages();
   const queryClient = useQueryClient();
   const today = useMemo(() => todayKolkata(), []);
   const [tab, setTab] = useState<Tab>('expense');
@@ -82,8 +80,8 @@ export function RecordsScreen({ role }: { role: EntryRole }) {
     <div className="grid gap-4" data-testid="records-screen">
       <Card>
         <CardHeader>
-          <CardTitle>{ENTRY_UI.recordsTitle}</CardTitle>
-          <CardDescription>{ENTRY_UI.recordsSubtitle}</CardDescription>
+          <CardTitle>{m.ENTRY_UI.recordsTitle}</CardTitle>
+          <CardDescription>{m.ENTRY_UI.recordsSubtitle}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
           <SitePicker sites={sites} isLoading={sitesQ.isPending} value={siteId} onChange={setPickedSiteId} />
@@ -110,7 +108,7 @@ export function RecordsScreen({ role }: { role: EntryRole }) {
                 )}
                 onClick={() => setTab(t)}
               >
-                {t === 'expense' ? ENTRY_UI.tabExpense : ENTRY_UI.tabProgress}
+                {t === 'expense' ? m.ENTRY_UI.tabExpense : m.ENTRY_UI.tabProgress}
               </button>
             ))}
           </div>
@@ -139,6 +137,7 @@ export function RecordsScreen({ role }: { role: EntryRole }) {
 // ---------------------------------------------------------------------------
 
 function ExpenseEntry({ siteId, date, onSaved }: { siteId: UUID | ''; date: BusinessDate; onSaved: () => void }) {
+  const m = useMessages();
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoWarning, setPhotoWarning] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -154,7 +153,7 @@ function ExpenseEntry({ siteId, date, onSaved }: { siteId: UUID | ''; date: Busi
     reset,
     formState: { errors },
   } = useForm<ExpenseForm>({
-    resolver: zodResolver(ExpenseFormSchema),
+    resolver: zodResolver(useMemo(() => makeExpenseFormSchema(m.ENTRY_UI), [m])),
     defaultValues: { amountRupees: '', billNo: '' },
   });
 
@@ -193,9 +192,9 @@ function ExpenseEntry({ siteId, date, onSaved }: { siteId: UUID | ''; date: Busi
 
   const serverError =
     mutation.error instanceof ApiClientError
-      ? apiErrorMessage(mutation.error.code)
+      ? apiErrorMessage(m, mutation.error.code)
       : mutation.error
-        ? apiErrorMessage()
+        ? apiErrorMessage(m)
         : null;
 
   return (
@@ -208,10 +207,10 @@ function ExpenseEntry({ siteId, date, onSaved }: { siteId: UUID | ''; date: Busi
         mutation.mutate(values);
       })}
     >
-      <p className="text-sm font-medium">{ENTRY_UI.expenseTitle}</p>
+      <p className="text-sm font-medium">{m.ENTRY_UI.expenseTitle}</p>
 
       <div className="grid gap-2">
-        <Label>{ENTRY_UI.category}</Label>
+        <Label>{m.ENTRY_UI.category}</Label>
         <div className="grid grid-cols-3 gap-1.5">
           {EXPENSE_CATEGORIES.map((c: ExpenseCategory) => (
             <Button
@@ -226,7 +225,7 @@ function ExpenseEntry({ siteId, date, onSaved }: { siteId: UUID | ''; date: Busi
                 setValue('category', c, { shouldValidate: true });
               }}
             >
-              {EXPENSE_CATEGORY_LABELS[c]}
+              {m.EXPENSE_CATEGORY_LABELS[c]}
             </Button>
           ))}
         </div>
@@ -238,7 +237,7 @@ function ExpenseEntry({ siteId, date, onSaved }: { siteId: UUID | ''; date: Busi
       </div>
 
       <div className="grid gap-2">
-        <Label htmlFor="expense-amount">{ENTRY_UI.amountRupees}</Label>
+        <Label htmlFor="expense-amount">{m.ENTRY_UI.amountRupees}</Label>
         <Input
           id="expense-amount"
           type="number"
@@ -256,7 +255,7 @@ function ExpenseEntry({ siteId, date, onSaved }: { siteId: UUID | ''; date: Busi
       </div>
 
       <div className="grid gap-2">
-        <Label htmlFor="expense-bill-no">{ENTRY_UI.billNo}</Label>
+        <Label htmlFor="expense-bill-no">{m.ENTRY_UI.billNo}</Label>
         <Input id="expense-bill-no" data-testid="expense-bill-no" {...register('billNo')} />
       </div>
 
@@ -269,17 +268,17 @@ function ExpenseEntry({ siteId, date, onSaved }: { siteId: UUID | ''; date: Busi
       )}
       {saved && (
         <Notice tone="success" testId="expense-saved">
-          {ENTRY_UI.expenseSaved}
+          {m.ENTRY_UI.expenseSaved}
         </Notice>
       )}
       {photoWarning && (
         <Notice tone="warning" testId="expense-photo-warning">
-          {ENTRY_UI.photoNotUploaded}
+          {m.ENTRY_UI.photoNotUploaded}
         </Notice>
       )}
 
       <Button type="submit" data-testid="expense-submit" disabled={mutation.isPending || !siteId}>
-        {mutation.isPending ? ENTRY_UI.saving : ENTRY_UI.expenseSubmit}
+        {mutation.isPending ? m.ENTRY_UI.saving : m.ENTRY_UI.expenseSubmit}
       </Button>
     </form>
   );
@@ -290,6 +289,7 @@ function ExpenseEntry({ siteId, date, onSaved }: { siteId: UUID | ''; date: Busi
 // ---------------------------------------------------------------------------
 
 function ProgressEntry({ siteId, date, onSaved }: { siteId: UUID | ''; date: BusinessDate; onSaved: () => void }) {
+  const m = useMessages();
   const [text, setText] = useState('');
   const [textError, setTextError] = useState<string | null>(null);
   const [photo, setPhoto] = useState<File | null>(null);
@@ -329,7 +329,7 @@ function ProgressEntry({ siteId, date, onSaved }: { siteId: UUID | ''; date: Bus
   const submit = (noteText: string) => {
     if (!siteId || mutation.isPending) return;
     if (!noteText.trim()) {
-      setTextError(ENTRY_UI.progressTextRequired);
+      setTextError(m.ENTRY_UI.progressTextRequired);
       return;
     }
     setTextError(null);
@@ -340,9 +340,9 @@ function ProgressEntry({ siteId, date, onSaved }: { siteId: UUID | ''; date: Bus
 
   const serverError =
     mutation.error instanceof ApiClientError
-      ? apiErrorMessage(mutation.error.code)
+      ? apiErrorMessage(m, mutation.error.code)
       : mutation.error
-        ? apiErrorMessage()
+        ? apiErrorMessage(m)
         : null;
 
   return (
@@ -354,16 +354,16 @@ function ProgressEntry({ siteId, date, onSaved }: { siteId: UUID | ''; date: Bus
         submit(text);
       }}
     >
-      <p className="text-sm font-medium">{ENTRY_UI.progressTitle}</p>
+      <p className="text-sm font-medium">{m.ENTRY_UI.progressTitle}</p>
 
       <div className="grid gap-2">
         <Label htmlFor="progress-text" className="sr-only">
-          {ENTRY_UI.progressTitle}
+          {m.ENTRY_UI.progressTitle}
         </Label>
         <Textarea
           id="progress-text"
           data-testid="progress-text"
-          placeholder={ENTRY_UI.progressPlaceholder}
+          placeholder={m.ENTRY_UI.progressPlaceholder}
           value={text}
           onChange={(e) => setText(e.target.value)}
         />
@@ -383,12 +383,12 @@ function ProgressEntry({ siteId, date, onSaved }: { siteId: UUID | ''; date: Bus
       )}
       {saved && (
         <Notice tone="success" testId="progress-saved">
-          {ENTRY_UI.progressSaved}
+          {m.ENTRY_UI.progressSaved}
         </Notice>
       )}
       {photoWarning && (
         <Notice tone="warning" testId="progress-photo-warning">
-          {ENTRY_UI.photoNotUploaded}
+          {m.ENTRY_UI.photoNotUploaded}
         </Notice>
       )}
 
@@ -400,10 +400,10 @@ function ProgressEntry({ siteId, date, onSaved }: { siteId: UUID | ''; date: Bus
           disabled={mutation.isPending || !siteId}
           onClick={() => submit(NOTHING_TO_REPORT_TEXT)}
         >
-          {ENTRY_UI.nothingToReport}
+          {m.ENTRY_UI.nothingToReport}
         </Button>
         <Button type="submit" data-testid="progress-submit" disabled={mutation.isPending || !siteId}>
-          {mutation.isPending ? ENTRY_UI.saving : ENTRY_UI.progressSubmit}
+          {mutation.isPending ? m.ENTRY_UI.saving : m.ENTRY_UI.progressSubmit}
         </Button>
       </div>
     </form>
@@ -415,6 +415,7 @@ function ProgressEntry({ siteId, date, onSaved }: { siteId: UUID | ''; date: Bus
 // ---------------------------------------------------------------------------
 
 function RecentExpenses({ siteId, qs }: { siteId: UUID | ''; qs: string }) {
+  const m = useMessages();
   const q = useQuery({
     queryKey: ['records', 'expense', siteId],
     queryFn: () => api<Expense[]>('GET', `/records/expense?${qs}`),
@@ -428,7 +429,7 @@ function RecentExpenses({ siteId, qs }: { siteId: UUID | ''; qs: string }) {
       onRetry={() => void q.refetch()}
       rows={q.data?.map((e) => ({
         id: e.id,
-        primary: EXPENSE_CATEGORY_LABELS[e.category] + (e.billNo ? ` · ${e.billNo}` : ''),
+        primary: m.EXPENSE_CATEGORY_LABELS[e.category] + (e.billNo ? ` · ${e.billNo}` : ''),
         secondary: formatPaise(e.amountPaise),
         tertiary: e.businessDate,
       }))}

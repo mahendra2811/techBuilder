@@ -10,11 +10,13 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { Role } from '@techbuilder/contracts';
 import { navItemsFor } from '@/lib/nav';
+import { useMessages } from '@/lib/i18n/locale-context';
 import { cn } from '@/lib/utils';
 
 export function RoleNav({ role }: { role: Role }) {
   const pathname = usePathname();
-  const items = navItemsFor(role);
+  const m = useMessages();
+  const items = navItemsFor(role, m.NAV_LABELS);
 
   return (
     <nav data-testid="role-nav" aria-label="Primary" className="border-t">
@@ -28,6 +30,9 @@ export function RoleNav({ role }: { role: Role }) {
             <Link
               key={item.action}
               href={item.href}
+              // Some destinations are not built yet (Phase-3 placeholders) —
+              // prefetching them 404s in the console and wastes mobile data.
+              prefetch={false}
               aria-current={active ? 'page' : undefined}
               data-testid={item.testId}
               className={cn(

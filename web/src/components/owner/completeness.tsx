@@ -9,7 +9,7 @@
  */
 import type { BusinessDate, Completeness, CompletenessState } from '@techbuilder/contracts';
 import { eachDate, formatBusinessDateShort } from '@/lib/business-date';
-import { COMPLETENESS_STATE_LABELS, OWNER_UI } from '@/lib/messages';
+import { useMessages } from '@/lib/i18n/locale-context';
 import { cn } from '@/lib/utils';
 
 const BADGE_CLASS: Record<CompletenessState, string> = {
@@ -26,6 +26,7 @@ const DOT_CLASS: Record<CompletenessState, string> = {
 
 /** Labelled state pill; `state === undefined` → muted "No data". */
 export function CompletenessBadge({ state, testId }: { state: CompletenessState | undefined; testId?: string }) {
+  const m = useMessages();
   return (
     <span
       data-testid={testId}
@@ -34,7 +35,7 @@ export function CompletenessBadge({ state, testId }: { state: CompletenessState 
         state ? BADGE_CLASS[state] : 'bg-muted text-muted-foreground',
       )}
     >
-      {state ? COMPLETENESS_STATE_LABELS[state] : OWNER_UI.completenessNoData}
+      {state ? m.COMPLETENESS_STATE_LABELS[state] : m.OWNER_UI.completenessNoData}
     </span>
   );
 }
@@ -51,12 +52,13 @@ export function CompletenessDots({
   from: BusinessDate;
   to: BusinessDate;
 }) {
+  const m = useMessages();
   const byDate = new Map(rows.filter((r) => r.scopeId === siteId).map((r) => [r.businessDate, r.state]));
   return (
     <span className="flex items-center gap-1" data-testid={`completeness-dots-${siteId}`}>
       {eachDate(from, to).map((d) => {
         const state = byDate.get(d);
-        const label = `${formatBusinessDateShort(d)}: ${state ? COMPLETENESS_STATE_LABELS[state] : OWNER_UI.offDay}`;
+        const label = `${formatBusinessDateShort(d)}: ${state ? m.COMPLETENESS_STATE_LABELS[state] : m.OWNER_UI.offDay}`;
         return (
           <span
             key={d}

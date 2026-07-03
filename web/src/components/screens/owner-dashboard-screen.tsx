@@ -21,7 +21,8 @@ import type { Attendance, Completeness, OwnerDashboard, Site, UUID, Vehicle } fr
 import { api, me } from '@/lib/api-client';
 import { addDays, formatBusinessDate, todayKolkata } from '@/lib/business-date';
 import { buildTodayDigest, whatsappShareUrl, type DigestSiteLine } from '@/lib/digest';
-import { OWNER_UI } from '@/lib/messages';
+import { useMessages } from '@/lib/i18n/locale-context';
+import type { Messages } from '@/lib/i18n/messages';
 import { formatPaise } from '@/lib/money';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,15 +33,17 @@ import { cn } from '@/lib/utils';
 
 type DashWindow = 'today' | '7d' | '30d';
 
-const WINDOW_OPTIONS = [
-  { value: 'today', label: OWNER_UI.windowToday },
-  { value: '7d', label: OWNER_UI.window7d },
-  { value: '30d', label: OWNER_UI.window30d },
-] as const;
+const windowOptions = (o: Messages['OWNER_UI']) =>
+  [
+    { value: 'today', label: o.windowToday },
+    { value: '7d', label: o.window7d },
+    { value: '30d', label: o.window30d },
+  ] as const;
 
 const WINDOW_DAYS_BACK: Record<DashWindow, number> = { today: 0, '7d': 6, '30d': 29 };
 
 export function OwnerDashboardScreen() {
+  const m = useMessages();
   const today = useMemo(() => todayKolkata(), []);
   const [win, setWin] = useState<DashWindow>('7d');
   const from = addDays(today, -WINDOW_DAYS_BACK[win]);
@@ -83,7 +86,7 @@ export function OwnerDashboardScreen() {
 
   return (
     <div className="grid gap-4" data-testid="owner-dashboard">
-      <WindowToggle options={WINDOW_OPTIONS} value={win} onChange={setWin} testIdPrefix="dash-window" />
+      <WindowToggle options={windowOptions(m.OWNER_UI)} value={win} onChange={setWin} testIdPrefix="dash-window" />
 
       {dashQ.isPending ? (
         <LoadingState />
@@ -91,19 +94,19 @@ export function OwnerDashboardScreen() {
         <ErrorState error={dashQ.error} onRetry={() => void dashQ.refetch()} />
       ) : kpis ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <Kpi testId="kpi-headcount" value={String(kpis.headcountToday)} label={OWNER_UI.kpiHeadcount} />
-          <Kpi testId="kpi-spend" value={formatPaise(kpis.spendTodayPaise)} label={OWNER_UI.kpiSpendToday} />
-          <Kpi testId="kpi-sites" value={String(kpis.activeSites)} label={OWNER_UI.kpiActiveSites} />
-          <Kpi testId="kpi-vehicles" value={String(kpis.vehiclesActiveToday)} label={OWNER_UI.kpiVehiclesActive} />
-          <Kpi testId="kpi-issues" value={String(kpis.openIssues)} label={OWNER_UI.kpiOpenIssues} />
-          <Kpi testId="kpi-approvals" value={String(kpis.pendingApprovals)} label={OWNER_UI.kpiPendingApprovals} />
+          <Kpi testId="kpi-headcount" value={String(kpis.headcountToday)} label={m.OWNER_UI.kpiHeadcount} />
+          <Kpi testId="kpi-spend" value={formatPaise(kpis.spendTodayPaise)} label={m.OWNER_UI.kpiSpendToday} />
+          <Kpi testId="kpi-sites" value={String(kpis.activeSites)} label={m.OWNER_UI.kpiActiveSites} />
+          <Kpi testId="kpi-vehicles" value={String(kpis.vehiclesActiveToday)} label={m.OWNER_UI.kpiVehiclesActive} />
+          <Kpi testId="kpi-issues" value={String(kpis.openIssues)} label={m.OWNER_UI.kpiOpenIssues} />
+          <Kpi testId="kpi-approvals" value={String(kpis.pendingApprovals)} label={m.OWNER_UI.kpiPendingApprovals} />
         </div>
       ) : null}
 
       <Card>
         <CardHeader>
-          <CardTitle>{OWNER_UI.completenessTitle}</CardTitle>
-          <CardDescription>{OWNER_UI.completenessSubtitle}</CardDescription>
+          <CardTitle>{m.OWNER_UI.completenessTitle}</CardTitle>
+          <CardDescription>{m.OWNER_UI.completenessSubtitle}</CardDescription>
         </CardHeader>
         <CardContent>
           {sitesQ.isPending || comp7Q.isPending ? (
@@ -113,7 +116,7 @@ export function OwnerDashboardScreen() {
           ) : comp7Q.error ? (
             <ErrorState error={comp7Q.error} onRetry={() => void comp7Q.refetch()} />
           ) : sites.length === 0 ? (
-            <EmptyState label={OWNER_UI.sitesEmpty} />
+            <EmptyState label={m.OWNER_UI.sitesEmpty} />
           ) : (
             <ul className="divide-y">
               {sites.map((s) => {
@@ -133,7 +136,7 @@ export function OwnerDashboardScreen() {
                           {s.name} <span className="text-muted-foreground">({s.code})</span>
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {marked !== undefined && `${marked} ${OWNER_UI.markedSuffix}`}
+                          {marked !== undefined && `${marked} ${m.OWNER_UI.markedSuffix}`}
                         </p>
                       </div>
                       <CompletenessDots rows={comp7Q.data ?? []} siteId={s.id} from={dotsFrom} to={today} />
@@ -150,7 +153,7 @@ export function OwnerDashboardScreen() {
 
       <Card>
         <CardHeader>
-          <CardTitle>{OWNER_UI.costTitle}</CardTitle>
+          <CardTitle>{m.OWNER_UI.costTitle}</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4">
           {dashQ.isPending || sitesQ.isPending || vehiclesQ.isPending ? (
@@ -209,16 +212,17 @@ function CostRollupView({
   sites: Site[];
   vehicles: Vehicle[];
 }) {
-  const siteName = (id: UUID) => sites.find((s) => s.id === id)?.name ?? OWNER_UI.unknownSite;
-  const regNo = (id: UUID) => vehicles.find((v) => v.id === id)?.regNo ?? OWNER_UI.unknownVehicle;
+  const m = useMessages();
+  const siteName = (id: UUID) => sites.find((s) => s.id === id)?.name ?? m.OWNER_UI.unknownSite;
+  const regNo = (id: UUID) => vehicles.find((v) => v.id === id)?.regNo ?? m.OWNER_UI.unknownVehicle;
   if (rollup.bySite.length === 0 && rollup.byVehicle.length === 0) {
-    return <EmptyState label={OWNER_UI.costEmpty} />;
+    return <EmptyState label={m.OWNER_UI.costEmpty} />;
   }
   return (
     <>
       {rollup.bySite.length > 0 && (
         <div data-testid="cost-by-site">
-          <p className="mb-1 text-xs font-medium text-muted-foreground">{OWNER_UI.costBySite}</p>
+          <p className="mb-1 text-xs font-medium text-muted-foreground">{m.OWNER_UI.costBySite}</p>
           <ul className="divide-y">
             {rollup.bySite.map((row) => (
               <li key={row.siteId} className="flex items-baseline justify-between gap-3 py-1.5">
@@ -231,7 +235,7 @@ function CostRollupView({
       )}
       {rollup.byVehicle.length > 0 && (
         <div data-testid="cost-by-vehicle">
-          <p className="mb-1 text-xs font-medium text-muted-foreground">{OWNER_UI.costByVehicle}</p>
+          <p className="mb-1 text-xs font-medium text-muted-foreground">{m.OWNER_UI.costByVehicle}</p>
           <ul className="divide-y">
             {rollup.byVehicle.map((row) => (
               <li key={row.vehicleId} className="flex items-baseline justify-between gap-3 py-1.5">
@@ -271,11 +275,13 @@ function DigestCard({
   error: unknown;
   onRetry: () => void;
 }) {
+  const m = useMessages();
   const [copied, setCopied] = useState<'ok' | 'fail' | null>(null);
 
   const digest =
     ready && orgName && todayDash && vehicles
-      ? buildTodayDigest({
+      ? buildTodayDigest(
+          {
           orgName,
           dateLabel: formatBusinessDate(today),
           sites: sites.map((s): DigestSiteLine => {
@@ -293,7 +299,9 @@ function DigestCard({
           }),
           headcountToday: todayDash.kpis.headcountToday,
           spendTodayPaise: todayDash.kpis.spendTodayPaise,
-        })
+          },
+          m,
+        )
       : null;
 
   const copy = async () => {
@@ -309,8 +317,8 @@ function DigestCard({
   return (
     <Card data-testid="digest-card">
       <CardHeader>
-        <CardTitle>{OWNER_UI.digestTitle}</CardTitle>
-        <CardDescription>{OWNER_UI.digestSubtitle}</CardDescription>
+        <CardTitle>{m.OWNER_UI.digestTitle}</CardTitle>
+        <CardDescription>{m.OWNER_UI.digestSubtitle}</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3">
         {error ? (
@@ -334,21 +342,21 @@ function DigestCard({
                 className={cn(buttonVariants({ variant: 'default' }))}
               >
                 <MessageCircle className="size-4" aria-hidden="true" />
-                {OWNER_UI.digestShare}
+                {m.OWNER_UI.digestShare}
               </a>
               <Button type="button" variant="outline" data-testid="digest-copy" onClick={() => void copy()}>
                 <Copy className="size-4" aria-hidden="true" />
-                {OWNER_UI.digestCopy}
+                {m.OWNER_UI.digestCopy}
               </Button>
             </div>
             {copied === 'ok' && (
               <Notice tone="success" testId="digest-copied">
-                {OWNER_UI.digestCopied}
+                {m.OWNER_UI.digestCopied}
               </Notice>
             )}
             {copied === 'fail' && (
               <Notice tone="warning" testId="digest-copy-failed">
-                {OWNER_UI.digestCopyFailed}
+                {m.OWNER_UI.digestCopyFailed}
               </Notice>
             )}
           </>

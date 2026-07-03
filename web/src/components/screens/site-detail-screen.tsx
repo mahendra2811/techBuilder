@@ -29,7 +29,8 @@ import type {
 } from '@techbuilder/contracts';
 import { api } from '@/lib/api-client';
 import { addDays, formatBusinessDateShort, todayKolkata } from '@/lib/business-date';
-import { ATTENDANCE_STATUS_LABELS, EXPENSE_CATEGORY_LABELS, OWNER_UI } from '@/lib/messages';
+import { useMessages } from '@/lib/i18n/locale-context';
+import type { Messages } from '@/lib/i18n/messages';
 import { formatPaise } from '@/lib/money';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
@@ -41,19 +42,21 @@ import { cn } from '@/lib/utils';
 type DetailWindow = '7d' | '30d';
 type Tab = 'attendance' | 'expenses' | 'progress' | 'fuel';
 
-const WINDOW_OPTIONS = [
-  { value: '7d', label: OWNER_UI.window7d },
-  { value: '30d', label: OWNER_UI.window30d },
-] as const;
+const windowOptions = (o: Messages['OWNER_UI']) =>
+  [
+    { value: '7d', label: o.window7d },
+    { value: '30d', label: o.window30d },
+  ] as const;
 
-const TABS: Array<{ value: Tab; label: string }> = [
-  { value: 'attendance', label: OWNER_UI.tabAttendance },
-  { value: 'expenses', label: OWNER_UI.tabExpenses },
-  { value: 'progress', label: OWNER_UI.tabProgress },
-  { value: 'fuel', label: OWNER_UI.tabFuel },
+const tabs = (o: Messages['OWNER_UI']): Array<{ value: Tab; label: string }> => [
+  { value: 'attendance', label: o.tabAttendance },
+  { value: 'expenses', label: o.tabExpenses },
+  { value: 'progress', label: o.tabProgress },
+  { value: 'fuel', label: o.tabFuel },
 ];
 
 export function SiteDetailScreen({ siteId }: { siteId: UUID }) {
+  const m = useMessages();
   const today = useMemo(() => todayKolkata(), []);
   const [win, setWin] = useState<DetailWindow>('7d');
   const [tab, setTab] = useState<Tab>('attendance');
@@ -85,9 +88,9 @@ export function SiteDetailScreen({ siteId }: { siteId: UUID }) {
   const site = sitesQ.data?.find((s) => s.id === siteId);
   const users = usersQ.data;
   const personName = (id: UUID) => peopleQ.data?.find((p) => p.id === id)?.name ?? id;
-  const userName = (id: UUID) => users?.find((u) => u.id === id)?.name ?? OWNER_UI.auditUnknownUser;
+  const userName = (id: UUID) => users?.find((u) => u.id === id)?.name ?? m.OWNER_UI.auditUnknownUser;
   const siteVehicleIds = new Set((vehiclesQ.data ?? []).filter((v) => v.assignedSiteId === siteId).map((v) => v.id));
-  const regNo = (id: UUID) => vehiclesQ.data?.find((v) => v.id === id)?.regNo ?? OWNER_UI.unknownVehicle;
+  const regNo = (id: UUID) => vehiclesQ.data?.find((v) => v.id === id)?.regNo ?? m.OWNER_UI.unknownVehicle;
 
   const byDateDesc = <T extends { businessDate: string }>(rows: T[]): T[] =>
     [...rows].sort((a, b) => b.businessDate.localeCompare(a.businessDate));
@@ -101,7 +104,7 @@ export function SiteDetailScreen({ siteId }: { siteId: UUID }) {
           className="flex shrink-0 items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="size-4" aria-hidden="true" />
-          {OWNER_UI.siteBack}
+          {m.OWNER_UI.siteBack}
         </Link>
       </div>
 
@@ -116,14 +119,14 @@ export function SiteDetailScreen({ siteId }: { siteId: UUID }) {
               {site.name} <span className="font-normal text-muted-foreground">({site.code})</span>
             </CardTitle>
           ) : (
-            <EmptyState label={OWNER_UI.siteNotFound} />
+            <EmptyState label={m.OWNER_UI.siteNotFound} />
           )}
         </CardHeader>
         <CardContent className="grid gap-4">
-          <WindowToggle options={WINDOW_OPTIONS} value={win} onChange={setWin} testIdPrefix="detail-window" />
+          <WindowToggle options={windowOptions(m.OWNER_UI)} value={win} onChange={setWin} testIdPrefix="detail-window" />
 
           <div className="grid grid-cols-4 gap-1 rounded-lg bg-muted p-1" role="tablist">
-            {TABS.map((t) => (
+            {tabs(m.OWNER_UI).map((t) => (
               <button
                 key={t.value}
                 type="button"
@@ -146,7 +149,7 @@ export function SiteDetailScreen({ siteId }: { siteId: UUID }) {
           {tab === 'attendance' && (
             <RecordList
               query={attendanceQ}
-              emptyLabel={OWNER_UI.attendanceEmpty}
+              emptyLabel={m.OWNER_UI.attendanceEmpty}
               testId="detail-attendance"
               rows={(data) =>
                 byDateDesc(data).map((a) => (
@@ -155,9 +158,9 @@ export function SiteDetailScreen({ siteId }: { siteId: UUID }) {
                     testId={`attendance-row-${a.id}`}
                     primary={personName(a.personId)}
                     secondary={
-                      ATTENDANCE_STATUS_LABELS[a.status] + (a.otHours > 0 ? ` · ${OWNER_UI.otPrefix} ${a.otHours}h` : '')
+                      m.ATTENDANCE_STATUS_LABELS[a.status] + (a.otHours > 0 ? ` · ${m.OWNER_UI.otPrefix} ${a.otHours}h` : '')
                     }
-                    tertiary={`${formatBusinessDateShort(a.businessDate)} · ${OWNER_UI.markedByPrefix} ${userName(a.markedBy)}`}
+                    tertiary={`${formatBusinessDateShort(a.businessDate)} · ${m.OWNER_UI.markedByPrefix} ${userName(a.markedBy)}`}
                     chip={<AuditChip row={a} users={users} />}
                   />
                 ))
@@ -168,21 +171,21 @@ export function SiteDetailScreen({ siteId }: { siteId: UUID }) {
           {tab === 'expenses' && (
             <RecordList
               query={expensesQ}
-              emptyLabel={OWNER_UI.expensesEmpty}
+              emptyLabel={m.OWNER_UI.expensesEmpty}
               testId="detail-expenses"
               rows={(data) =>
                 byDateDesc(data).map((e) => (
                   <RecordRow
                     key={e.id}
                     testId={`expense-row-${e.id}`}
-                    primary={EXPENSE_CATEGORY_LABELS[e.category] + (e.billNo ? ` · ${e.billNo}` : '')}
+                    primary={m.EXPENSE_CATEGORY_LABELS[e.category] + (e.billNo ? ` · ${e.billNo}` : '')}
                     amount={formatPaise(e.amountPaise)}
-                    tertiary={`${formatBusinessDateShort(e.businessDate)} · ${OWNER_UI.enteredByPrefix} ${userName(e.enteredBy)}`}
+                    tertiary={`${formatBusinessDateShort(e.businessDate)} · ${m.OWNER_UI.enteredByPrefix} ${userName(e.enteredBy)}`}
                     chip={
                       <>
                         {e.void && (
                           <span className="inline-block w-fit rounded bg-destructive/10 px-1.5 py-0.5 text-[11px] font-medium text-destructive">
-                            {OWNER_UI.voided}
+                            {m.OWNER_UI.voided}
                           </span>
                         )}
                         <AuditChip row={e} users={users} />
@@ -197,7 +200,7 @@ export function SiteDetailScreen({ siteId }: { siteId: UUID }) {
           {tab === 'progress' && (
             <RecordList
               query={progressQ}
-              emptyLabel={OWNER_UI.progressEmpty}
+              emptyLabel={m.OWNER_UI.progressEmpty}
               testId="detail-progress"
               rows={(data) =>
                 byDateDesc(data).map((n) => (
@@ -205,7 +208,7 @@ export function SiteDetailScreen({ siteId }: { siteId: UUID }) {
                     key={n.id}
                     testId={`progress-row-${n.id}`}
                     primary={n.text}
-                    tertiary={`${formatBusinessDateShort(n.businessDate)} · ${OWNER_UI.enteredByPrefix} ${userName(n.enteredBy)}`}
+                    tertiary={`${formatBusinessDateShort(n.businessDate)} · ${m.OWNER_UI.enteredByPrefix} ${userName(n.enteredBy)}`}
                     chip={<AuditChip row={n} users={users} />}
                     wrapPrimary
                   />
@@ -217,7 +220,7 @@ export function SiteDetailScreen({ siteId }: { siteId: UUID }) {
           {tab === 'fuel' && (
             <RecordList
               query={fuelQ}
-              emptyLabel={OWNER_UI.fuelEmpty}
+              emptyLabel={m.OWNER_UI.fuelEmpty}
               testId="detail-fuel"
               filter={(rows) => rows.filter((f) => siteVehicleIds.has(f.vehicleId))}
               rows={(data) =>
@@ -226,9 +229,9 @@ export function SiteDetailScreen({ siteId }: { siteId: UUID }) {
                     key={f.id}
                     testId={`fuel-row-${f.id}`}
                     primary={regNo(f.vehicleId)}
-                    secondary={`${f.litres} ${OWNER_UI.litresSuffix}`}
+                    secondary={`${f.litres} ${m.OWNER_UI.litresSuffix}`}
                     amount={formatPaise(f.amountPaise)}
-                    tertiary={`${formatBusinessDateShort(f.businessDate)} · ${OWNER_UI.readingPrefix} ${f.reading}`}
+                    tertiary={`${formatBusinessDateShort(f.businessDate)} · ${m.OWNER_UI.readingPrefix} ${f.reading}`}
                     chip={<AuditChip row={f} users={users} />}
                   />
                 ))

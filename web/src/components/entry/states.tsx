@@ -4,15 +4,17 @@
 import { Loader2 } from 'lucide-react';
 import type { ErrorCode } from '@techbuilder/contracts';
 import { ApiClientError } from '@/lib/api-client';
-import { ENTRY_UI, apiErrorMessage } from '@/lib/messages';
+import { apiErrorMessage } from '@/lib/i18n/messages';
+import { useMessages } from '@/lib/i18n/locale-context';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-export function LoadingState({ label = ENTRY_UI.loading }: { label?: string }) {
+export function LoadingState({ label }: { label?: string }) {
+  const m = useMessages();
   return (
     <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground" data-testid="loading-state">
       <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-      {label}
+      {label ?? m.ENTRY_UI.loading}
     </div>
   );
 }
@@ -27,13 +29,14 @@ export function EmptyState({ label }: { label: string }) {
 
 /** Maps unknown/query errors through the message catalog; optional retry. */
 export function ErrorState({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
+  const m = useMessages();
   const code: ErrorCode | undefined = error instanceof ApiClientError ? error.code : undefined;
   return (
     <div className="flex flex-col items-start gap-2 py-4" role="alert" data-testid="error-state">
-      <p className="text-sm text-destructive">{apiErrorMessage(code)}</p>
+      <p className="text-sm text-destructive">{apiErrorMessage(m, code)}</p>
       {onRetry && (
         <Button variant="outline" size="sm" onClick={onRetry}>
-          {ENTRY_UI.retry}
+          {m.ENTRY_UI.retry}
         </Button>
       )}
     </div>

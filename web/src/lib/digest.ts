@@ -4,7 +4,7 @@
  * only from data the dashboard screen already fetched; stays under ~15 lines.
  */
 import type { CompletenessState, Paise } from '@techbuilder/contracts';
-import { COMPLETENESS_STATE_LABELS, OWNER_UI } from './messages';
+import type { Messages } from './i18n/messages';
 import { formatPaise } from './money';
 
 export interface DigestSiteLine {
@@ -29,23 +29,24 @@ export interface DigestInput {
   spendTodayPaise: Paise;
 }
 
-/** Plain-text digest of TODAY: org header, one line per site, org totals. */
-export function buildTodayDigest(input: DigestInput): string {
+/** Plain-text digest of TODAY: org header, one line per site, org totals.
+ * Strings come from the ACTIVE locale's catalog (the owner shares it as-is). */
+export function buildTodayDigest(input: DigestInput, m: Messages): string {
   const lines: string[] = [
     `${input.orgName} — ${input.dateLabel}`,
-    OWNER_UI.digestSitesHeading,
+    m.OWNER_UI.digestSitesHeading,
   ];
   for (const s of input.sites) {
-    const state = s.state ? COMPLETENESS_STATE_LABELS[s.state] : OWNER_UI.completenessNoData;
+    const state = s.state ? m.COMPLETENESS_STATE_LABELS[s.state] : m.OWNER_UI.completenessNoData;
     lines.push(
-      `• ${s.code} ${s.name}: ${s.markedCount} ${OWNER_UI.digestMarked} · ${state} · ` +
-        `${OWNER_UI.digestExpense} ${formatPaise(s.expensePaise)} · ${OWNER_UI.digestFuel} ${formatPaise(s.fuelPaise)}`,
+      `• ${s.code} ${s.name}: ${s.markedCount} ${m.OWNER_UI.digestMarked} · ${state} · ` +
+        `${m.OWNER_UI.digestExpense} ${formatPaise(s.expensePaise)} · ${m.OWNER_UI.digestFuel} ${formatPaise(s.fuelPaise)}`,
     );
   }
   lines.push(
-    `${OWNER_UI.digestTotalSpend} ${formatPaise(input.spendTodayPaise)}`,
-    `${OWNER_UI.digestHeadcount} ${input.headcountToday}`,
-    OWNER_UI.digestFooter,
+    `${m.OWNER_UI.digestTotalSpend} ${formatPaise(input.spendTodayPaise)}`,
+    `${m.OWNER_UI.digestHeadcount} ${input.headcountToday}`,
+    m.OWNER_UI.digestFooter,
   );
   return lines.join('\n');
 }

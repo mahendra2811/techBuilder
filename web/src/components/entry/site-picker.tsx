@@ -6,7 +6,7 @@
  * fixed read-only row; multiple render a native select.
  */
 import type { Site, UUID } from '@techbuilder/contracts';
-import { ENTRY_UI } from '@/lib/messages';
+import { useMessages } from '@/lib/i18n/locale-context';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
 import { LoadingState, EmptyState } from './states';
@@ -22,13 +22,14 @@ export function SitePicker({
   value: UUID | '';
   onChange: (siteId: UUID) => void;
 }) {
+  const m = useMessages();
   if (isLoading) return <LoadingState />;
-  if (!sites || sites.length === 0) return <EmptyState label={ENTRY_UI.noSites} />;
+  if (!sites || sites.length === 0) return <EmptyState label={m.ENTRY_UI.noSites} />;
 
   const single = sites.length === 1 ? sites[0] : undefined;
   return (
     <div className="grid gap-2">
-      <Label htmlFor="site-picker">{ENTRY_UI.site}</Label>
+      <Label htmlFor="site-picker">{m.ENTRY_UI.site}</Label>
       {single ? (
         <p
           id="site-picker"

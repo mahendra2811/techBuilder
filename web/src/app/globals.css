@@ -49,6 +49,9 @@
 }
 
 :root {
+  /* Actual UI font stack (the @theme block maps Tailwind's font-sans to this).
+     Geist covers Latin; Noto Sans Devanagari covers the Hindi-first UI. */
+  --font-sans: var(--font-geist-sans), var(--font-devanagari), ui-sans-serif, system-ui, sans-serif;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);

@@ -1,7 +1,7 @@
 'use client';
 
 /** Read-only "last 7 days" context list rendered under each entry form. */
-import { ENTRY_UI } from '@/lib/messages';
+import { useMessages } from '@/lib/i18n/locale-context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { LoadingState, EmptyState, ErrorState } from './states';
 
@@ -28,10 +28,11 @@ export function RecentEntries({
   onRetry?: () => void;
   testId: string;
 }) {
+  const m = useMessages();
   return (
     <Card size="sm" data-testid={testId}>
       <CardHeader>
-        <CardTitle>{ENTRY_UI.recentTitle}</CardTitle>
+        <CardTitle>{m.ENTRY_UI.recentTitle}</CardTitle>
       </CardHeader>
       <CardContent>
         {isLoading ? (
@@ -39,7 +40,7 @@ export function RecentEntries({
         ) : error ? (
           <ErrorState error={error} onRetry={onRetry} />
         ) : !rows || rows.length === 0 ? (
-          <EmptyState label={ENTRY_UI.recentEmpty} />
+          <EmptyState label={m.ENTRY_UI.recentEmpty} />
         ) : (
           <ul className="divide-y">
             {rows.map((r) => (

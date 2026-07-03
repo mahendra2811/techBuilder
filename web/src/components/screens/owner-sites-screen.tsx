@@ -11,12 +11,13 @@ import { ChevronRight } from 'lucide-react';
 import type { Completeness, Site } from '@techbuilder/contracts';
 import { api } from '@/lib/api-client';
 import { todayKolkata } from '@/lib/business-date';
-import { OWNER_UI } from '@/lib/messages';
+import { useMessages } from '@/lib/i18n/locale-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { CompletenessBadge } from '@/components/owner/completeness';
 import { LoadingState, EmptyState, ErrorState } from '@/components/entry/states';
 
 export function OwnerSitesScreen() {
+  const m = useMessages();
   const today = useMemo(() => todayKolkata(), []);
   const sitesQ = useQuery({ queryKey: ['sites'], queryFn: () => api<Site[]>('GET', '/sites') });
   const compQ = useQuery({
@@ -27,8 +28,8 @@ export function OwnerSitesScreen() {
   return (
     <Card data-testid="owner-sites">
       <CardHeader>
-        <CardTitle>{OWNER_UI.sitesTitle}</CardTitle>
-        <CardDescription>{OWNER_UI.sitesSubtitle}</CardDescription>
+        <CardTitle>{m.OWNER_UI.sitesTitle}</CardTitle>
+        <CardDescription>{m.OWNER_UI.sitesSubtitle}</CardDescription>
       </CardHeader>
       <CardContent>
         {sitesQ.isPending || compQ.isPending ? (
@@ -38,7 +39,7 @@ export function OwnerSitesScreen() {
         ) : compQ.error ? (
           <ErrorState error={compQ.error} onRetry={() => void compQ.refetch()} />
         ) : !sitesQ.data || sitesQ.data.length === 0 ? (
-          <EmptyState label={OWNER_UI.sitesEmpty} />
+          <EmptyState label={m.OWNER_UI.sitesEmpty} />
         ) : (
           <ul className="divide-y">
             {sitesQ.data.map((s) => {

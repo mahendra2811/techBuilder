@@ -28,7 +28,8 @@ import type {
 } from '@techbuilder/contracts';
 import { ApiClientError, api, me } from '@/lib/api-client';
 import { minEntryDate, todayKolkata } from '@/lib/business-date';
-import { ATTENDANCE_STATUS_LABELS, ENTRY_UI, apiErrorMessage } from '@/lib/messages';
+import { apiErrorMessage } from '@/lib/i18n/messages';
+import { useMessages } from '@/lib/i18n/locale-context';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -61,6 +62,7 @@ interface PendingState {
 }
 
 export function AttendanceScreen({ role }: { role: EntryRole }) {
+  const m = useMessages();
   const queryClient = useQueryClient();
   const today = useMemo(() => todayKolkata(), []);
   const [date, setDate] = useState<BusinessDate>(today);
@@ -159,14 +161,14 @@ export function AttendanceScreen({ role }: { role: EntryRole }) {
   };
 
   const serverError =
-    mark.error instanceof ApiClientError ? apiErrorMessage(mark.error.code) : mark.error ? apiErrorMessage() : null;
+    mark.error instanceof ApiClientError ? apiErrorMessage(m, mark.error.code) : mark.error ? apiErrorMessage(m) : null;
 
   return (
     <div className="grid gap-4" data-testid="attendance-screen">
       <Card>
         <CardHeader>
-          <CardTitle>{ENTRY_UI.attendanceTitle}</CardTitle>
-          <CardDescription>{ENTRY_UI.attendanceSubtitle}</CardDescription>
+          <CardTitle>{m.ENTRY_UI.attendanceTitle}</CardTitle>
+          <CardDescription>{m.ENTRY_UI.attendanceSubtitle}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
           <div className="grid grid-cols-2 items-end gap-3">
@@ -188,7 +190,7 @@ export function AttendanceScreen({ role }: { role: EntryRole }) {
               onClick={allPresent}
               disabled={people.length === 0}
             >
-              {ENTRY_UI.allPresent}
+              {m.ENTRY_UI.allPresent}
             </Button>
           </div>
           <SitePicker
@@ -210,7 +212,7 @@ export function AttendanceScreen({ role }: { role: EntryRole }) {
           ) : attendanceQ.error ? (
             <ErrorState error={attendanceQ.error} onRetry={() => void attendanceQ.refetch()} />
           ) : people.length === 0 ? (
-            <EmptyState label={ENTRY_UI.rosterEmpty} />
+            <EmptyState label={m.ENTRY_UI.rosterEmpty} />
           ) : (
             <ul className="divide-y">
               {people.map((person) => {
@@ -224,10 +226,10 @@ export function AttendanceScreen({ role }: { role: EntryRole }) {
                       {base && !pending && (
                         <span className="flex shrink-0 items-center gap-1 text-xs text-emerald-700 dark:text-emerald-400">
                           <Check className="size-3.5" aria-hidden="true" />
-                          {ENTRY_UI.markedTick}
+                          {m.ENTRY_UI.markedTick}
                           {base.version > 1 && (
                             <span className="rounded bg-amber-500/15 px-1 py-0.5 text-[10px] text-amber-700 dark:text-amber-400">
-                              {ENTRY_UI.corrected}
+                              {m.ENTRY_UI.corrected}
                             </span>
                           )}
                         </span>
@@ -245,18 +247,18 @@ export function AttendanceScreen({ role }: { role: EntryRole }) {
                           className={cn('flex-1', status === s && STATUS_SELECTED_CLASS[s])}
                           onClick={() => setStatus(person.id, s)}
                         >
-                          {ATTENDANCE_STATUS_LABELS[s]}
+                          {m.ATTENDANCE_STATUS_LABELS[s]}
                         </Button>
                       ))}
                       <label className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
-                        {ENTRY_UI.otHours}
+                        {m.ENTRY_UI.otHours}
                         <Input
                           type="number"
                           inputMode="decimal"
                           min={0}
                           max={24}
                           step={0.5}
-                          aria-label={ENTRY_UI.otHoursAria}
+                          aria-label={m.ENTRY_UI.otHoursAria}
                           data-testid={`attendance-ot-${person.id}`}
                           className="w-14 px-1.5 text-center"
                           value={effectiveOt(person.id)}
@@ -277,11 +279,11 @@ export function AttendanceScreen({ role }: { role: EntryRole }) {
           )}
           {savedCount !== null && (
             <Notice tone="success" testId="attendance-saved">
-              {ENTRY_UI.attendanceSavedPrefix} {savedCount} {ENTRY_UI.attendanceSavedSuffix}
+              {m.ENTRY_UI.attendanceSavedPrefix} {savedCount} {m.ENTRY_UI.attendanceSavedSuffix}
             </Notice>
           )}
           {savedCount === null && !mark.isPending && people.length > 0 && changedRows.length === 0 && (
-            <p className="text-xs text-muted-foreground">{ENTRY_UI.attendanceNoChanges}</p>
+            <p className="text-xs text-muted-foreground">{m.ENTRY_UI.attendanceNoChanges}</p>
           )}
 
           <Button
@@ -290,7 +292,7 @@ export function AttendanceScreen({ role }: { role: EntryRole }) {
             disabled={mark.isPending || changedRows.length === 0}
             onClick={submit}
           >
-            {mark.isPending ? ENTRY_UI.saving : `${ENTRY_UI.attendanceSubmit} (${changedRows.length})`}
+            {mark.isPending ? m.ENTRY_UI.saving : `${m.ENTRY_UI.attendanceSubmit} (${changedRows.length})`}
           </Button>
         </CardContent>
       </Card>

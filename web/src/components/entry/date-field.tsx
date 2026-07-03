@@ -6,7 +6,7 @@
  * The server stays authoritative — out-of-window picks still error cleanly.
  */
 import type { BusinessDate } from '@techbuilder/contracts';
-import { ENTRY_UI } from '@/lib/messages';
+import { useMessages } from '@/lib/i18n/locale-context';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
@@ -25,9 +25,10 @@ export function DateField({
   max: BusinessDate;
   testId: string;
 }) {
+  const m = useMessages();
   return (
     <div className="grid gap-2">
-      <Label htmlFor={id}>{ENTRY_UI.date}</Label>
+      <Label htmlFor={id}>{m.ENTRY_UI.date}</Label>
       <Input
         id={id}
         type="date"

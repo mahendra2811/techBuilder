@@ -11,9 +11,12 @@
 import type { Metadata } from 'next';
 import { ACTIONS, ROLES, scopeFor } from '@techbuilder/contracts';
 import { requireSession } from '@/lib/server/require-session';
-import { ROLE_LABEL } from '@/lib/roles';
-import { RBAC_MATRIX_UI } from '@/lib/messages';
+// Dev-only surface — deliberately pinned to the ENGLISH catalog (no locale).
+import { en } from '@/lib/i18n/messages.en';
 import { cn } from '@/lib/utils';
+
+const RBAC_MATRIX_UI = en.RBAC_MATRIX_UI;
+const ROLE_LABEL = en.ROLE_LABELS;
 
 export const metadata: Metadata = { title: RBAC_MATRIX_UI.title };
 

@@ -1,15 +1,17 @@
 /**
  * Shared shell for the 5 role areas — mobile-first top bar with org name,
- * role badge, user name and logout, plus the RBAC-driven nav (Phase 2).
- * Nav destinations are Phase-3 placeholder routes; only visibility is real.
+ * role badge, user name, language toggle (हि/EN) and logout, plus the
+ * RBAC-driven nav. Server component: reads the locale cookie per request so
+ * SSR HTML and the client (via LocaleProvider) always agree.
  */
-import type { Org, Role, User } from '@techbuilder/contracts';
-import { ROLE_LABEL } from '@/lib/roles';
-import { UI } from '@/lib/messages';
-import { LogoutButton } from './logout-button';
-import { RoleNav } from './role-nav';
+import type { Org, Role, User } from "@techbuilder/contracts";
+import { getLocale } from "@/lib/server/locale";
+import { getMessages } from "@/lib/i18n/messages";
+import { LocaleToggle } from "./locale-toggle";
+import { LogoutButton } from "./logout-button";
+import { RoleNav } from "./role-nav";
 
-export function RoleShell({
+export async function RoleShell({
   role,
   user,
   org,
@@ -20,6 +22,7 @@ export function RoleShell({
   org: Org;
   children: React.ReactNode;
 }) {
+  const m = getMessages(await getLocale());
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur">
@@ -31,12 +34,15 @@ export function RoleShell({
                 className="mr-1 inline-block rounded bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium text-primary"
                 data-testid="role-badge"
               >
-                {ROLE_LABEL[role]}
+                {m.ROLE_LABELS[role]}
               </span>
-              {UI.loggedInAs} {user.name}
+              {m.UI.loggedInAs} {user.name}
             </p>
           </div>
-          <LogoutButton />
+          <div className="flex shrink-0 items-center gap-2">
+            <LocaleToggle />
+            <LogoutButton />
+          </div>
         </div>
         <RoleNav role={role} />
       </header>

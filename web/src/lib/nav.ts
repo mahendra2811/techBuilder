@@ -28,7 +28,9 @@ import {
   Wallet,
 } from 'lucide-react';
 import { roleHome } from './roles';
-import { NAV_LABELS, type NavLabelKey } from './messages';
+import type { Messages } from '@/lib/i18n/messages';
+
+export type NavLabelKey = keyof Messages['NAV_LABELS'];
 
 interface NavDef {
   action: Action;
@@ -70,12 +72,13 @@ export function navTestId(action: Action): string {
   return `nav-${action.replace('.', '-')}`;
 }
 
-/** The nav items the given role is permitted to see, in display order. */
-export function navItemsFor(role: Role): NavItem[] {
+/** The nav items the given role is permitted to see, in display order.
+ * Labels come from the active locale's catalog (passed in by the caller). */
+export function navItemsFor(role: Role, labels: Messages['NAV_LABELS']): NavItem[] {
   const home = roleHome(role);
   return NAV_DEFS.filter((def) => can(role, def.action)).map((def) => ({
     action: def.action,
-    label: NAV_LABELS[def.labelKey],
+    label: labels[def.labelKey],
     href: `${home}${def.path}`,
     icon: def.icon,
     exact: def.path === '',

@@ -1,15 +1,15 @@
-'use client';
+"use client";
 
 /**
  * Optional photo attachment for entry forms: camera-first file input.
  * The FILE stays in parent state; the actual (best-effort) upload happens at
  * submit time via lib/media-upload — a failed upload never blocks the record.
  */
-import { useRef } from 'react';
-import { Camera, X } from 'lucide-react';
-import { ENTRY_UI } from '@/lib/messages';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
+import { useRef } from "react";
+import { Camera, X } from "lucide-react";
+import { useMessages } from "@/lib/i18n/locale-context";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 
 export function PhotoField({
   file,
@@ -20,10 +20,11 @@ export function PhotoField({
   onChange: (file: File | null) => void;
   testId: string;
 }) {
+  const m = useMessages();
   const inputRef = useRef<HTMLInputElement>(null);
   return (
     <div className="grid gap-2">
-      <Label>{ENTRY_UI.photo}</Label>
+      <Label>{m.ENTRY_UI.photo}</Label>
       <input
         ref={inputRef}
         type="file"
@@ -36,25 +37,31 @@ export function PhotoField({
       {file ? (
         <div className="flex items-center gap-2 text-sm">
           <span className="min-w-0 truncate text-muted-foreground">
-            {ENTRY_UI.photoSelected}: {file.name}
+            {m.ENTRY_UI.photoSelected}: {file.name}
           </span>
           <Button
             type="button"
             variant="ghost"
             size="icon-sm"
-            aria-label={ENTRY_UI.photoRemove}
+            aria-label={m.ENTRY_UI.photoRemove}
             onClick={() => {
               onChange(null);
-              if (inputRef.current) inputRef.current.value = '';
+              if (inputRef.current) inputRef.current.value = "";
             }}
           >
             <X aria-hidden="true" />
           </Button>
         </div>
       ) : (
-        <Button type="button" variant="outline" size="sm" className="w-fit" onClick={() => inputRef.current?.click()}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="w-fit"
+          onClick={() => inputRef.current?.click()}
+        >
           <Camera aria-hidden="true" />
-          {ENTRY_UI.photo}
+          {m.ENTRY_UI.photo}
         </Button>
       )}
     </div>

@@ -17,7 +17,8 @@ import type { BusinessDate, CreateFuelLogInput, FuelLog, UUID, Vehicle } from '@
 import { ApiClientError, api } from '@/lib/api-client';
 import { addDays, minEntryDate, todayKolkata } from '@/lib/business-date';
 import { uploadPhoto } from '@/lib/media-upload';
-import { ENTRY_UI, apiErrorMessage } from '@/lib/messages';
+import { apiErrorMessage, type Messages } from '@/lib/i18n/messages';
+import { useMessages } from '@/lib/i18n/locale-context';
 import { formatPaise, rupeesToPaise } from '@/lib/money';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,23 +32,26 @@ import { RecentEntries } from '@/components/entry/recent-entries';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
 
 // Local FORM schema only (UX); the DTO comes from the frozen contracts.
-const FuelFormSchema = z.object({
-  reading: z
-    .string()
-    .min(1, ENTRY_UI.readingInvalid)
-    .refine((v) => Number.isFinite(Number(v)) && Number(v) >= 0, ENTRY_UI.readingInvalid),
-  litres: z
-    .string()
-    .min(1, ENTRY_UI.litresInvalid)
-    .refine((v) => Number.isFinite(Number(v)) && Number(v) > 0, ENTRY_UI.litresInvalid),
-  amountRupees: z
-    .string()
-    .min(1, ENTRY_UI.amountInvalid)
-    .refine((v) => Number.isFinite(Number(v)) && Number(v) > 0, ENTRY_UI.amountInvalid),
-});
-type FuelForm = z.infer<typeof FuelFormSchema>;
+// Built per-locale (messages).
+const makeFuelFormSchema = (e: Messages['ENTRY_UI']) =>
+  z.object({
+    reading: z
+      .string()
+      .min(1, e.readingInvalid)
+      .refine((v) => Number.isFinite(Number(v)) && Number(v) >= 0, e.readingInvalid),
+    litres: z
+      .string()
+      .min(1, e.litresInvalid)
+      .refine((v) => Number.isFinite(Number(v)) && Number(v) > 0, e.litresInvalid),
+    amountRupees: z
+      .string()
+      .min(1, e.amountInvalid)
+      .refine((v) => Number.isFinite(Number(v)) && Number(v) > 0, e.amountInvalid),
+  });
+type FuelForm = z.infer<ReturnType<typeof makeFuelFormSchema>>;
 
 export function FuelScreen() {
+  const m = useMessages();
   const queryClient = useQueryClient();
   const today = useMemo(() => todayKolkata(), []);
   const [date, setDate] = useState<BusinessDate>(today);
@@ -75,7 +79,7 @@ export function FuelScreen() {
     reset,
     formState: { errors },
   } = useForm<FuelForm>({
-    resolver: zodResolver(FuelFormSchema),
+    resolver: zodResolver(useMemo(() => makeFuelFormSchema(m.ENTRY_UI), [m])),
     defaultValues: { reading: '', litres: '', amountRupees: '' },
   });
 
@@ -113,9 +117,9 @@ export function FuelScreen() {
 
   const serverError =
     mutation.error instanceof ApiClientError
-      ? apiErrorMessage(mutation.error.code)
+      ? apiErrorMessage(m, mutation.error.code)
       : mutation.error
-        ? apiErrorMessage()
+        ? apiErrorMessage(m)
         : null;
 
   const vehicleLabel = (v: Vehicle) => (v.name ? `${v.regNo} · ${v.name}` : v.regNo);
@@ -128,18 +132,18 @@ export function FuelScreen() {
     <div className="grid gap-4" data-testid="fuel-screen">
       <Card>
         <CardHeader>
-          <CardTitle>{ENTRY_UI.fuelTitle}</CardTitle>
-          <CardDescription>{ENTRY_UI.fuelSubtitle}</CardDescription>
+          <CardTitle>{m.ENTRY_UI.fuelTitle}</CardTitle>
+          <CardDescription>{m.ENTRY_UI.fuelSubtitle}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
           <div className="grid gap-2">
-            <Label htmlFor="fuel-vehicle">{ENTRY_UI.vehicle}</Label>
+            <Label htmlFor="fuel-vehicle">{m.ENTRY_UI.vehicle}</Label>
             {vehiclesQ.isPending ? (
               <LoadingState />
             ) : vehiclesQ.error ? (
               <ErrorState error={vehiclesQ.error} onRetry={() => void vehiclesQ.refetch()} />
             ) : !vehicles || vehicles.length === 0 ? (
-              <EmptyState label={ENTRY_UI.noVehicle} />
+              <EmptyState label={m.ENTRY_UI.noVehicle} />
             ) : vehicles.length === 1 ? (
               <p
                 id="fuel-vehicle"
@@ -177,7 +181,7 @@ export function FuelScreen() {
           >
             <div className="grid grid-cols-2 gap-3">
               <div className="grid gap-2">
-                <Label htmlFor="fuel-reading">{ENTRY_UI.reading}</Label>
+                <Label htmlFor="fuel-reading">{m.ENTRY_UI.reading}</Label>
                 <Input
                   id="fuel-reading"
                   type="number"
@@ -188,7 +192,7 @@ export function FuelScreen() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="fuel-litres">{ENTRY_UI.litres}</Label>
+                <Label htmlFor="fuel-litres">{m.ENTRY_UI.litres}</Label>
                 <Input
                   id="fuel-litres"
                   type="number"
@@ -207,7 +211,7 @@ export function FuelScreen() {
             )}
 
             <div className="grid gap-2">
-              <Label htmlFor="fuel-amount">{ENTRY_UI.amountRupees}</Label>
+              <Label htmlFor="fuel-amount">{m.ENTRY_UI.amountRupees}</Label>
               <Input
                 id="fuel-amount"
                 type="number"
@@ -243,21 +247,21 @@ export function FuelScreen() {
             {saved && (
               <div className="grid gap-2">
                 <Notice tone="success" testId="fuel-saved">
-                  {ENTRY_UI.fuelSaved}
+                  {m.ENTRY_UI.fuelSaved}
                 </Notice>
                 <Button type="button" variant="outline" size="sm" className="w-fit" onClick={() => setSaved(false)}>
-                  {ENTRY_UI.enterAnother}
+                  {m.ENTRY_UI.enterAnother}
                 </Button>
               </div>
             )}
             {photoWarning && (
               <Notice tone="warning" testId="fuel-photo-warning">
-                {ENTRY_UI.photoNotUploaded}
+                {m.ENTRY_UI.photoNotUploaded}
               </Notice>
             )}
 
             <Button type="submit" data-testid="fuel-submit" disabled={mutation.isPending || !vehicleId}>
-              {mutation.isPending ? ENTRY_UI.saving : ENTRY_UI.fuelSubmit}
+              {mutation.isPending ? m.ENTRY_UI.saving : m.ENTRY_UI.fuelSubmit}
             </Button>
           </form>
 

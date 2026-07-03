@@ -12,14 +12,6 @@ export const ROLE_SLUG: Record<Role, string> = {
   WORKER: 'worker',
 };
 
-export const ROLE_LABEL: Record<Role, string> = {
-  OWNER: 'Owner',
-  SITE_MANAGER: 'Site Manager',
-  TEAM_HEAD: 'Team Head',
-  DRIVER: 'Driver',
-  WORKER: 'Worker',
-};
-
 /** Absolute path of a role's home area, e.g. OWNER → "/owner". */
 export function roleHome(role: Role): string {
   return `/${ROLE_SLUG[role]}`;

@@ -16,7 +16,8 @@ import type { Attendance, Expense, Person, Site, User } from '@techbuilder/contr
 import { api, me } from '@/lib/api-client';
 import { addDays, todayKolkata } from '@/lib/business-date';
 import { attendanceSheetRows, buildWorkbook, expenseSheetRows, exportFileName } from '@/lib/export-excel';
-import { OWNER_UI } from '@/lib/messages';
+import { useMessages } from '@/lib/i18n/locale-context';
+import type { Messages } from '@/lib/i18n/messages';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { WindowToggle } from '@/components/owner/window-toggle';
@@ -24,12 +25,14 @@ import { LoadingState, ErrorState, Notice } from '@/components/entry/states';
 
 type ReportWindow = '7d' | '30d';
 
-const WINDOW_OPTIONS = [
-  { value: '7d', label: OWNER_UI.window7d },
-  { value: '30d', label: OWNER_UI.window30d },
-] as const;
+const windowOptions = (o: Messages['OWNER_UI']) =>
+  [
+    { value: '7d', label: o.window7d },
+    { value: '30d', label: o.window30d },
+  ] as const;
 
 export function ReportsScreen() {
+  const m = useMessages();
   const today = useMemo(() => todayKolkata(), []);
   const [win, setWin] = useState<ReportWindow>('7d');
   const [downloaded, setDownloaded] = useState(false);
@@ -66,8 +69,9 @@ export function ReportsScreen() {
   const download = () => {
     if (!ready || !attendance || !fileName) return;
     const wb = buildWorkbook(
-      attendanceSheetRows(attendance, sites, peopleQ.data ?? [], usersQ.data ?? []),
-      expenseSheetRows(expensesQ.data ?? [], sites, usersQ.data ?? []),
+      attendanceSheetRows(attendance, sites, peopleQ.data ?? [], usersQ.data ?? [], m),
+      expenseSheetRows(expensesQ.data ?? [], sites, usersQ.data ?? [], m),
+      m,
     );
     XLSX.writeFile(wb, fileName);
     setDownloaded(true);
@@ -76,12 +80,12 @@ export function ReportsScreen() {
   return (
     <Card data-testid="reports-screen">
       <CardHeader>
-        <CardTitle>{OWNER_UI.reportsTitle}</CardTitle>
-        <CardDescription>{OWNER_UI.reportsSubtitle}</CardDescription>
+        <CardTitle>{m.OWNER_UI.reportsTitle}</CardTitle>
+        <CardDescription>{m.OWNER_UI.reportsSubtitle}</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
         <WindowToggle
-          options={WINDOW_OPTIONS}
+          options={windowOptions(m.OWNER_UI)}
           value={win}
           onChange={(w) => {
             setDownloaded(false);
@@ -93,12 +97,12 @@ export function ReportsScreen() {
         {error ? (
           <ErrorState error={error} onRetry={() => queries.forEach((q) => void q.refetch())} />
         ) : loading || attendance === null ? (
-          <LoadingState label={OWNER_UI.reportsPreparing} />
+          <LoadingState label={m.OWNER_UI.reportsPreparing} />
         ) : (
           <dl className="grid gap-1 text-sm" data-testid="report-preview">
             <div className="flex justify-between gap-3">
               <dt className="text-muted-foreground">
-                {OWNER_UI.reportsPreviewAttendance} ({OWNER_UI.sheetAttendance})
+                {m.OWNER_UI.reportsPreviewAttendance} ({m.OWNER_UI.sheetAttendance})
               </dt>
               <dd className="font-medium tabular-nums" data-testid="report-count-attendance">
                 {attendance.length}
@@ -106,7 +110,7 @@ export function ReportsScreen() {
             </div>
             <div className="flex justify-between gap-3">
               <dt className="text-muted-foreground">
-                {OWNER_UI.reportsPreviewExpenses} ({OWNER_UI.sheetExpenses})
+                {m.OWNER_UI.reportsPreviewExpenses} ({m.OWNER_UI.sheetExpenses})
               </dt>
               <dd className="font-medium tabular-nums" data-testid="report-count-expenses">
                 {expensesQ.data?.length ?? 0}
@@ -114,7 +118,7 @@ export function ReportsScreen() {
             </div>
             {fileName && (
               <div className="flex justify-between gap-3">
-                <dt className="text-muted-foreground">{OWNER_UI.reportsFileLabel}</dt>
+                <dt className="text-muted-foreground">{m.OWNER_UI.reportsFileLabel}</dt>
                 <dd className="min-w-0 truncate font-mono text-xs" data-testid="report-file-name">
                   {fileName}
                 </dd>
@@ -125,13 +129,13 @@ export function ReportsScreen() {
 
         {downloaded && (
           <Notice tone="success" testId="report-downloaded">
-            {OWNER_UI.reportsDone}
+            {m.OWNER_UI.reportsDone}
           </Notice>
         )}
 
         <Button type="button" data-testid="report-download" disabled={!ready} onClick={download}>
           <FileSpreadsheet className="size-4" aria-hidden="true" />
-          {OWNER_UI.reportsDownload}
+          {m.OWNER_UI.reportsDownload}
         </Button>
       </CardContent>
     </Card>
