@@ -1,0 +1,45 @@
+- main [ref=f5e2]:
+  - generic [ref=f5e3]:
+    - generic [ref=f5e4]:
+      - generic [ref=f5e5]:
+        - generic [ref=f5e6]: techBuilder
+        - group "भाषा" [ref=f5e7]:
+          - button "हिं" [pressed] [ref=f5e8]
+          - button "EN" [ref=f5e9]
+      - generic [ref=f5e10]: आपकी कंपनी का रोज़ का साइट रिकॉर्ड
+    - generic [ref=f5e11]:
+      - generic [ref=f5e12]:
+        - generic [ref=f5e13]:
+          - generic [ref=f5e14]: यूज़रनेम
+          - textbox "यूज़रनेम" [ref=f5e15]
+        - generic [ref=f5e16]:
+          - generic [ref=f5e17]: पासवर्ड
+          - textbox "पासवर्ड" [ref=f5e18]
+        - button "लॉग इन करें" [ref=f5e19]
+      - generic [ref=f5e20]:
+        - paragraph [ref=f5e21]: Dev logins — tap to fill
+        - paragraph [ref=f5e22]:
+          - text: "Password for all:"
+          - code [ref=f5e23]: changeme123
+        - generic [ref=f5e24]:
+          - button "owner Owner" [ref=f5e25]:
+            - text: owner
+            - generic [ref=f5e26]: Owner
+          - button "sm1 Site Manager" [ref=f5e27]:
+            - text: sm1
+            - generic [ref=f5e28]: Site Manager
+          - button "th1 Team Head (GF)" [ref=f5e29]:
+            - text: th1
+            - generic [ref=f5e30]: Team Head (GF)
+          - button "th2 Team Head (ST)" [ref=f5e31]:
+            - text: th2
+            - generic [ref=f5e32]: Team Head (ST)
+          - button "driver1 Driver (GF)" [ref=f5e33]:
+            - text: driver1
+            - generic [ref=f5e34]: Driver (GF)
+          - button "driver3 Driver (ST)" [ref=f5e35]:
+            - text: driver3
+            - generic [ref=f5e36]: Driver (ST)
+          - button "worker1 Worker" [ref=f5e37]:
+            - text: worker1
+            - generic [ref=f5e38]: Worker

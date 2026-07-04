@@ -1,0 +1,115 @@
+- generic [ref=f17e2]:
+  - banner [ref=f17e3]:
+    - generic [ref=f17e4]:
+      - generic [ref=f17e5]:
+        - paragraph [ref=f17e6]: DevCo Builders
+        - paragraph [ref=f17e7]:
+          - generic [ref=f17e8]: साइट मैनेजर
+          - text: "लॉग इन: Rajesh Site Manager"
+      - generic [ref=f17e9]:
+        - group "भाषा" [ref=f17e10]:
+          - button "हिं" [pressed] [ref=f17e11]
+          - button "EN" [ref=f17e12]
+        - button "लॉग आउट" [ref=f17e13]
+    - navigation "Primary" [ref=f17e14]:
+      - generic [ref=f17e15]:
+        - link "डैशबोर्ड" [ref=f17e16] [cursor=pointer]:
+          - /url: /site-manager
+          - img [ref=f17e17]
+          - text: डैशबोर्ड
+        - link "हाज़िरी" [ref=f17e22] [cursor=pointer]:
+          - /url: /site-manager/attendance
+          - img [ref=f17e23]
+          - text: हाज़िरी
+        - link "रिकॉर्ड" [ref=f17e27] [cursor=pointer]:
+          - /url: /site-manager/records
+          - img [ref=f17e28]
+          - text: रिकॉर्ड
+        - link "गाड़ी / तेल" [ref=f17e31] [cursor=pointer]:
+          - /url: /site-manager/vehicle
+          - img [ref=f17e32]
+          - text: गाड़ी / तेल
+        - link "रिक्वेस्ट" [ref=f17e35] [cursor=pointer]:
+          - /url: /site-manager/requests
+          - img [ref=f17e36]
+          - text: रिक्वेस्ट
+        - link "मंज़ूरी" [ref=f17e39] [cursor=pointer]:
+          - /url: /site-manager/approvals
+          - img [ref=f17e40]
+          - text: मंज़ूरी
+        - link "लोग" [ref=f17e43] [cursor=pointer]:
+          - /url: /site-manager/people
+          - img [ref=f17e44]
+          - text: लोग
+        - link "गाड़ियाँ" [ref=f17e49] [cursor=pointer]:
+          - /url: /site-manager/fleet
+          - img [ref=f17e50]
+          - text: गाड़ियाँ
+        - link "मज़दूरी" [ref=f17e55] [cursor=pointer]:
+          - /url: /site-manager/wages
+          - img [ref=f17e56]
+          - text: मज़दूरी
+        - link "रिपोर्ट" [ref=f17e59] [cursor=pointer]:
+          - /url: /site-manager/reports
+          - img [ref=f17e60]
+          - text: रिपोर्ट
+  - main [ref=f17e63]:
+    - generic [ref=f17e64]:
+      - generic [ref=f17e66]:
+        - generic [ref=f17e67]: गाड़ियाँ
+        - generic [ref=f17e68]: गाड़ी, उसका टाइप, और कहाँ लगी है।
+      - generic [ref=f17e69]:
+        - generic [ref=f17e71]: गाड़ियाँ
+        - generic [ref=f17e73]:
+          - img [ref=f17e74]
+          - text: लोड हो रहा है…
+      - generic [ref=f17e76]:
+        - generic [ref=f17e78]: नई गाड़ी जोड़ें
+        - generic [ref=f17e80]:
+          - generic [ref=f17e81]:
+            - generic [ref=f17e82]: नंबर प्लेट
+            - textbox "नंबर प्लेट" [ref=f17e83]
+          - generic [ref=f17e84]:
+            - generic [ref=f17e85]: नाम (ज़रूरी नहीं)
+            - textbox "नाम (ज़रूरी नहीं)" [ref=f17e86]
+          - generic [ref=f17e87]:
+            - generic [ref=f17e88]: गाड़ी का टाइप
+            - generic [ref=f17e89]:
+              - img [ref=f17e90]
+              - text: लोड हो रहा है…
+          - generic [ref=f17e92]:
+            - generic [ref=f17e93]: साइट
+            - generic [ref=f17e94]:
+              - img [ref=f17e95]
+              - text: लोड हो रहा है…
+          - generic [ref=f17e97]:
+            - generic [ref=f17e98]: ड्राइवर (ज़रूरी नहीं)
+            - combobox "ड्राइवर (ज़रूरी नहीं)" [ref=f17e99]:
+              - option "कोई ड्राइवर नहीं लगा" [selected]
+          - generic [ref=f17e100]:
+            - generic [ref=f17e101]: हालत
+            - combobox "हालत" [ref=f17e102]:
+              - option "चालू"
+              - option "खाली" [selected]
+              - option "मरम्मत में"
+          - button "गाड़ी जोड़ें" [ref=f17e103]:
+            - img
+            - text: गाड़ी जोड़ें
+      - generic [ref=f17e104]:
+        - generic [ref=f17e106]: गाड़ी के टाइप
+        - generic [ref=f17e108]:
+          - img [ref=f17e109]
+          - text: लोड हो रहा है…
+      - generic [ref=f17e111]:
+        - generic [ref=f17e113]: नया टाइप जोड़ें
+        - generic [ref=f17e115]:
+          - generic [ref=f17e116]:
+            - generic [ref=f17e117]:
+              - generic [ref=f17e118]: टाइप का नाम
+              - textbox "टाइप का नाम" [ref=f17e119]
+            - generic [ref=f17e120]:
+              - generic [ref=f17e121]: हिसाब किससे
+              - combobox "हिसाब किससे" [ref=f17e122]:
+                - option "किलोमीटर" [selected]
+                - option "घंटे"
+          - button "टाइप जोड़ें" [ref=f17e123]

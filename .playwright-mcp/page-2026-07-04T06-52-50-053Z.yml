@@ -1,0 +1,105 @@
+- generic [ref=f13e2]:
+  - banner [ref=f13e3]:
+    - generic [ref=f13e4]:
+      - generic [ref=f13e5]:
+        - paragraph [ref=f13e6]: DevCo Builders
+        - paragraph [ref=f13e7]:
+          - generic [ref=f13e8]: मालिक
+          - text: "लॉग इन: Owner Sahab"
+      - generic [ref=f13e9]:
+        - group "भाषा" [ref=f13e10]:
+          - button "हिं" [pressed] [ref=f13e11]
+          - button "EN" [ref=f13e12]
+        - button "लॉग आउट" [ref=f13e13]
+    - navigation "Primary" [ref=f13e14]:
+      - generic [ref=f13e15]:
+        - link "डैशबोर्ड" [ref=f13e16] [cursor=pointer]:
+          - /url: /owner
+          - img [ref=f13e17]
+          - text: डैशबोर्ड
+        - link "हाज़िरी" [ref=f13e22] [cursor=pointer]:
+          - /url: /owner/attendance
+          - img [ref=f13e23]
+          - text: हाज़िरी
+        - link "मंज़ूरी" [ref=f13e27] [cursor=pointer]:
+          - /url: /owner/approvals
+          - img [ref=f13e28]
+          - text: मंज़ूरी
+        - link "लोग" [ref=f13e31] [cursor=pointer]:
+          - /url: /owner/people
+          - img [ref=f13e32]
+          - text: लोग
+        - link "साइटें" [ref=f13e37] [cursor=pointer]:
+          - /url: /owner/sites
+          - img [ref=f13e38]
+          - text: साइटें
+        - link "गाड़ियाँ" [ref=f13e42] [cursor=pointer]:
+          - /url: /owner/fleet
+          - img [ref=f13e43]
+          - text: गाड़ियाँ
+        - link "मज़दूरी" [ref=f13e48] [cursor=pointer]:
+          - /url: /owner/wages
+          - img [ref=f13e49]
+          - text: मज़दूरी
+        - link "रिपोर्ट" [ref=f13e52] [cursor=pointer]:
+          - /url: /owner/reports
+          - img [ref=f13e53]
+          - text: रिपोर्ट
+        - link "सेटिंग" [ref=f13e56] [cursor=pointer]:
+          - /url: /owner/settings
+          - img [ref=f13e57]
+          - text: सेटिंग
+  - main [ref=f13e60]:
+    - generic [ref=f13e61]:
+      - generic [ref=f13e62]:
+        - generic [ref=f13e63]:
+          - generic [ref=f13e64]: मज़दूरी
+          - generic [ref=f13e65]: हाज़िरी, रेट और पेशगी से बना हिसाब।
+        - tablist [ref=f13e67]:
+          - tab "7 दिन" [ref=f13e68]
+          - tab "30 दिन" [selected] [ref=f13e69]
+      - generic [ref=f13e70]:
+        - generic [ref=f13e72]: इस दौरान का कुल हिसाब
+        - generic [ref=f13e74]:
+          - img [ref=f13e75]
+          - text: लोड हो रहा है…
+      - generic [ref=f13e77]:
+        - generic [ref=f13e79]: हर मज़दूर का हिसाब
+        - generic [ref=f13e81]:
+          - img [ref=f13e82]
+          - text: लोड हो रहा है…
+      - generic [ref=f13e84]:
+        - generic [ref=f13e86]: पेशगी दर्ज करें
+        - generic [ref=f13e88]:
+          - generic [ref=f13e89]:
+            - generic [ref=f13e90]: मज़दूर
+            - generic [ref=f13e91]:
+              - img [ref=f13e92]
+              - text: लोड हो रहा है…
+          - generic [ref=f13e94]:
+            - generic [ref=f13e95]:
+              - generic [ref=f13e96]: रकम (₹)
+              - spinbutton "रकम (₹)" [ref=f13e97]
+            - generic [ref=f13e98]:
+              - generic [ref=f13e99]: तारीख
+              - textbox "तारीख" [ref=f13e100]: 2026-07-04
+          - generic [ref=f13e101]:
+            - generic [ref=f13e102]: नोट (ज़रूरी नहीं)
+            - textbox "नोट (ज़रूरी नहीं)" [ref=f13e103]
+          - button "पेशगी सेव करें" [ref=f13e104]
+      - generic [ref=f13e105]:
+        - generic [ref=f13e107]: मज़दूरी का रेट सेट करें
+        - generic [ref=f13e109]:
+          - generic [ref=f13e110]:
+            - generic [ref=f13e111]: मज़दूर
+            - generic [ref=f13e112]:
+              - img [ref=f13e113]
+              - text: लोड हो रहा है…
+          - generic [ref=f13e115]:
+            - generic [ref=f13e116]:
+              - generic [ref=f13e117]: रोज़ का रेट
+              - spinbutton "रोज़ का रेट" [ref=f13e118]
+            - generic [ref=f13e119]:
+              - generic [ref=f13e120]: कब से लागू
+              - textbox "कब से लागू" [ref=f13e121]: 2026-07-04
+          - button "रेट सेव करें" [ref=f13e122]

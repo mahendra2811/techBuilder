@@ -1,5 +1,6 @@
-import { RoleHomePlaceholder } from '@/components/role-home-placeholder';
+import { DriverDashboardScreen } from '@/components/screens/driver-dashboard-screen';
 
+// Auth + role pinning + shell come from the parent driver/layout.tsx.
 export default function Page() {
-  return <RoleHomePlaceholder role="DRIVER" />;
+  return <DriverDashboardScreen />;
 }

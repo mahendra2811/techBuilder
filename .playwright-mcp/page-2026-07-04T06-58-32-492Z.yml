@@ -1,0 +1,96 @@
+- generic [ref=f16e2]:
+  - banner [ref=f16e3]:
+    - generic [ref=f16e4]:
+      - generic [ref=f16e5]:
+        - paragraph [ref=f16e6]: DevCo Builders
+        - paragraph [ref=f16e7]:
+          - generic [ref=f16e8]: साइट मैनेजर
+          - text: "लॉग इन: Rajesh Site Manager"
+      - generic [ref=f16e9]:
+        - group "भाषा" [ref=f16e10]:
+          - button "हिं" [pressed] [ref=f16e11]
+          - button "EN" [ref=f16e12]
+        - button "लॉग आउट" [ref=f16e13]
+    - navigation "Primary" [ref=f16e14]:
+      - generic [ref=f16e15]:
+        - link "डैशबोर्ड" [ref=f16e16] [cursor=pointer]:
+          - /url: /site-manager
+          - img [ref=f16e17]
+          - text: डैशबोर्ड
+        - link "हाज़िरी" [ref=f16e22] [cursor=pointer]:
+          - /url: /site-manager/attendance
+          - img [ref=f16e23]
+          - text: हाज़िरी
+        - link "रिकॉर्ड" [ref=f16e27] [cursor=pointer]:
+          - /url: /site-manager/records
+          - img [ref=f16e28]
+          - text: रिकॉर्ड
+        - link "गाड़ी / तेल" [ref=f16e31] [cursor=pointer]:
+          - /url: /site-manager/vehicle
+          - img [ref=f16e32]
+          - text: गाड़ी / तेल
+        - link "रिक्वेस्ट" [ref=f16e35] [cursor=pointer]:
+          - /url: /site-manager/requests
+          - img [ref=f16e36]
+          - text: रिक्वेस्ट
+        - link "मंज़ूरी" [ref=f16e39] [cursor=pointer]:
+          - /url: /site-manager/approvals
+          - img [ref=f16e40]
+          - text: मंज़ूरी
+        - link "लोग" [ref=f16e43] [cursor=pointer]:
+          - /url: /site-manager/people
+          - img [ref=f16e44]
+          - text: लोग
+        - link "गाड़ियाँ" [ref=f16e49] [cursor=pointer]:
+          - /url: /site-manager/fleet
+          - img [ref=f16e50]
+          - text: गाड़ियाँ
+        - link "मज़दूरी" [ref=f16e55] [cursor=pointer]:
+          - /url: /site-manager/wages
+          - img [ref=f16e56]
+          - text: मज़दूरी
+        - link "रिपोर्ट" [ref=f16e59] [cursor=pointer]:
+          - /url: /site-manager/reports
+          - img [ref=f16e60]
+          - text: रिपोर्ट
+  - main [ref=f16e63]:
+    - generic [ref=f16e64]:
+      - generic [ref=f16e65]:
+        - generic [ref=f16e66]:
+          - generic [ref=f16e67]: मज़दूरी
+          - generic [ref=f16e68]: हाज़िरी, रेट और पेशगी से बना हिसाब।
+        - tablist [ref=f16e70]:
+          - tab "7 दिन" [ref=f16e71]
+          - tab "30 दिन" [selected] [ref=f16e72]
+      - generic [ref=f16e73]:
+        - generic [ref=f16e75]: इस दौरान का कुल हिसाब
+        - generic [ref=f16e77]:
+          - img [ref=f16e78]
+          - text: लोड हो रहा है…
+      - generic [ref=f16e80]:
+        - generic [ref=f16e82]: हर मज़दूर का हिसाब
+        - generic [ref=f16e84]:
+          - img [ref=f16e85]
+          - text: लोड हो रहा है…
+      - generic [ref=f16e87]:
+        - generic [ref=f16e89]: पेशगी दर्ज करें
+        - generic [ref=f16e91]:
+          - generic [ref=f16e92]:
+            - generic [ref=f16e93]: मज़दूर
+            - generic [ref=f16e94]:
+              - img [ref=f16e95]
+              - text: लोड हो रहा है…
+          - generic [ref=f16e97]:
+            - generic [ref=f16e98]:
+              - generic [ref=f16e99]: रकम (₹)
+              - spinbutton "रकम (₹)" [ref=f16e100]
+            - generic [ref=f16e101]:
+              - generic [ref=f16e102]: तारीख
+              - textbox "तारीख" [ref=f16e103]: 2026-07-04
+          - generic [ref=f16e104]:
+            - generic [ref=f16e105]: नोट (ज़रूरी नहीं)
+            - textbox "नोट (ज़रूरी नहीं)" [ref=f16e106]
+          - button "पेशगी सेव करें" [ref=f16e107]
+      - generic [ref=f16e108]:
+        - generic [ref=f16e110]: मज़दूरी का रेट सेट करें
+        - status [ref=f16e112]: रेट सिर्फ़ मालिक बदल सकते हैं — बदलवाने के लिए उनसे कहें।

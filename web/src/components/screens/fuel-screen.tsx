@@ -1,9 +1,12 @@
 'use client';
 
 /**
- * Fuel entry (DRIVER — /driver/vehicle). GET /vehicles is server-scoped to the
- * driver's assigned vehicle(s): exactly one renders as a fixed card, several as
- * a native select. After save: green saved state + "Enter another" (form resets).
+ * Fuel entry (DRIVER — /driver/vehicle; SITE_MANAGER — /site-manager/vehicle).
+ * GET /vehicles is server-scoped per role (driver: assigned vehicle(s); SM:
+ * their sites' fleet): exactly one renders as a fixed card, several as a
+ * native select. `role` only widens the date picker to the role's backdating
+ * window — the form, save flow and recent list are identical.
+ * After save: green saved state + "Enter another" (form resets).
  * Recent fuel entries (7 days, already vehicle-scoped) listed below.
  */
 import { useMemo, useState } from 'react';
@@ -50,7 +53,7 @@ const makeFuelFormSchema = (e: Messages['ENTRY_UI']) =>
   });
 type FuelForm = z.infer<ReturnType<typeof makeFuelFormSchema>>;
 
-export function FuelScreen() {
+export function FuelScreen({ role = 'DRIVER' }: { role?: 'DRIVER' | 'SITE_MANAGER' }) {
   const m = useMessages();
   const queryClient = useQueryClient();
   const today = useMemo(() => todayKolkata(), []);
@@ -233,7 +236,7 @@ export function FuelScreen() {
               testId="fuel-date"
               value={date}
               onChange={setDate}
-              min={minEntryDate('DRIVER', today)}
+              min={minEntryDate(role, today)}
               max={today}
             />
 

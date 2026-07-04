@@ -110,6 +110,26 @@ export async function readAuthCookies(): Promise<{
 }
 
 /**
+ * Short-lived in-memory memo for GET /me, keyed by access token.
+ *
+ * Why: every SSR render of a protected page calls getSession(); against a
+ * remote Postgres (Neon) that round-trip costs 1.5–2s of TTFB PER PAGE VIEW.
+ * The access token itself already has a 15-minute validity window, so serving
+ * the same token's /me for up to 60s does not weaken auth (the token is what
+ * authenticates; role/flag changes propagate within the TTL).
+ *
+ * Invalidation: password change busts the entry (see /api/proxy route);
+ * login/refresh mint NEW tokens, which are new cache keys by construction.
+ */
+const SESSION_MEMO_TTL_MS = 60_000;
+const SESSION_MEMO_MAX = 500;
+const sessionMemo = new Map<string, { at: number; session: Session }>();
+
+export function invalidateSessionMemo(accessToken: string | null | undefined): void {
+  if (accessToken) sessionMemo.delete(accessToken);
+}
+
+/**
  * Resolve the current session via GET /me using the httpOnly access cookie.
  * Server Components cannot rotate cookies, so NO refresh is attempted here —
  * proxy.ts refreshes an expired access cookie before rendering ever starts.
@@ -118,6 +138,22 @@ export async function readAuthCookies(): Promise<{
 export async function getSession(): Promise<Session | null> {
   const { accessToken } = await readAuthCookies();
   if (!accessToken) return null;
+
+  const hit = sessionMemo.get(accessToken);
+  if (hit && Date.now() - hit.at < SESSION_MEMO_TTL_MS) return hit.session;
+
   const res = await backendFetch<Session>('GET', '/me', { accessToken });
-  return res.ok ? res.data : null;
+  if (!res.ok) {
+    sessionMemo.delete(accessToken);
+    return null;
+  }
+  sessionMemo.set(accessToken, { at: Date.now(), session: res.data });
+  if (sessionMemo.size > SESSION_MEMO_MAX) {
+    // Map iterates in insertion order — drop the oldest half.
+    for (const key of sessionMemo.keys()) {
+      if (sessionMemo.size <= SESSION_MEMO_MAX / 2) break;
+      sessionMemo.delete(key);
+    }
+  }
+  return res.data;
 }

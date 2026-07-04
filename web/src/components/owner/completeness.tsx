@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 
 const BADGE_CLASS: Record<CompletenessState, string> = {
   COMPLETE: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
-  PARTIAL: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
+  PARTIAL: 'bg-amber-500/15 text-amber-800 dark:text-amber-400',
   MISSING: 'bg-destructive/10 text-destructive',
 };
 

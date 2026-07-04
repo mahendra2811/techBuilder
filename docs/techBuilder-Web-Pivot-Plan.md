@@ -79,11 +79,26 @@ Split into two verified batches: **Batch A = screens 1–4** (attendance roster 
 3. **Tests:** 31 unit + **21** integration (2 new: REST create windows per role + sync create window) — all green vs live Neon. Live HTTP proof: 10-day-old expense → `FORBIDDEN: Backdating window exceeded: SITE_MANAGER may go up to 7 day(s) back (Owner override required)`; future date → `VALIDATION_FAILED: Business date cannot be in the future`; same-password → `VALIDATION_FAILED: New password must be different from the current password`.
 4. Dev convenience: cleared `must_change_password` for the remaining devco seed users (driver2-4, worker2-6) since re-entering the same password is now rejected; Spec §5 updated with both new policy lines. Web posture confirmed online-required v1 (no offline queue).
 
-## Phase 5 — Polish + pilot prep (not started)
+## Phase 5 — Polish + pilot prep — ✅ DONE & INDEPENDENTLY VERIFIED (2026-07-03; Fable-5 agent built it, orchestrator completed verification after the agent died on an API error at the finish line)
 
-PWA manifest + icon, responsive QA on a low-end Android browser, Hindi completeness for SM/TH/Driver flows, Sentry (web + backend), `web/README.md` (run/env/deploy — Vercel for web + Railway/Render for backend, only when pilot time actually comes).
+**Hindi (the big item):** two-locale catalog system at `web/src/lib/i18n/` (`messages.en.ts` = shape source, `messages.hi.ts` typed `: Messages` against it — **a missing Hindi key is a TS compile error**, proven: TS2741). Locale = plain `tb_locale` cookie (not a secret), **default `hi`** (Hindi-first product); server components read it via `cookies()`, clients via `LocaleProvider` — verified **zero hydration errors** in a real-browser toggle round-trip (hi→en→hi). **हिं/EN toggle** (`locale-toggle` group with `locale-hi`/`locale-en` buttons) in RoleShell + login. Register = everyday site Hindi (सब हाज़िर, हाज़िरी सेव करें, आधा दिन…), 164 Devanagari chars SSR'd on the TH attendance page; dev-only surfaces stay English by design.
+**PWA:** `src/app/manifest.ts` (standalone, brand `#1A5276`, name techBuilder) + icons 192/512/512-maskable + apple-icon — all serve 200; no service worker (online-required v1; installability doesn't need one on current Chrome).
+**Lighthouse (authed `/owner`, mobile, prod build):** **Performance 91 · Accessibility 100 · Best Practices 100 · SEO 100** (target was ≥85).
+**Docs:** `web/README.md` (run/env/dev-logins/locale-how-to/strip-before-pilot); also `docs/techBuilder-Web-Local-Dev-Startup.md` (local run guide, supersedes the Expo-era TESTING-AND-SETUP for the web stack).
+**Deferred:** **Sentry** (needs the user to create a free sentry.io account + 2 DSNs — ~10 min to wire once provided).
 
-**Acceptance:** Lighthouse mobile ≥85 on the dashboard, add-to-home-screen works, all pilot screens usable one-handed on a phone.
+---
+
+## ✅ PIVOT PLAN COMPLETE (Phases 0–5, 2026-07-03 — one day)
+Everything except Sentry monitoring is done and verified. Remaining before a real pilot: Sentry DSNs; strip dev-only surfaces (login dev panel, `/dev/rbac-matrix`); host the backend again (Railway config still committed, ~2 min) + deploy web (Vercel); re-seed a real merchant via `npm run seed:merchant`; run the Pilot Playbook.
+
+## ✅ FULL PAGE BUILD-OUT COMPLETE (2026-07-04) — every nav route for every role now resolves
+After the pivot, all remaining placeholder/404/coming-soon routes were built in 3 sequential verified batches (model split per user: Fable=structure, Opus=logic, Sonnet=mechanical). **Backend needed ZERO new work** — every screen consumes existing scope-enforced endpoints.
+- **Batch 1 (Fable):** 4 role-home dashboards (SM reuses owner dashboard auto-scoped; TH/Driver/Worker composed from their own scoped reads since `/dashboards/owner` + `/completeness` are Owner/SM-only) + reuse wrappers (`/site-manager/reports`, `/site-manager/vehicle`, `/owner/attendance`). `RoleHomePlaceholder` deleted.
+- **Batch 2 (Opus):** approvals inbox (owner/SM/TH) + raise-request (SM/TH/Driver) + people mgmt/cascade-create (owner/SM/TH). Live-verified: self-approval blocked, cross-scope approve works, cascade limit (SM can't create OWNER) enforced.
+- **Batch 3 (Sonnet):** fleet (owner/SM, list + add vehicle/type) + wage summary (owner/SM, read-only payable + record advances, owner-only rate-set) + settings (owner, READ-ONLY org-config viewer).
+- **Whole-app proof:** logged in as all 5 roles, probed all 29 nav destinations → **all HTTP 200, zero error pages, zero 404s, zero placeholders.** Build 41 routes, typecheck/lint clean, `backend`/`shared`/`app` untouched throughout.
+- **Known backend gaps (reported, NOT worked around with hacks; decide later):** (1) **no crews list/create/membership API** — in-app crew management impossible; a TH created in-app has no crew until one is seeded, and worker→crew assignment can't be done in-app (People screen builds what existing endpoints allow + surfaces this). (2) **no org-config update endpoint** — Settings is read-only; editable settings would need a `config.manage`-gated org-config PATCH re-validated via `parseOrgConfig`.
 
 ---
 

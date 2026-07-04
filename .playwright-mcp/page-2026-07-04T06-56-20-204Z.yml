@@ -1,0 +1,63 @@
+- generic [active] [ref=f15e1]:
+  - generic [ref=f15e2]:
+    - banner [ref=f15e3]:
+      - generic [ref=f15e4]:
+        - generic [ref=f15e5]:
+          - paragraph [ref=f15e6]: DevCo Builders
+          - paragraph [ref=f15e7]:
+            - generic [ref=f15e8]: मालिक
+            - text: "लॉग इन: Owner Sahab"
+        - generic [ref=f15e9]:
+          - group "भाषा" [ref=f15e10]:
+            - button "हिं" [pressed] [ref=f15e11]
+            - button "EN" [ref=f15e12]
+          - button "लॉग आउट" [ref=f15e13]
+      - navigation "Primary" [ref=f15e14]:
+        - generic [ref=f15e15]:
+          - link "डैशबोर्ड" [ref=f15e16] [cursor=pointer]:
+            - /url: /owner
+            - img [ref=f15e17]
+            - text: डैशबोर्ड
+          - link "हाज़िरी" [ref=f15e22] [cursor=pointer]:
+            - /url: /owner/attendance
+            - img [ref=f15e23]
+            - text: हाज़िरी
+          - link "मंज़ूरी" [ref=f15e27] [cursor=pointer]:
+            - /url: /owner/approvals
+            - img [ref=f15e28]
+            - text: मंज़ूरी
+          - link "लोग" [ref=f15e31] [cursor=pointer]:
+            - /url: /owner/people
+            - img [ref=f15e32]
+            - text: लोग
+          - link "साइटें" [ref=f15e37] [cursor=pointer]:
+            - /url: /owner/sites
+            - img [ref=f15e38]
+            - text: साइटें
+          - link "गाड़ियाँ" [ref=f15e42] [cursor=pointer]:
+            - /url: /owner/fleet
+            - img [ref=f15e43]
+            - text: गाड़ियाँ
+          - link "मज़दूरी" [ref=f15e48] [cursor=pointer]:
+            - /url: /owner/wages
+            - img [ref=f15e49]
+            - text: मज़दूरी
+          - link "रिपोर्ट" [ref=f15e52] [cursor=pointer]:
+            - /url: /owner/reports
+            - img [ref=f15e53]
+            - text: रिपोर्ट
+          - link "सेटिंग" [ref=f15e56] [cursor=pointer]:
+            - /url: /owner/settings
+            - img [ref=f15e57]
+            - text: सेटिंग
+    - main [ref=f15e60]:
+      - generic [ref=f15e61]:
+        - generic [ref=f15e62]:
+          - generic [ref=f15e63]:
+            - generic [ref=f15e64]: सेटिंग
+            - generic [ref=f15e65]: आपकी कंपनी का सेटअप।
+          - status [ref=f15e67]: यह सेटिंग आपकी कंपनी जोड़ते वक़्त डेवलपर द्वारा सेट की जाती है। ऐप के अंदर से बदलना आगे आने वाला है।
+        - generic [ref=f15e70]:
+          - img [ref=f15e71]
+          - text: लोड हो रहा है…
+  - alert [ref=f15e73]

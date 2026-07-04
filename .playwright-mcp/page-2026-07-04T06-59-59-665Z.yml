@@ -1,0 +1,94 @@
+- generic [ref=f18e2]:
+  - banner [ref=f18e3]:
+    - generic [ref=f18e4]:
+      - generic [ref=f18e5]:
+        - paragraph [ref=f18e6]: DevCo Builders
+        - paragraph [ref=f18e7]:
+          - generic [ref=f18e8]: साइट मैनेजर
+          - text: "लॉग इन: Rajesh Site Manager"
+      - generic [ref=f18e9]:
+        - group "भाषा" [ref=f18e10]:
+          - button "हिं" [pressed] [ref=f18e11]
+          - button "EN" [ref=f18e12]
+        - button "लॉग आउट" [ref=f18e13]
+    - navigation "Primary" [ref=f18e14]:
+      - generic [ref=f18e15]:
+        - link "डैशबोर्ड" [ref=f18e16] [cursor=pointer]:
+          - /url: /site-manager
+          - img [ref=f18e17]
+          - text: डैशबोर्ड
+        - link "हाज़िरी" [ref=f18e22] [cursor=pointer]:
+          - /url: /site-manager/attendance
+          - img [ref=f18e23]
+          - text: हाज़िरी
+        - link "रिकॉर्ड" [ref=f18e27] [cursor=pointer]:
+          - /url: /site-manager/records
+          - img [ref=f18e28]
+          - text: रिकॉर्ड
+        - link "गाड़ी / तेल" [ref=f18e31] [cursor=pointer]:
+          - /url: /site-manager/vehicle
+          - img [ref=f18e32]
+          - text: गाड़ी / तेल
+        - link "रिक्वेस्ट" [ref=f18e35] [cursor=pointer]:
+          - /url: /site-manager/requests
+          - img [ref=f18e36]
+          - text: रिक्वेस्ट
+        - link "मंज़ूरी" [ref=f18e39] [cursor=pointer]:
+          - /url: /site-manager/approvals
+          - img [ref=f18e40]
+          - text: मंज़ूरी
+        - link "लोग" [ref=f18e43] [cursor=pointer]:
+          - /url: /site-manager/people
+          - img [ref=f18e44]
+          - text: लोग
+        - link "गाड़ियाँ" [ref=f18e49] [cursor=pointer]:
+          - /url: /site-manager/fleet
+          - img [ref=f18e50]
+          - text: गाड़ियाँ
+        - link "मज़दूरी" [ref=f18e55] [cursor=pointer]:
+          - /url: /site-manager/wages
+          - img [ref=f18e56]
+          - text: मज़दूरी
+        - link "रिपोर्ट" [ref=f18e59] [cursor=pointer]:
+          - /url: /site-manager/reports
+          - img [ref=f18e60]
+          - text: रिपोर्ट
+  - main [ref=f18e63]:
+    - generic [ref=f18e64]:
+      - generic [ref=f18e65]:
+        - heading "साइट डैशबोर्ड" [level=1] [ref=f18e66]
+        - paragraph [ref=f18e67]: आपकी साइटों का हाल एक नज़र में।
+      - tablist [ref=f18e68]:
+        - tab "आज" [ref=f18e69]
+        - tab "7 दिन" [selected] [ref=f18e70]
+        - tab "30 दिन" [ref=f18e71]
+      - generic [ref=f18e98]:
+        - generic [ref=f18e99]: रोज़ का रिकॉर्ड — हर साइट का
+        - generic [ref=f18e100]: आज का हाल और पिछले 7 दिन।
+      - generic [ref=f18e111]: पैसा कहाँ गया
+      - generic [ref=f18e120]:
+        - generic [ref=f18e122]: शॉर्टकट
+        - generic [ref=f18e124]:
+          - link "हाज़िरी" [ref=f18e125] [cursor=pointer]:
+            - /url: /site-manager/attendance
+            - img [ref=f18e126]
+            - generic [ref=f18e130]: हाज़िरी
+          - link "रिकॉर्ड" [ref=f18e131] [cursor=pointer]:
+            - /url: /site-manager/records
+            - img [ref=f18e132]
+            - generic [ref=f18e135]: रिकॉर्ड
+          - link "गाड़ी / तेल" [ref=f18e136] [cursor=pointer]:
+            - /url: /site-manager/vehicle
+            - img [ref=f18e137]
+            - generic [ref=f18e140]: गाड़ी / तेल
+          - link "रिपोर्ट" [ref=f18e141] [cursor=pointer]:
+            - /url: /site-manager/reports
+            - img [ref=f18e142]
+            - generic [ref=f18e145]: रिपोर्ट
+      - generic [ref=f18e146]:
+        - generic [ref=f18e147]:
+          - generic [ref=f18e148]: आज का सार
+          - generic [ref=f18e149]: आपके WhatsApp ग्रुप के लिए एक मैसेज।
+        - generic [ref=f18e151]:
+          - img [ref=f18e152]
+          - text: लोड हो रहा है…

@@ -1,0 +1,56 @@
+- generic [active] [ref=f7e1]:
+  - generic [ref=f7e2]:
+    - banner [ref=f7e3]:
+      - generic [ref=f7e4]:
+        - generic [ref=f7e5]:
+          - paragraph [ref=f7e6]: DevCo Builders
+          - paragraph [ref=f7e7]:
+            - generic [ref=f7e8]: टीम हेड
+            - text: "लॉग इन: Mistri Greenfield"
+        - generic [ref=f7e9]:
+          - group "भाषा" [ref=f7e10]:
+            - button "हिं" [pressed] [ref=f7e11]
+            - button "EN" [ref=f7e12]
+          - button "लॉग आउट" [ref=f7e13]
+      - navigation "Primary" [ref=f7e14]:
+        - generic [ref=f7e15]:
+          - link "डैशबोर्ड" [ref=f7e16] [cursor=pointer]:
+            - /url: /team-head
+            - img [ref=f7e17]
+            - text: डैशबोर्ड
+          - link "हाज़िरी" [ref=f7e22] [cursor=pointer]:
+            - /url: /team-head/attendance
+            - img [ref=f7e23]
+            - text: हाज़िरी
+          - link "रिकॉर्ड" [ref=f7e27] [cursor=pointer]:
+            - /url: /team-head/records
+            - img [ref=f7e28]
+            - text: रिकॉर्ड
+          - link "रिक्वेस्ट" [ref=f7e31] [cursor=pointer]:
+            - /url: /team-head/requests
+            - img [ref=f7e32]
+            - text: रिक्वेस्ट
+          - link "मंज़ूरी" [ref=f7e35] [cursor=pointer]:
+            - /url: /team-head/approvals
+            - img [ref=f7e36]
+            - text: मंज़ूरी
+          - link "लोग" [ref=f7e39] [cursor=pointer]:
+            - /url: /team-head/people
+            - img [ref=f7e40]
+            - text: लोग
+    - main [ref=f7e45]:
+      - generic [ref=f7e46]:
+        - generic [ref=f7e47]:
+          - generic [ref=f7e48]:
+            - generic [ref=f7e49]: मंज़ूरी
+            - generic [ref=f7e50]: आपके फ़ैसले के इंतज़ार में रिक्वेस्ट।
+          - tablist "दिखाएँ" [ref=f7e52]:
+            - tab "बाकी" [selected] [ref=f7e53]
+            - tab "मंज़ूर" [ref=f7e54]
+            - tab "नामंज़ूर" [ref=f7e55]
+            - tab "सभी" [ref=f7e56]
+        - generic [ref=f7e57]:
+          - img [ref=f7e58]
+          - text: लोड हो रहा है…
+  - button "Open Next.js Dev Tools" [ref=f7e65] [cursor=pointer]:
+    - img [ref=f7e66]

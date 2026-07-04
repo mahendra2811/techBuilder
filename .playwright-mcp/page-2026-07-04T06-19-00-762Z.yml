@@ -1,0 +1,84 @@
+- generic [active] [ref=f6e1]:
+  - generic [ref=f6e2]:
+    - banner [ref=f6e3]:
+      - generic [ref=f6e4]:
+        - generic [ref=f6e5]:
+          - paragraph [ref=f6e6]: DevCo Builders
+          - paragraph [ref=f6e7]:
+            - generic [ref=f6e8]: टीम हेड
+            - text: "लॉग इन: Mistri Greenfield"
+        - generic [ref=f6e9]:
+          - group "भाषा" [ref=f6e10]:
+            - button "हिं" [pressed] [ref=f6e11]
+            - button "EN" [ref=f6e12]
+          - button "लॉग आउट" [ref=f6e13]
+      - navigation "Primary" [ref=f6e14]:
+        - generic [ref=f6e15]:
+          - link "डैशबोर्ड" [ref=f6e16] [cursor=pointer]:
+            - /url: /team-head
+            - img [ref=f6e17]
+            - text: डैशबोर्ड
+          - link "हाज़िरी" [ref=f6e22] [cursor=pointer]:
+            - /url: /team-head/attendance
+            - img [ref=f6e23]
+            - text: हाज़िरी
+          - link "रिकॉर्ड" [ref=f6e27] [cursor=pointer]:
+            - /url: /team-head/records
+            - img [ref=f6e28]
+            - text: रिकॉर्ड
+          - link "रिक्वेस्ट" [ref=f6e31] [cursor=pointer]:
+            - /url: /team-head/requests
+            - img [ref=f6e32]
+            - text: रिक्वेस्ट
+          - link "मंज़ूरी" [ref=f6e35] [cursor=pointer]:
+            - /url: /team-head/approvals
+            - img [ref=f6e36]
+            - text: मंज़ूरी
+          - link "लोग" [ref=f6e39] [cursor=pointer]:
+            - /url: /team-head/people
+            - img [ref=f6e40]
+            - text: लोग
+    - main [ref=f6e45]:
+      - generic [ref=f6e46]:
+        - generic [ref=f6e47]:
+          - generic [ref=f6e48]:
+            - generic [ref=f6e49]: नई रिक्वेस्ट
+            - generic [ref=f6e50]: मंज़ूरी के लिए रिक्वेस्ट भेजें।
+          - generic [ref=f6e52]:
+            - generic [ref=f6e53]:
+              - generic [ref=f6e54]: किस बारे में
+              - generic [ref=f6e55]:
+                - button "छुट्टी" [pressed] [ref=f6e56]
+                - button "माल / सामान" [ref=f6e57]
+                - button "गाड़ी बदलना" [ref=f6e58]
+            - separator [ref=f6e59]
+            - generic [ref=f6e60]:
+              - generic [ref=f6e61]: मज़दूर
+              - combobox "मज़दूर" [ref=f6e62]:
+                - option "मैं खुद" [selected]
+            - generic [ref=f6e63]:
+              - generic [ref=f6e64]:
+                - generic [ref=f6e65]: से
+                - textbox "से" [ref=f6e66]: 2026-07-04
+              - generic [ref=f6e67]:
+                - generic [ref=f6e68]: तक
+                - textbox "तक" [ref=f6e69]: 2026-07-04
+            - generic [ref=f6e70]:
+              - generic [ref=f6e71]: छुट्टी का टाइप
+              - combobox "छुट्टी का टाइप" [ref=f6e72]:
+                - option "आम छुट्टी" [selected]
+                - option "बीमारी"
+                - option "बिना तनख़्वाह"
+                - option "अन्य"
+            - generic [ref=f6e73]:
+              - generic [ref=f6e74]: वजह
+              - textbox "वजह" [ref=f6e75]:
+                - /placeholder: कुछ और? (ज़रूरी नहीं)
+            - button "रिक्वेस्ट भेजें" [ref=f6e76]
+        - generic [ref=f6e77]:
+          - generic [ref=f6e79]: मेरी रिक्वेस्ट
+          - generic [ref=f6e81]:
+            - img [ref=f6e82]
+            - text: लोड हो रहा है…
+  - button "Open Next.js Dev Tools" [ref=f6e89] [cursor=pointer]:
+    - img [ref=f6e90]

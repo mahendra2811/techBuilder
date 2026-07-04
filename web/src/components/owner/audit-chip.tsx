@@ -23,7 +23,7 @@ export function AuditChip({
   return (
     <span
       data-testid="audit-chip"
-      className="inline-block w-fit shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[11px] text-amber-700 dark:text-amber-400"
+      className="inline-block w-fit shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[11px] text-amber-800 dark:text-amber-400"
     >
       {m.OWNER_UI.auditCorrected} — {name} · {formatKolkataDateTime(row.updatedAt)}
     </span>

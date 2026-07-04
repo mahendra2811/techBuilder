@@ -1,0 +1,225 @@
+- generic [ref=f9e1]:
+  - generic [ref=f9e2]:
+    - banner [ref=f9e3]:
+      - generic [ref=f9e4]:
+        - generic [ref=f9e5]:
+          - paragraph [ref=f9e6]: DevCo Builders
+          - paragraph [ref=f9e7]:
+            - generic [ref=f9e8]: मालिक
+            - text: "लॉग इन: Owner Sahab"
+        - generic [ref=f9e9]:
+          - group "भाषा" [ref=f9e10]:
+            - button "हिं" [pressed] [ref=f9e11]
+            - button "EN" [ref=f9e12]
+          - button "लॉग आउट" [ref=f9e13]
+      - navigation "Primary" [ref=f9e14]:
+        - generic [ref=f9e15]:
+          - link "डैशबोर्ड" [ref=f9e16] [cursor=pointer]:
+            - /url: /owner
+            - img [ref=f9e17]
+            - text: डैशबोर्ड
+          - link "हाज़िरी" [ref=f9e22] [cursor=pointer]:
+            - /url: /owner/attendance
+            - img [ref=f9e23]
+            - text: हाज़िरी
+          - link "मंज़ूरी" [ref=f9e27] [cursor=pointer]:
+            - /url: /owner/approvals
+            - img [ref=f9e28]
+            - text: मंज़ूरी
+          - link "लोग" [ref=f9e31] [cursor=pointer]:
+            - /url: /owner/people
+            - img [ref=f9e32]
+            - text: लोग
+          - link "साइटें" [ref=f9e37] [cursor=pointer]:
+            - /url: /owner/sites
+            - img [ref=f9e38]
+            - text: साइटें
+          - link "गाड़ियाँ" [ref=f9e42] [cursor=pointer]:
+            - /url: /owner/fleet
+            - img [ref=f9e43]
+            - text: गाड़ियाँ
+          - link "मज़दूरी" [ref=f9e48] [cursor=pointer]:
+            - /url: /owner/wages
+            - img [ref=f9e49]
+            - text: मज़दूरी
+          - link "रिपोर्ट" [ref=f9e52] [cursor=pointer]:
+            - /url: /owner/reports
+            - img [ref=f9e53]
+            - text: रिपोर्ट
+          - link "सेटिंग" [ref=f9e56] [cursor=pointer]:
+            - /url: /owner/settings
+            - img [ref=f9e57]
+            - text: सेटिंग
+    - main [ref=f9e60]:
+      - generic [ref=f9e61]:
+        - generic [ref=f9e63]:
+          - generic [ref=f9e64]: लोग
+          - generic [ref=f9e65]: लॉगिन और मज़दूरों की लिस्ट संभालें।
+        - generic [ref=f9e66]:
+          - generic [ref=f9e68]: लॉगिन
+          - list [ref=f9e124]:
+            - listitem [ref=f9e231]:
+              - generic [ref=f9e232]:
+                - paragraph [ref=f9e233]: UI Test SM
+                - paragraph [ref=f9e234]: ui_sm_pw1 · साइट मैनेजर
+              - generic [ref=f9e235]: चालू
+              - button "बंद करें" [ref=f9e236]
+            - listitem [ref=f9e125]:
+              - generic [ref=f9e126]:
+                - paragraph [ref=f9e127]: Test TH
+                - paragraph [ref=f9e128]: test_th_d7b33a · टीम हेड
+              - generic [ref=f9e129]: चालू
+              - button "बंद करें" [ref=f9e130]
+            - listitem [ref=f9e131]:
+              - generic [ref=f9e132]:
+                - paragraph [ref=f9e133]: Test SM
+                - paragraph [ref=f9e134]: test_sm_87b8e1 · साइट मैनेजर
+              - generic [ref=f9e135]: चालू
+              - button "बंद करें" [ref=f9e136]
+            - listitem [ref=f9e137]:
+              - generic [ref=f9e138]:
+                - paragraph [ref=f9e139]: Crew Driver
+                - paragraph [ref=f9e140]: crewdrv_8f06a8 · ड्राइवर
+              - generic [ref=f9e141]: चालू
+              - button "बंद करें" [ref=f9e142]
+            - listitem [ref=f9e149]:
+              - generic [ref=f9e150]:
+                - paragraph [ref=f9e151]: Mistri Greenfield
+                - paragraph [ref=f9e152]: th1 · टीम हेड
+              - generic [ref=f9e153]: चालू
+              - button "बंद करें" [ref=f9e154]
+            - listitem [ref=f9e155]:
+              - generic [ref=f9e156]:
+                - paragraph [ref=f9e157]: Mistri Sunrise
+                - paragraph [ref=f9e158]: th2 · टीम हेड
+              - generic [ref=f9e159]: चालू
+              - button "बंद करें" [ref=f9e160]
+            - listitem [ref=f9e161]:
+              - generic [ref=f9e162]:
+                - paragraph [ref=f9e163]: Ramesh Driver
+                - paragraph [ref=f9e164]: driver2 · ड्राइवर
+              - generic [ref=f9e165]: चालू
+              - button "बंद करें" [ref=f9e166]
+            - listitem [ref=f9e167]:
+              - generic [ref=f9e168]:
+                - paragraph [ref=f9e169]: Suraj Driver
+                - paragraph [ref=f9e170]: driver3 · ड्राइवर
+              - generic [ref=f9e171]: चालू
+              - button "बंद करें" [ref=f9e172]
+            - listitem [ref=f9e208]:
+              - generic [ref=f9e209]:
+                - paragraph [ref=f9e210]: Manoj Driver
+                - paragraph [ref=f9e211]: driver4 · ड्राइवर
+              - generic [ref=f9e212]: चालू
+              - button "बंद करें" [ref=f9e213]
+            - listitem [ref=f9e173]:
+              - generic [ref=f9e174]:
+                - paragraph [ref=f9e175]: Owner Sahab
+                - paragraph [ref=f9e176]: owner · मालिक
+              - generic [ref=f9e177]: चालू
+            - listitem [ref=f9e184]:
+              - generic [ref=f9e185]:
+                - paragraph [ref=f9e186]: Mangal Singh
+                - paragraph [ref=f9e187]: worker3 · मज़दूर
+              - generic [ref=f9e188]: चालू
+              - button "बंद करें" [ref=f9e189]
+            - listitem [ref=f9e190]:
+              - generic [ref=f9e191]:
+                - paragraph [ref=f9e192]: Suresh Prasad
+                - paragraph [ref=f9e193]: worker4 · मज़दूर
+              - generic [ref=f9e194]: चालू
+              - button "बंद करें" [ref=f9e195]
+            - listitem [ref=f9e196]:
+              - generic [ref=f9e197]:
+                - paragraph [ref=f9e198]: Vikram Rathore
+                - paragraph [ref=f9e199]: worker5 · मज़दूर
+              - generic [ref=f9e200]: चालू
+              - button "बंद करें" [ref=f9e201]
+            - listitem [ref=f9e202]:
+              - generic [ref=f9e203]:
+                - paragraph [ref=f9e204]: Ajay Kumar
+                - paragraph [ref=f9e205]: worker6 · मज़दूर
+              - generic [ref=f9e206]: चालू
+              - button "बंद करें" [ref=f9e207]
+            - listitem [ref=f9e178]:
+              - generic [ref=f9e179]:
+                - paragraph [ref=f9e180]: Shyam Kumar
+                - paragraph [ref=f9e181]: worker2 · मज़दूर
+              - generic [ref=f9e182]: चालू
+              - button "बंद करें" [ref=f9e183]
+            - listitem [ref=f9e214]:
+              - generic [ref=f9e215]:
+                - paragraph [ref=f9e216]: Rajesh Site Manager
+                - paragraph [ref=f9e217]: sm1 · साइट मैनेजर
+              - generic [ref=f9e218]: चालू
+              - button "बंद करें" [ref=f9e219]
+            - listitem [ref=f9e220]:
+              - generic [ref=f9e221]:
+                - paragraph [ref=f9e222]: Dinesh Driver
+                - paragraph [ref=f9e223]: driver1 · ड्राइवर
+              - generic [ref=f9e224]: चालू
+              - button "बंद करें" [ref=f9e225]
+            - listitem [ref=f9e143]:
+              - generic [ref=f9e144]:
+                - paragraph [ref=f9e145]: Ramu Yadav
+                - paragraph [ref=f9e146]: worker1 · मज़दूर
+              - generic [ref=f9e147]: चालू
+              - button "बंद करें" [ref=f9e148]
+        - generic [ref=f9e73]:
+          - generic [ref=f9e75]: नया लॉगिन बनाएँ
+          - generic [ref=f9e77]:
+            - generic [ref=f9e78]:
+              - generic [ref=f9e79]: भूमिका
+              - combobox "भूमिका" [ref=f9e80]:
+                - option "साइट मैनेजर" [selected]
+                - option "टीम हेड"
+                - option "ड्राइवर"
+                - option "मज़दूर"
+            - generic [ref=f9e81]:
+              - generic [ref=f9e82]: नाम
+              - textbox "नाम" [ref=f9e83]: Dup SM
+            - generic [ref=f9e84]:
+              - generic [ref=f9e85]: यूज़रनेम
+              - textbox "यूज़रनेम" [active] [ref=f9e86]: ui_sm_pw1
+            - generic [ref=f9e87]:
+              - generic [ref=f9e88]: फ़ोन (ज़रूरी नहीं)
+              - textbox "फ़ोन (ज़रूरी नहीं)" [ref=f9e89]
+            - generic [ref=f9e90]:
+              - generic [ref=f9e91]: साइट
+              - combobox "साइट" [ref=f9e226]:
+                - option "— कोई नहीं —"
+                - option "Greenfield Residency (GF)" [selected]
+                - option "Sunrise Towers (ST)"
+            - status [ref=f9e228]:
+              - text: "लॉगिन बन गया। यूज़रनेम:"
+              - strong [ref=f9e229]: ui_sm_pw1
+              - text: "· अस्थायी पासवर्ड:"
+              - strong [ref=f9e230]: tb-HG6VVHEZ
+              - text: यह पासवर्ड यूज़र को दें — पहली बार लॉगिन पर वे अपना नया पासवर्ड बनाएँगे।
+            - button "लॉगिन बनाएँ" [ref=f9e95]
+        - generic [ref=f9e96]:
+          - generic [ref=f9e98]: मज़दूर जोड़ें (मज़दूर लिस्ट)
+          - generic [ref=f9e100]:
+            - generic [ref=f9e101]:
+              - generic [ref=f9e102]: मज़दूर का नाम
+              - textbox "मज़दूर का नाम" [ref=f9e103]
+            - generic [ref=f9e104]:
+              - generic [ref=f9e105]:
+                - generic [ref=f9e106]: हुनर (ज़रूरी नहीं)
+                - combobox "हुनर (ज़रूरी नहीं)" [ref=f9e107]:
+                  - option "— कोई नहीं —" [selected]
+                  - option "बिना हुनर"
+                  - option "थोड़ा हुनर"
+                  - option "हुनरमंद"
+                  - option "ऑपरेटर"
+                  - option "ड्राइवर"
+              - generic [ref=f9e108]:
+                - generic [ref=f9e109]: रोज़ की मज़दूरी ₹ (ज़रूरी नहीं)
+                - spinbutton "रोज़ की मज़दूरी ₹ (ज़रूरी नहीं)" [ref=f9e110]
+            - generic [ref=f9e111]:
+              - generic [ref=f9e112]: फ़ोन (ज़रूरी नहीं)
+              - textbox "फ़ोन (ज़रूरी नहीं)" [ref=f9e113]
+            - button "मज़दूर जोड़ें" [ref=f9e114]
+  - button "Open Next.js Dev Tools" [ref=f9e120] [cursor=pointer]:
+    - img [ref=f9e121]
+  - alert [ref=f9e227]

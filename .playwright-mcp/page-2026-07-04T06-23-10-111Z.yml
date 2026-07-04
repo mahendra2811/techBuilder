@@ -1,0 +1,112 @@
+- generic [active] [ref=f9e1]:
+  - generic [ref=f9e2]:
+    - banner [ref=f9e3]:
+      - generic [ref=f9e4]:
+        - generic [ref=f9e5]:
+          - paragraph [ref=f9e6]: DevCo Builders
+          - paragraph [ref=f9e7]:
+            - generic [ref=f9e8]: मालिक
+            - text: "लॉग इन: Owner Sahab"
+        - generic [ref=f9e9]:
+          - group "भाषा" [ref=f9e10]:
+            - button "हिं" [pressed] [ref=f9e11]
+            - button "EN" [ref=f9e12]
+          - button "लॉग आउट" [ref=f9e13]
+      - navigation "Primary" [ref=f9e14]:
+        - generic [ref=f9e15]:
+          - link "डैशबोर्ड" [ref=f9e16] [cursor=pointer]:
+            - /url: /owner
+            - img [ref=f9e17]
+            - text: डैशबोर्ड
+          - link "हाज़िरी" [ref=f9e22] [cursor=pointer]:
+            - /url: /owner/attendance
+            - img [ref=f9e23]
+            - text: हाज़िरी
+          - link "मंज़ूरी" [ref=f9e27] [cursor=pointer]:
+            - /url: /owner/approvals
+            - img [ref=f9e28]
+            - text: मंज़ूरी
+          - link "लोग" [ref=f9e31] [cursor=pointer]:
+            - /url: /owner/people
+            - img [ref=f9e32]
+            - text: लोग
+          - link "साइटें" [ref=f9e37] [cursor=pointer]:
+            - /url: /owner/sites
+            - img [ref=f9e38]
+            - text: साइटें
+          - link "गाड़ियाँ" [ref=f9e42] [cursor=pointer]:
+            - /url: /owner/fleet
+            - img [ref=f9e43]
+            - text: गाड़ियाँ
+          - link "मज़दूरी" [ref=f9e48] [cursor=pointer]:
+            - /url: /owner/wages
+            - img [ref=f9e49]
+            - text: मज़दूरी
+          - link "रिपोर्ट" [ref=f9e52] [cursor=pointer]:
+            - /url: /owner/reports
+            - img [ref=f9e53]
+            - text: रिपोर्ट
+          - link "सेटिंग" [ref=f9e56] [cursor=pointer]:
+            - /url: /owner/settings
+            - img [ref=f9e57]
+            - text: सेटिंग
+    - main [ref=f9e60]:
+      - generic [ref=f9e61]:
+        - generic [ref=f9e63]:
+          - generic [ref=f9e64]: लोग
+          - generic [ref=f9e65]: लॉगिन और मज़दूरों की लिस्ट संभालें।
+        - generic [ref=f9e66]:
+          - generic [ref=f9e68]: लॉगिन
+          - generic [ref=f9e70]:
+            - img [ref=f9e71]
+            - text: लोड हो रहा है…
+        - generic [ref=f9e73]:
+          - generic [ref=f9e75]: नया लॉगिन बनाएँ
+          - generic [ref=f9e77]:
+            - generic [ref=f9e78]:
+              - generic [ref=f9e79]: भूमिका
+              - combobox "भूमिका" [ref=f9e80]:
+                - option "साइट मैनेजर" [selected]
+                - option "टीम हेड"
+                - option "ड्राइवर"
+                - option "मज़दूर"
+            - generic [ref=f9e81]:
+              - generic [ref=f9e82]: नाम
+              - textbox "नाम" [ref=f9e83]
+            - generic [ref=f9e84]:
+              - generic [ref=f9e85]: यूज़रनेम
+              - textbox "यूज़रनेम" [ref=f9e86]
+            - generic [ref=f9e87]:
+              - generic [ref=f9e88]: फ़ोन (ज़रूरी नहीं)
+              - textbox "फ़ोन (ज़रूरी नहीं)" [ref=f9e89]
+            - generic [ref=f9e90]:
+              - generic [ref=f9e91]: साइट
+              - generic [ref=f9e92]:
+                - img [ref=f9e93]
+                - text: लोड हो रहा है…
+            - button "लॉगिन बनाएँ" [ref=f9e95]
+        - generic [ref=f9e96]:
+          - generic [ref=f9e98]: मज़दूर जोड़ें (मज़दूर लिस्ट)
+          - generic [ref=f9e100]:
+            - generic [ref=f9e101]:
+              - generic [ref=f9e102]: मज़दूर का नाम
+              - textbox "मज़दूर का नाम" [ref=f9e103]
+            - generic [ref=f9e104]:
+              - generic [ref=f9e105]:
+                - generic [ref=f9e106]: हुनर (ज़रूरी नहीं)
+                - combobox "हुनर (ज़रूरी नहीं)" [ref=f9e107]:
+                  - option "— कोई नहीं —" [selected]
+                  - option "बिना हुनर"
+                  - option "थोड़ा हुनर"
+                  - option "हुनरमंद"
+                  - option "ऑपरेटर"
+                  - option "ड्राइवर"
+              - generic [ref=f9e108]:
+                - generic [ref=f9e109]: रोज़ की मज़दूरी ₹ (ज़रूरी नहीं)
+                - spinbutton "रोज़ की मज़दूरी ₹ (ज़रूरी नहीं)" [ref=f9e110]
+            - generic [ref=f9e111]:
+              - generic [ref=f9e112]: फ़ोन (ज़रूरी नहीं)
+              - textbox "फ़ोन (ज़रूरी नहीं)" [ref=f9e113]
+            - button "मज़दूर जोड़ें" [ref=f9e114]
+  - button "Open Next.js Dev Tools" [ref=f9e120] [cursor=pointer]:
+    - img [ref=f9e121]

@@ -1,13 +1,15 @@
 'use client';
 
 /**
- * Attendance roster (SM + TH — one component, two thin route wrappers).
+ * Attendance roster (Owner + SM + TH — one component, three thin route
+ * wrappers). Role differences are entirely data-driven: GET /sites (Owner all,
+ * SM own, TH one) feeds the picker, GET /people pre-scopes the roster, and
+ * minEntryDate applies the role's backdating window (Owner unlimited).
  *
  * ≤30-second flow: date defaults to today → "All present" → adjust exceptions →
- * single submit. Lists come pre-scoped from the backend (GET /people returns
- * only the roster this role may mark). Existing attendance for the chosen
- * date+site pre-fills the roster, so re-opening shows saved state and edits
- * become server-side upsert corrections (version bumps).
+ * single submit. Existing attendance for the chosen date+site pre-fills the
+ * roster, so re-opening shows saved state and edits become server-side upsert
+ * corrections (version bumps).
  *
  * Only CHANGED rows are submitted — re-sending an identical row would bump its
  * version and falsely flag it as "corrected" in exports.
@@ -39,7 +41,7 @@ import { SitePicker } from '@/components/entry/site-picker';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
 import { cn } from '@/lib/utils';
 
-type EntryRole = 'SITE_MANAGER' | 'TEAM_HEAD';
+type EntryRole = 'OWNER' | 'SITE_MANAGER' | 'TEAM_HEAD';
 
 interface RowEdit {
   status?: AttendanceStatus;
@@ -228,7 +230,7 @@ export function AttendanceScreen({ role }: { role: EntryRole }) {
                           <Check className="size-3.5" aria-hidden="true" />
                           {m.ENTRY_UI.markedTick}
                           {base.version > 1 && (
-                            <span className="rounded bg-amber-500/15 px-1 py-0.5 text-[10px] text-amber-700 dark:text-amber-400">
+                            <span className="rounded bg-amber-500/15 px-1 py-0.5 text-[10px] text-amber-800 dark:text-amber-400">
                               {m.ENTRY_UI.corrected}
                             </span>
                           )}

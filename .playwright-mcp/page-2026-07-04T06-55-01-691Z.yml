@@ -1,0 +1,168 @@
+- generic [active] [ref=f14e1]:
+  - generic [ref=f14e2]:
+    - banner [ref=f14e3]:
+      - generic [ref=f14e4]:
+        - generic [ref=f14e5]:
+          - paragraph [ref=f14e6]: DevCo Builders
+          - paragraph [ref=f14e7]:
+            - generic [ref=f14e8]: मालिक
+            - text: "लॉग इन: Owner Sahab"
+        - generic [ref=f14e9]:
+          - group "भाषा" [ref=f14e10]:
+            - button "हिं" [pressed] [ref=f14e11]
+            - button "EN" [ref=f14e12]
+          - button "लॉग आउट" [ref=f14e13]
+      - navigation "Primary" [ref=f14e14]:
+        - generic [ref=f14e15]:
+          - link "डैशबोर्ड" [ref=f14e16] [cursor=pointer]:
+            - /url: /owner
+            - img [ref=f14e17]
+            - text: डैशबोर्ड
+          - link "हाज़िरी" [ref=f14e22] [cursor=pointer]:
+            - /url: /owner/attendance
+            - img [ref=f14e23]
+            - text: हाज़िरी
+          - link "मंज़ूरी" [ref=f14e27] [cursor=pointer]:
+            - /url: /owner/approvals
+            - img [ref=f14e28]
+            - text: मंज़ूरी
+          - link "लोग" [ref=f14e31] [cursor=pointer]:
+            - /url: /owner/people
+            - img [ref=f14e32]
+            - text: लोग
+          - link "साइटें" [ref=f14e37] [cursor=pointer]:
+            - /url: /owner/sites
+            - img [ref=f14e38]
+            - text: साइटें
+          - link "गाड़ियाँ" [ref=f14e42] [cursor=pointer]:
+            - /url: /owner/fleet
+            - img [ref=f14e43]
+            - text: गाड़ियाँ
+          - link "मज़दूरी" [ref=f14e48] [cursor=pointer]:
+            - /url: /owner/wages
+            - img [ref=f14e49]
+            - text: मज़दूरी
+          - link "रिपोर्ट" [ref=f14e52] [cursor=pointer]:
+            - /url: /owner/reports
+            - img [ref=f14e53]
+            - text: रिपोर्ट
+          - link "सेटिंग" [ref=f14e56] [cursor=pointer]:
+            - /url: /owner/settings
+            - img [ref=f14e57]
+            - text: सेटिंग
+    - main [ref=f14e60]:
+      - generic [ref=f14e61]:
+        - generic [ref=f14e62]:
+          - generic [ref=f14e63]:
+            - generic [ref=f14e64]: मज़दूरी
+            - generic [ref=f14e65]: हाज़िरी, रेट और पेशगी से बना हिसाब।
+          - tablist [ref=f14e67]:
+            - tab "7 दिन" [ref=f14e68]
+            - tab "30 दिन" [selected] [ref=f14e69]
+        - generic [ref=f14e70]:
+          - generic [ref=f14e72]: इस दौरान का कुल हिसाब
+          - generic [ref=f14e123]:
+            - generic [ref=f14e124]:
+              - paragraph [ref=f14e125]: ₹4,693.75
+              - paragraph [ref=f14e126]: कुल बनता है
+            - generic [ref=f14e127]:
+              - paragraph [ref=f14e128]: ₹0
+              - paragraph [ref=f14e129]: पेशगी
+            - generic [ref=f14e130]:
+              - paragraph [ref=f14e131]: ₹4,693.75
+              - paragraph [ref=f14e132]: कुल देना है
+        - generic [ref=f14e77]:
+          - generic [ref=f14e79]: हर मज़दूर का हिसाब
+          - list [ref=f14e133]:
+            - listitem [ref=f14e134]:
+              - generic [ref=f14e135]:
+                - paragraph [ref=f14e136]: Ajay Kumar
+                - generic [ref=f14e137]: ₹600देना है
+              - paragraph [ref=f14e138]: 1 हाज़िर · 0 आधा दिन · 0 OT · ₹600 रोज़ का रेट
+              - paragraph [ref=f14e139]: "बनता है: ₹600 · पेशगी: ₹0"
+            - listitem [ref=f14e140]:
+              - generic [ref=f14e141]:
+                - paragraph [ref=f14e142]: Mangal Singh
+                - generic [ref=f14e143]: ₹600देना है
+              - paragraph [ref=f14e144]: 1 हाज़िर · 0 आधा दिन · 0 OT · ₹600 रोज़ का रेट
+              - paragraph [ref=f14e145]: "बनता है: ₹600 · पेशगी: ₹0"
+            - listitem [ref=f14e146]:
+              - generic [ref=f14e147]:
+                - paragraph [ref=f14e148]: Ramu Yadav
+                - generic [ref=f14e149]: ₹1,093.75देना है
+              - paragraph [ref=f14e150]: 2 हाज़िर · 0 आधा दिन · 1 OT · ₹500 रोज़ का रेट
+              - paragraph [ref=f14e151]: "बनता है: ₹1,093.75 · पेशगी: ₹0"
+            - listitem [ref=f14e152]:
+              - generic [ref=f14e153]:
+                - paragraph [ref=f14e154]: Shyam Kumar
+                - generic [ref=f14e155]: ₹700देना है
+              - paragraph [ref=f14e156]: 1 हाज़िर · 0 आधा दिन · 0 OT · ₹700 रोज़ का रेट
+              - paragraph [ref=f14e157]: "बनता है: ₹700 · पेशगी: ₹0"
+            - listitem [ref=f14e158]:
+              - generic [ref=f14e159]:
+                - paragraph [ref=f14e160]: Suresh Prasad
+                - generic [ref=f14e161]: ₹1,000देना है
+              - paragraph [ref=f14e162]: 2 हाज़िर · 0 आधा दिन · 0 OT · ₹500 रोज़ का रेट
+              - paragraph [ref=f14e163]: "बनता है: ₹1,000 · पेशगी: ₹0"
+            - listitem [ref=f14e164]:
+              - generic [ref=f14e165]:
+                - paragraph [ref=f14e166]: Vikram Rathore
+                - generic [ref=f14e167]: ₹700देना है
+              - paragraph [ref=f14e168]: 1 हाज़िर · 0 आधा दिन · 0 OT · ₹700 रोज़ का रेट
+              - paragraph [ref=f14e169]: "बनता है: ₹700 · पेशगी: ₹0"
+        - generic [ref=f14e84]:
+          - generic [ref=f14e86]: पेशगी दर्ज करें
+          - generic [ref=f14e88]:
+            - generic [ref=f14e89]:
+              - generic [ref=f14e90]: मज़दूर
+              - combobox "मज़दूर" [ref=f14e170]:
+                - option "मज़दूर चुनें"
+                - option "Test Labour ba11"
+                - option "Shyam Kumar"
+                - option "Mangal Singh"
+                - option "Suresh Prasad"
+                - option "Vikram Rathore"
+                - option "Ramu Yadav" [selected]
+                - option "Dinesh Driver"
+                - option "Ramesh Driver"
+                - option "Suraj Driver"
+                - option "Manoj Driver"
+                - option "Ajay Kumar"
+            - generic [ref=f14e94]:
+              - generic [ref=f14e95]:
+                - generic [ref=f14e96]: रकम (₹)
+                - spinbutton "रकम (₹)" [ref=f14e97]
+              - generic [ref=f14e98]:
+                - generic [ref=f14e99]: तारीख
+                - textbox "तारीख" [ref=f14e100]: 2026-07-04
+            - generic [ref=f14e101]:
+              - generic [ref=f14e102]: नोट (ज़रूरी नहीं)
+              - textbox "नोट (ज़रूरी नहीं)" [ref=f14e103]
+            - button "पेशगी सेव करें" [ref=f14e104]
+        - generic [ref=f14e105]:
+          - generic [ref=f14e107]: मज़दूरी का रेट सेट करें
+          - generic [ref=f14e109]:
+            - generic [ref=f14e110]:
+              - generic [ref=f14e111]: मज़दूर
+              - combobox "मज़दूर" [ref=f14e171]:
+                - option "मज़दूर चुनें" [selected]
+                - option "Test Labour ba11"
+                - option "Shyam Kumar"
+                - option "Mangal Singh"
+                - option "Suresh Prasad"
+                - option "Vikram Rathore"
+                - option "Ramu Yadav"
+                - option "Dinesh Driver"
+                - option "Ramesh Driver"
+                - option "Suraj Driver"
+                - option "Manoj Driver"
+                - option "Ajay Kumar"
+            - generic [ref=f14e115]:
+              - generic [ref=f14e116]:
+                - generic [ref=f14e117]: रोज़ का रेट
+                - spinbutton "रोज़ का रेट" [ref=f14e118]
+              - generic [ref=f14e119]:
+                - generic [ref=f14e120]: कब से लागू
+                - textbox "कब से लागू" [ref=f14e121]: 2026-07-04
+            - button "रेट सेव करें" [ref=f14e122]
+  - alert [ref=f14e172]

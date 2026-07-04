@@ -9,7 +9,7 @@
  */
 import { NextResponse, type NextRequest } from 'next/server';
 import type { ApiError } from '@techbuilder/contracts';
-import { backendFetch, backendRefresh, type BackendMethod } from '@/lib/server/backend';
+import { backendFetch, backendRefresh, invalidateSessionMemo, type BackendMethod } from '@/lib/server/backend';
 import {
   ACCESS_COOKIE,
   DEVICE_COOKIE,
@@ -39,6 +39,9 @@ async function handle(req: NextRequest, ctx: Ctx) {
     method === 'GET' || method === 'DELETE' ? undefined : ((await req.json().catch(() => undefined)) as unknown);
 
   const accessToken = req.cookies.get(ACCESS_COOKIE)?.value ?? null;
+  // Password change clears mustChangePassword server-side — bust the SSR
+  // session memo so the next server render sees the fresh flag immediately.
+  if (joined === 'auth/change-password') invalidateSessionMemo(accessToken);
   const first = await backendFetch<unknown>(method, target, { accessToken, body });
 
   const needsRefresh =

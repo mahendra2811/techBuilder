@@ -14,12 +14,14 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// Hindi-first product: Devanagari glyphs come from a proper self-hosted font
-// (falls back to system Devanagari where unavailable).
+// Hindi-first product: Devanagari glyphs come from a proper self-hosted font.
+// display:"optional" — on a slow first load the system Devanagari fallback is
+// kept for the whole pageview (no late font swap => no LCP re-paint, no CLS);
+// the font is cached and used from the next navigation onward.
 const notoDevanagari = Noto_Sans_Devanagari({
   variable: "--font-devanagari",
   subsets: ["devanagari"],
-  display: "swap",
+  display: "optional",
 });
 
 export const metadata: Metadata = {

@@ -1,0 +1,121 @@
+- generic [active] [ref=f7e1]:
+  - generic [ref=f7e2]:
+    - banner [ref=f7e3]:
+      - generic [ref=f7e4]:
+        - generic [ref=f7e5]:
+          - paragraph [ref=f7e6]: DevCo Builders
+          - paragraph [ref=f7e7]:
+            - generic [ref=f7e8]: टीम हेड
+            - text: "लॉग इन: Mistri Greenfield"
+        - generic [ref=f7e9]:
+          - group "भाषा" [ref=f7e10]:
+            - button "हिं" [pressed] [ref=f7e11]
+            - button "EN" [ref=f7e12]
+          - button "लॉग आउट" [ref=f7e13]
+      - navigation "Primary" [ref=f7e14]:
+        - generic [ref=f7e15]:
+          - link "डैशबोर्ड" [ref=f7e16] [cursor=pointer]:
+            - /url: /team-head
+            - img [ref=f7e17]
+            - text: डैशबोर्ड
+          - link "हाज़िरी" [ref=f7e22] [cursor=pointer]:
+            - /url: /team-head/attendance
+            - img [ref=f7e23]
+            - text: हाज़िरी
+          - link "रिकॉर्ड" [ref=f7e27] [cursor=pointer]:
+            - /url: /team-head/records
+            - img [ref=f7e28]
+            - text: रिकॉर्ड
+          - link "रिक्वेस्ट" [ref=f7e31] [cursor=pointer]:
+            - /url: /team-head/requests
+            - img [ref=f7e32]
+            - text: रिक्वेस्ट
+          - link "मंज़ूरी" [ref=f7e35] [cursor=pointer]:
+            - /url: /team-head/approvals
+            - img [ref=f7e36]
+            - text: मंज़ूरी
+          - link "लोग" [ref=f7e39] [cursor=pointer]:
+            - /url: /team-head/people
+            - img [ref=f7e40]
+            - text: लोग
+    - main [ref=f7e45]:
+      - generic [ref=f7e46]:
+        - generic [ref=f7e47]:
+          - generic [ref=f7e48]:
+            - generic [ref=f7e49]: मंज़ूरी
+            - generic [ref=f7e50]: आपके फ़ैसले के इंतज़ार में रिक्वेस्ट।
+          - tablist "दिखाएँ" [ref=f7e52]:
+            - tab "बाकी" [selected] [ref=f7e53]
+            - tab "मंज़ूर" [ref=f7e54]
+            - tab "नामंज़ूर" [ref=f7e55]
+            - tab "सभी" [ref=f7e56]
+        - list [ref=f7e70]:
+          - listitem [ref=f7e71]:
+            - generic [ref=f7e72]:
+              - generic [ref=f7e73]:
+                - generic [ref=f7e74]:
+                  - generic [ref=f7e75]: गाड़ी बदलना
+                  - generic [ref=f7e76]: बाकी
+                - generic [ref=f7e77]: "भेजने वाला: Crew Driver · 04 Jul, 11:50"
+              - generic [ref=f7e78]:
+                - generic [ref=f7e79]:
+                  - generic [ref=f7e80]:
+                    - term [ref=f7e81]: गाड़ी
+                    - definition [ref=f7e82]: MH04AB1001
+                  - generic [ref=f7e83]:
+                    - term [ref=f7e84]: वजह
+                    - definition [ref=f7e85]: Truck breakdown, need swap
+                - generic [ref=f7e86]:
+                  - textbox "टिप्पणी (ज़रूरी नहीं)" [ref=f7e87]:
+                    - /placeholder: भेजने वाले के लिए कुछ लिखें…
+                  - generic [ref=f7e88]:
+                    - button "हो रहा है…" [disabled]
+                    - button "हो रहा है…" [disabled]
+          - listitem [ref=f7e91]:
+            - generic [ref=f7e92]:
+              - generic [ref=f7e93]:
+                - generic [ref=f7e94]:
+                  - generic [ref=f7e95]: छुट्टी
+                  - generic [ref=f7e96]: बाकी
+                - generic [ref=f7e97]: "भेजने वाला: Crew Driver · 04 Jul, 11:44"
+              - generic [ref=f7e99]:
+                - generic [ref=f7e100]:
+                  - term [ref=f7e101]: मज़दूर
+                  - definition [ref=f7e102]: मैं खुद
+                - generic [ref=f7e103]:
+                  - term [ref=f7e104]: से
+                  - definition [ref=f7e105]: 2026-07-04
+                - generic [ref=f7e106]:
+                  - term [ref=f7e107]: तक
+                  - definition [ref=f7e108]: 2026-07-04
+                - generic [ref=f7e109]:
+                  - term [ref=f7e110]: छुट्टी का टाइप
+                  - definition [ref=f7e111]: बीमारी
+          - listitem [ref=f7e112]:
+            - generic [ref=f7e113]:
+              - generic [ref=f7e114]:
+                - generic [ref=f7e115]:
+                  - generic [ref=f7e116]: छुट्टी
+                  - generic [ref=f7e117]: बाकी
+                - generic [ref=f7e118]: "भेजने वाला: Mistri Greenfield · 04 Jul, 11:43"
+              - generic [ref=f7e119]:
+                - generic [ref=f7e120]:
+                  - generic [ref=f7e121]:
+                    - term [ref=f7e122]: मज़दूर
+                    - definition [ref=f7e123]: मैं खुद
+                  - generic [ref=f7e124]:
+                    - term [ref=f7e125]: से
+                    - definition [ref=f7e126]: 2026-07-04
+                  - generic [ref=f7e127]:
+                    - term [ref=f7e128]: तक
+                    - definition [ref=f7e129]: 2026-07-04
+                  - generic [ref=f7e130]:
+                    - term [ref=f7e131]: छुट्टी का टाइप
+                    - definition [ref=f7e132]: आम छुट्टी
+                  - generic [ref=f7e133]:
+                    - term [ref=f7e134]: वजह
+                    - definition [ref=f7e135]: Family function
+                - paragraph [ref=f7e136]: यह आपकी अपनी रिक्वेस्ट है — फ़ैसला कोई और करेगा।
+  - button "Open Next.js Dev Tools" [ref=f7e65] [cursor=pointer]:
+    - img [ref=f7e66]
+  - alert [ref=f7e69]

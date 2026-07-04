@@ -2,6 +2,11 @@
 
 /**
  * Owner dashboard (/owner) — where the owner gets value OUT of field data.
+ * Also serves as the SITE_MANAGER dashboard (variant="SITE_MANAGER"): the
+ * backend auto-scopes GET /dashboards/owner + /completeness (and every list)
+ * to the SM's sites, so the same queries render only their slice. SM
+ * differences are purely presentational: a heading, quick-action shortcuts,
+ * and no per-site drill-in links (the owner-only /owner/sites/[id] screen).
  *
  * - Window toggle Today / 7 / 30 days. `to` is ALWAYS today (Kolkata): the
  *   backend computes the "today" KPIs at window.to, so KPI cards stay "today"
@@ -16,7 +21,7 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useQueries, useQuery } from '@tanstack/react-query';
-import { ChevronRight, Copy, MessageCircle } from 'lucide-react';
+import { ChevronRight, ClipboardCheck, Copy, FileSpreadsheet, Fuel, MessageCircle, NotebookPen } from 'lucide-react';
 import type { Attendance, Completeness, OwnerDashboard, Site, UUID, Vehicle } from '@techbuilder/contracts';
 import { api, me } from '@/lib/api-client';
 import { addDays, formatBusinessDate, todayKolkata } from '@/lib/business-date';
@@ -28,6 +33,7 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { CompletenessBadge, CompletenessDots } from '@/components/owner/completeness';
 import { WindowToggle } from '@/components/owner/window-toggle';
+import { QuickActions } from '@/components/dashboard/quick-actions';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
 import { cn } from '@/lib/utils';
 
@@ -42,8 +48,9 @@ const windowOptions = (o: Messages['OWNER_UI']) =>
 
 const WINDOW_DAYS_BACK: Record<DashWindow, number> = { today: 0, '7d': 6, '30d': 29 };
 
-export function OwnerDashboardScreen() {
+export function OwnerDashboardScreen({ variant = 'OWNER' }: { variant?: 'OWNER' | 'SITE_MANAGER' }) {
   const m = useMessages();
+  const isOwner = variant === 'OWNER';
   const today = useMemo(() => todayKolkata(), []);
   const [win, setWin] = useState<DashWindow>('7d');
   const from = addDays(today, -WINDOW_DAYS_BACK[win]);
@@ -55,10 +62,14 @@ export function OwnerDashboardScreen() {
     queryKey: ['owner-dashboard', from, today],
     queryFn: () => api<OwnerDashboard>('GET', dashboardPath(from)),
   });
-  // Digest is always about TODAY (dedupes with dashQ when the Today window is active).
+  // Digest is always about TODAY (dedupes with dashQ when the Today window is
+  // active). Deferred until the above-fold dashboard query settles — the two
+  // aggregate queries otherwise compete on the backend and delay first content
+  // (the digest card sits below the fold anyway).
   const todayDashQ = useQuery({
     queryKey: ['owner-dashboard', today, today],
     queryFn: () => api<OwnerDashboard>('GET', dashboardPath(today)),
+    enabled: !dashQ.isPending,
   });
   const comp7Q = useQuery({
     queryKey: ['completeness', dotsFrom, today],
@@ -85,11 +96,29 @@ export function OwnerDashboardScreen() {
   const kpis = dashQ.data?.kpis;
 
   return (
-    <div className="grid gap-4" data-testid="owner-dashboard">
+    <div className="grid gap-4" data-testid={isOwner ? 'owner-dashboard' : 'sm-dashboard'}>
+      {!isOwner && (
+        <div>
+          <h1 className="text-lg font-semibold">{m.DASH_UI.smTitle}</h1>
+          <p className="text-sm text-muted-foreground">{m.DASH_UI.smSubtitle}</p>
+        </div>
+      )}
       <WindowToggle options={windowOptions(m.OWNER_UI)} value={win} onChange={setWin} testIdPrefix="dash-window" />
 
       {dashQ.isPending ? (
-        <LoadingState />
+        // STATIC skeleton with the same geometry as the KPI grid — reserves
+        // space (no layout shift) without animation (keeps the viewport
+        // visually stable while the live queries resolve).
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3" aria-hidden="true" data-testid="kpi-skeleton">
+          {[0, 1, 2, 3, 4, 5].map((i) => (
+            <Card size="sm" key={i}>
+              <CardContent>
+                <div className="h-7 w-14 rounded bg-muted" />
+                <div className="mt-1 h-4 w-24 rounded bg-muted" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       ) : dashQ.error ? (
         <ErrorState error={dashQ.error} onRetry={() => void dashQ.refetch()} />
       ) : kpis ? (
@@ -108,9 +137,9 @@ export function OwnerDashboardScreen() {
           <CardTitle>{m.OWNER_UI.completenessTitle}</CardTitle>
           <CardDescription>{m.OWNER_UI.completenessSubtitle}</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="min-h-28">
           {sitesQ.isPending || comp7Q.isPending ? (
-            <LoadingState />
+            <RowsSkeleton rows={2} />
           ) : sitesQ.error ? (
             <ErrorState error={sitesQ.error} onRetry={() => void sitesQ.refetch()} />
           ) : comp7Q.error ? (
@@ -124,25 +153,34 @@ export function OwnerDashboardScreen() {
                   (c) => c.scopeId === s.id && c.businessDate === today,
                 )?.state;
                 const marked = markedToday.get(s.id);
+                const rowClass = 'flex items-center gap-3 py-3 first:pt-0 last:pb-0';
+                const row = (
+                  <>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">
+                        {s.name} <span className="text-muted-foreground">({s.code})</span>
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {marked !== undefined && `${marked} ${m.OWNER_UI.markedSuffix}`}
+                      </p>
+                    </div>
+                    <CompletenessDots rows={comp7Q.data ?? []} siteId={s.id} from={dotsFrom} to={today} />
+                    <CompletenessBadge state={todayState} testId={`site-state-${s.id}`} />
+                    {isOwner && <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />}
+                  </>
+                );
                 return (
                   <li key={s.id}>
-                    <Link
-                      href={`/owner/sites/${s.id}`}
-                      data-testid={`site-strip-${s.id}`}
-                      className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium">
-                          {s.name} <span className="text-muted-foreground">({s.code})</span>
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {marked !== undefined && `${marked} ${m.OWNER_UI.markedSuffix}`}
-                        </p>
+                    {isOwner ? (
+                      // Site drill-in exists only in the owner area.
+                      <Link href={`/owner/sites/${s.id}`} data-testid={`site-strip-${s.id}`} className={rowClass}>
+                        {row}
+                      </Link>
+                    ) : (
+                      <div data-testid={`site-strip-${s.id}`} className={rowClass}>
+                        {row}
                       </div>
-                      <CompletenessDots rows={comp7Q.data ?? []} siteId={s.id} from={dotsFrom} to={today} />
-                      <CompletenessBadge state={todayState} testId={`site-state-${s.id}`} />
-                      <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                    </Link>
+                    )}
                   </li>
                 );
               })}
@@ -155,9 +193,9 @@ export function OwnerDashboardScreen() {
         <CardHeader>
           <CardTitle>{m.OWNER_UI.costTitle}</CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-4">
+        <CardContent className="grid min-h-28 content-start gap-4">
           {dashQ.isPending || sitesQ.isPending || vehiclesQ.isPending ? (
-            <LoadingState />
+            <RowsSkeleton rows={2} />
           ) : dashQ.error ? (
             <ErrorState error={dashQ.error} onRetry={() => void dashQ.refetch()} />
           ) : dashQ.data ? (
@@ -165,6 +203,17 @@ export function OwnerDashboardScreen() {
           ) : null}
         </CardContent>
       </Card>
+
+      {!isOwner && (
+        <QuickActions
+          actions={[
+            { href: '/site-manager/attendance', label: m.NAV_LABELS.attendance, icon: ClipboardCheck, testId: 'qa-attendance' },
+            { href: '/site-manager/records', label: m.NAV_LABELS.records, icon: NotebookPen, testId: 'qa-records' },
+            { href: '/site-manager/vehicle', label: m.NAV_LABELS.vehicleFuel, icon: Fuel, testId: 'qa-vehicle' },
+            { href: '/site-manager/reports', label: m.NAV_LABELS.reports, icon: FileSpreadsheet, testId: 'qa-reports' },
+          ]}
+        />
+      )}
 
       <DigestCard
         orgName={meQ.data?.org.name}
@@ -188,6 +237,20 @@ export function OwnerDashboardScreen() {
           attQs.forEach((q) => void q.refetch());
         }}
       />
+    </div>
+  );
+}
+
+/** Static (non-animated) placeholder rows — space is reserved, pixels stay stable. */
+function RowsSkeleton({ rows }: { rows: number }) {
+  return (
+    <div className="grid gap-3 py-1" aria-hidden="true">
+      {Array.from({ length: rows }, (_, i) => (
+        <div key={i} className="flex items-center justify-between gap-3">
+          <div className="h-4 w-36 rounded bg-muted" />
+          <div className="h-4 w-16 rounded bg-muted" />
+        </div>
+      ))}
     </div>
   );
 }
@@ -320,7 +383,7 @@ function DigestCard({
         <CardTitle>{m.OWNER_UI.digestTitle}</CardTitle>
         <CardDescription>{m.OWNER_UI.digestSubtitle}</CardDescription>
       </CardHeader>
-      <CardContent className="grid gap-3">
+      <CardContent className="grid min-h-56 content-start gap-3">
         {error ? (
           <ErrorState error={error} onRetry={onRetry} />
         ) : !digest ? (

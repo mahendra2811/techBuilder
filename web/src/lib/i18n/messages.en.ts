@@ -10,11 +10,21 @@
  * the app flows from getMessages(locale) (see ./messages.ts).
  */
 import type {
+  ApprovalStatus,
+  ApprovalType,
   AttendanceStatus,
   CompletenessState,
   ErrorCode,
   ExpenseCategory,
+  LeaveType,
+  Locale,
+  OrgConfig,
+  PersonSkill,
+  RecordType,
   Role,
+  Uom,
+  VehicleStatus,
+  VehicleTrackingMode,
 } from "@techbuilder/contracts";
 
 export const en = {
@@ -72,7 +82,6 @@ export const en = {
     changingPassword: "Saving…",
     logout: "Log out",
     loggedInAs: "Logged in as",
-    comingSoon: "Your screens will appear here in the next phase.",
     languageToggle: "Language",
   },
 
@@ -117,6 +126,110 @@ export const en = {
     REPAIR: "Repair",
     MISC: "Misc",
   } satisfies Record<ExpenseCategory, string>,
+
+  /** Approval request type labels (enum values come from the frozen contracts). */
+  APPROVAL_TYPE_LABELS: {
+    VEHICLE_SWITCH: "Vehicle change",
+    LEAVE: "Leave",
+    MATERIAL: "Material",
+  } satisfies Record<ApprovalType, string>,
+
+  /** Approval status labels (enum values come from the frozen contracts). */
+  APPROVAL_STATUS_LABELS: {
+    PENDING: "Pending",
+    APPROVED: "Approved",
+    REJECTED: "Rejected",
+  } satisfies Record<ApprovalStatus, string>,
+
+  /** Leave type labels (enum values come from the frozen contracts). */
+  LEAVE_TYPE_LABELS: {
+    CASUAL: "Casual",
+    SICK: "Sick",
+    UNPAID: "Unpaid",
+    OTHER: "Other",
+  } satisfies Record<LeaveType, string>,
+
+  /** Person skill labels (enum values come from the frozen contracts). */
+  PERSON_SKILL_LABELS: {
+    UNSKILLED: "Unskilled",
+    SEMI_SKILLED: "Semi-skilled",
+    SKILLED: "Skilled",
+    OPERATOR: "Operator",
+    DRIVER: "Driver",
+  } satisfies Record<PersonSkill, string>,
+
+  /** Unit-of-measure labels (enum values come from the frozen contracts). */
+  UOM_LABELS: {
+    BAG: "Bag",
+    KG: "Kg",
+    CFT: "CFT",
+    NOS: "Nos",
+    MT: "Tonne",
+    LITRE: "Litre",
+  } satisfies Record<Uom, string>,
+
+  /** Vehicle status labels (enum values come from the frozen contracts). */
+  VEHICLE_STATUS_LABELS: {
+    ACTIVE: "Active",
+    IDLE: "Idle",
+    MAINTENANCE: "Maintenance",
+  } satisfies Record<VehicleStatus, string>,
+
+  /** Vehicle-type tracking-mode labels (enum values come from the frozen contracts). */
+  VEHICLE_TRACKING_MODE_LABELS: {
+    KM: "Kilometers",
+    HOURS: "Hours",
+  } satisfies Record<VehicleTrackingMode, string>,
+
+  /** Record-type labels (enum values come from the frozen contracts; used by Settings). */
+  RECORD_TYPE_LABELS: {
+    progress: "Progress",
+    expense: "Expense",
+    fuel: "Fuel",
+    trip: "Trip",
+    materialUsage: "Material usage",
+    materialMove: "Material move",
+    issue: "Issue",
+    attendance: "Attendance",
+    leave: "Leave",
+    vehicleStartEnd: "Vehicle start/end",
+  } satisfies Record<RecordType, string>,
+
+  /** Locale display names (used by Settings' language section). */
+  LOCALE_LABELS: {
+    hi: "Hindi",
+    en: "English",
+  } satisfies Record<Locale, string>,
+
+  /** OrgConfig feature-flag labels (keys mirror shared/src/config.ts OrgConfigSchema.features). */
+  FEATURE_FLAG_LABELS: {
+    voiceNotes: "Voice notes",
+    kioskMode: "Kiosk mode",
+    fuelReconciliation: "Fuel reconciliation",
+    materialReconciliation: "Material reconciliation",
+    wageSummary: "Wage summary",
+    whatsappShare: "WhatsApp share",
+    pdfExport: "PDF export",
+    docExpiryAlerts: "Document expiry alerts",
+    qrScan: "QR scan",
+    gpsGeotag: "GPS geotag",
+  } satisfies Record<keyof OrgConfig["features"], string>,
+
+  /** Approval request payload field labels — shared by the requests + approvals screens. */
+  REQUEST_FIELDS: {
+    vehicle: "Vehicle",
+    reason: "Reason",
+    desiredType: "Wanted vehicle type",
+    person: "Worker",
+    self: "Myself",
+    fromDate: "From",
+    toDate: "To",
+    leaveType: "Leave type",
+    material: "Material",
+    qty: "Quantity",
+    uom: "Unit",
+    note: "Note",
+  },
 
   /** Field-entry screens: attendance, records, fuel. */
   ENTRY_UI: {
@@ -285,6 +398,232 @@ export const en = {
     colEnteredBy: "Entered by",
     colVoided: "Voided",
     exportYes: "YES",
+  },
+
+  /** Role dashboards (SM / TH / Driver / Worker homes). */
+  DASH_UI: {
+    quickActions: "Quick actions",
+
+    // Site-manager dashboard (owner dashboard scoped to their sites)
+    smTitle: "Site dashboard",
+    smSubtitle: "Your sites at a glance.",
+
+    // Team-head dashboard
+    thCrewTitle: "Today's attendance",
+    thCrewSubtitle: "Your crew, today.",
+    thOnSiteLabel: "on site today (present + half day)",
+    thUnmarked: "Not marked",
+    thProgressTitle: "Today's work note",
+    thProgressDone: "Note saved for today.",
+    thProgressPending: "Today's note is pending.",
+
+    // Driver dashboard
+    driverVehicleTitle: "My vehicle",
+    driverAddFuel: "Add fuel",
+    driverLastFuel: "Last fuel entry",
+    driverNoFuelYet: "No fuel entry yet.",
+
+    // Worker dashboard (read-only)
+    workerIdTitle: "My card",
+    workerAttTitle: "My attendance",
+    workerAttSubtitle: "This month, day by day.",
+    workerAttEmpty: "No attendance marked this month yet.",
+    workerViewOnly: "View only — your team head marks the attendance.",
+  },
+
+  /** Approvals inbox (Owner / SM / TH). */
+  APPROVALS_UI: {
+    title: "Approvals",
+    subtitle: "Requests waiting for your decision.",
+    filterLabel: "Show",
+    filterAll: "All",
+    raisedByPrefix: "Raised by",
+    decidedByPrefix: "Decided by",
+    approve: "Approve",
+    reject: "Reject",
+    deciding: "Saving…",
+    commentLabel: "Comment (optional)",
+    commentPlaceholder: "Add a note for the requester…",
+    emptyPending: "Nothing waiting for approval.",
+    emptyGeneric: "No requests to show.",
+    ownRequestNote: "Your own request — someone else decides it.",
+    conflictNotice: "This was already decided. Refreshed the list.",
+    approvedNotice: "Approved.",
+    rejectedNotice: "Rejected.",
+    unknownRequester: "Unknown user",
+  },
+
+  /** Raise-request screen (SM / TH / Driver). */
+  REQUESTS_UI: {
+    title: "Requests",
+    subtitle: "Raise a request for approval.",
+    newRequestTitle: "New request",
+    typeLabel: "Request type",
+    submit: "Send request",
+    submitting: "Sending…",
+    submitted: "Request sent.",
+    myRequestsTitle: "My requests",
+    myRequestsEmpty: "You haven't sent any requests yet.",
+    selectVehicle: "Select vehicle",
+    noVehiclesInScope: "No vehicle available for your account.",
+    reasonPlaceholder: "Why is this needed?",
+    materialPlaceholder: "e.g. Cement",
+    notePlaceholder: "Anything to add? (optional)",
+    optionalDesiredType: "Wanted vehicle type (optional)",
+    none: "— none —",
+    reasonRequired: "Write a reason.",
+    vehicleRequired: "Pick a vehicle.",
+    datesRequired: "Pick both dates.",
+    dateOrderInvalid: "The 'to' date can't be before the 'from' date.",
+    materialRequired: "Enter the material.",
+    qtyInvalid: "Enter a quantity greater than 0.",
+  },
+
+  /** People management (Owner / SM / TH): logins + labour list. */
+  PEOPLE_UI: {
+    title: "People",
+    subtitle: "Manage logins and the labour list.",
+    usersTitle: "Logins",
+    usersEmpty: "No users yet.",
+    createUserTitle: "Add a login",
+    name: "Name",
+    username: "Username",
+    phone: "Phone (optional)",
+    roleLabel: "Role",
+    site: "Site",
+    selectSite: "Select site",
+    siteRequired: "Pick a site.",
+    linkPerson: "Link to worker (optional)",
+    none: "— none —",
+    tempPasswordLabel: "Temporary password",
+    createUserSubmit: "Create login",
+    creatingUser: "Creating…",
+    userCreatedNotice: "Login created.",
+    tempPasswordHint:
+      "Give this password to the user — they must set their own on first login.",
+    usernameTaken: "This username is already taken.",
+    nameRequired: "Enter a name.",
+    usernameRequired: "Enter a username.",
+    deactivate: "Deactivate",
+    deactivateConfirm: "Confirm?",
+    deactivating: "Deactivating…",
+    activeYes: "Active",
+    activeNo: "Inactive",
+    crewPrefillNote: "This login joins your crew.",
+    noCrewNote:
+      "A team head's crew is set up separately — here you only pick their site.",
+    noCrewWarning:
+      "Your account has no crew assigned, so you cannot create logins yet.",
+    createPersonTitle: "Add a worker (labour list)",
+    personName: "Worker name",
+    skill: "Skill (optional)",
+    defaultWage: "Daily wage ₹ (optional)",
+    createPersonSubmit: "Add worker",
+    creatingPerson: "Saving…",
+    personCreatedNotice: "Worker added.",
+  },
+
+  /** Fleet management (Owner / SM): vehicle list + add-vehicle + add-vehicle-type. */
+  FLEET_UI: {
+    title: "Fleet",
+    subtitle: "Vehicles, their type, and where they're assigned.",
+    listTitle: "Vehicles",
+    listEmpty: "No vehicles yet.",
+    assignedSite: "Site",
+    assignedDriver: "Driver",
+    noSite: "Not assigned to a site",
+    noDriver: "No driver assigned",
+    addVehicleTitle: "Add a vehicle",
+    regNo: "Registration no.",
+    name: "Name (optional)",
+    type: "Vehicle type",
+    selectType: "Select type",
+    noTypes: "No vehicle types yet — add one below first.",
+    site: "Site",
+    selectSite: "Select site",
+    driver: "Driver (optional)",
+    status: "Status",
+    addVehicleSubmit: "Add vehicle",
+    addingVehicle: "Adding…",
+    vehicleAdded: "Vehicle added.",
+    regNoRequired: "Enter the registration number.",
+    typeRequired: "Pick a vehicle type.",
+    siteRequired: "Pick a site.",
+    regNoTaken: "This registration number is already in use.",
+    typesTitle: "Vehicle types",
+    typesEmpty: "No vehicle types yet.",
+    addTypeTitle: "Add a vehicle type",
+    typeName: "Type name",
+    trackingMode: "Tracking mode",
+    addTypeSubmit: "Add type",
+    addingType: "Adding…",
+    typeAdded: "Vehicle type added.",
+    typeNameRequired: "Enter a name.",
+  },
+
+  /** Wage / cost summary (Owner / SM): read-only payroll view + advances + rates. */
+  WAGES_UI: {
+    title: "Wages",
+    subtitle: "What's payable, from attendance, rates, and advances.",
+    totalsTitle: "Totals for this window",
+    totalGross: "Gross payable",
+    totalAdvance: "Advances",
+    totalNet: "Net payable",
+    totalNetDue: "Net due from workers",
+    rowsTitle: "Per-worker summary",
+    rowsEmpty: "No attendance in this window yet.",
+    presentDaysShort: "Present",
+    halfDaysShort: "Half day",
+    otHoursShort: "OT",
+    dailyRate: "Daily rate",
+    gross: "Gross",
+    advance: "Advance",
+    net: "Net payable",
+    netDue: "Due from worker",
+    noRate: "No rate set",
+    advanceFormTitle: "Record an advance (peshgi)",
+    person: "Worker",
+    selectPerson: "Select worker",
+    amountRupees: "Amount (₹)",
+    date: "Date",
+    note: "Note (optional)",
+    advanceSubmit: "Save advance",
+    savingAdvance: "Saving…",
+    advanceSaved: "Advance recorded.",
+    personRequired: "Pick a worker.",
+    amountInvalid: "Enter an amount greater than 0.",
+    rateFormTitle: "Set a wage rate",
+    rateFormSubtitle: "Only the owner can set wage rates.",
+    effectiveFrom: "Effective from",
+    rateSubmit: "Save rate",
+    savingRate: "Saving…",
+    rateSaved: "Wage rate saved.",
+    rateReadOnlyNote: "Only the owner can set wage rates — ask them to update a rate.",
+  },
+
+  /** Settings (Owner-only): read-only org-config viewer. */
+  SETTINGS_UI: {
+    title: "Settings",
+    subtitle: "Your company's setup.",
+    readOnlyNote:
+      "These settings are set up by the developer when your company is onboarded. In-app editing is coming in a future update.",
+    brandTitle: "Company",
+    brandName: "Name",
+    brandColor: "Brand color",
+    localeTitle: "Language",
+    localeDefault: "Default",
+    localeEnabled: "Available",
+    rolesTitle: "Roles in use",
+    recordsTitle: "Record types in use",
+    featuresTitle: "Features",
+    featureOn: "On",
+    featureOff: "Off",
+    wageTitle: "Wage model",
+    wageModel: "Model",
+    wageModelDaily: "Daily rate",
+    otMultiplier: "Overtime multiplier",
+    vehicleTypesTitle: "Configured vehicle-type templates",
+    vehicleTypesEmpty: "None configured yet.",
   },
 
   /** Dev RBAC-matrix page strings (dev-only surface — stays English). */
