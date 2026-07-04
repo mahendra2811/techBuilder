@@ -1,0 +1,750 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>techBuilder — Role Blueprint</title>
+</head>
+<body>
+<style>
+  :root{
+    --bg:#F6F4EF; --surface:#FFFFFF; --surface2:#EFECE4; --ink:#26292E; --muted:#6E7076; --line:#E0DDD4; --line2:#CBC8BE;
+    --accent:#C05E1A; --accent-ink:#8F4512;
+    --new:#2E7D46; --new-bg:#E3F1E7; --rm:#B93A3A; --rm-bg:#F8E7E7; --kept:#5B6470; --kept-bg:#ECEEF1;
+    --worker:#0E8A7B; --worker-bg:#E1F1EE;
+    --driver:#A66F14; --driver-bg:#F5EDDA;
+    --th:#7457C0; --th-bg:#ECE7F8;
+    --sm:#2563B0; --sm-bg:#E4EDF8;
+    --owner:#B0355A; --owner-bg:#F7E6EC;
+    --chip-ink:#FFFFFF;
+    --shadow:0 1px 2px rgba(38,41,46,.06);
+    --mono:ui-monospace,'SF Mono','Cascadia Mono',Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,'Segoe UI',Roboto,'Noto Sans',sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#17191D; --surface:#1F2228; --surface2:#24272E; --ink:#E6E4DF; --muted:#9B9EA6; --line:#32363D; --line2:#43474F;
+      --accent:#E08A45; --accent-ink:#E8A468;
+      --new:#5FBE7F; --new-bg:#1E3226; --rm:#E07070; --rm-bg:#3A2323; --kept:#A6ADB8; --kept-bg:#2A2E35;
+      --worker:#3FBFAE; --worker-bg:#15302C;
+      --driver:#D9A544; --driver-bg:#33290F;
+      --th:#A88FE8; --th-bg:#282039;
+      --sm:#6FA3E0; --sm-bg:#182739;
+      --owner:#E0708F; --owner-bg:#361B24;
+      --shadow:0 1px 2px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"]{
+      --bg:#17191D; --surface:#1F2228; --surface2:#24272E; --ink:#E6E4DF; --muted:#9B9EA6; --line:#32363D; --line2:#43474F;
+      --accent:#E08A45; --accent-ink:#E8A468;
+      --new:#5FBE7F; --new-bg:#1E3226; --rm:#E07070; --rm-bg:#3A2323; --kept:#A6ADB8; --kept-bg:#2A2E35;
+      --worker:#3FBFAE; --worker-bg:#15302C;
+      --driver:#D9A544; --driver-bg:#33290F;
+      --th:#A88FE8; --th-bg:#282039;
+      --sm:#6FA3E0; --sm-bg:#182739;
+      --owner:#E0708F; --owner-bg:#361B24;
+      --shadow:0 1px 2px rgba(0,0,0,.35);
+  }
+  :root[data-theme="light"]{
+    --bg:#F6F4EF; --surface:#FFFFFF; --surface2:#EFECE4; --ink:#26292E; --muted:#6E7076; --line:#E0DDD4; --line2:#CBC8BE;
+    --accent:#C05E1A; --accent-ink:#8F4512;
+    --new:#2E7D46; --new-bg:#E3F1E7; --rm:#B93A3A; --rm-bg:#F8E7E7; --kept:#5B6470; --kept-bg:#ECEEF1;
+    --worker:#0E8A7B; --worker-bg:#E1F1EE;
+    --driver:#A66F14; --driver-bg:#F5EDDA;
+    --th:#7457C0; --th-bg:#ECE7F8;
+    --sm:#2563B0; --sm-bg:#E4EDF8;
+    --owner:#B0355A; --owner-bg:#F7E6EC;
+    --shadow:0 1px 2px rgba(38,41,46,.06);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  @media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto} }
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 var(--sans);-webkit-font-smoothing:antialiased}
+  a{color:inherit}
+  a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+
+  .wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+
+  /* ---- header ---- */
+  header.top{border-bottom:2px solid var(--ink);padding:34px 0 20px;background:var(--bg)}
+  .eyebrow{font:600 11px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+  h1{font-size:clamp(26px,4vw,38px);line-height:1.08;margin:10px 0 8px;letter-spacing:-.02em;text-wrap:balance;font-weight:750}
+  .sub{color:var(--muted);max-width:64ch;margin:0}
+  .statusline{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;align-items:center}
+  .pill{display:inline-block;font:600 10.5px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;padding:5px 9px;border-radius:3px;border:1px solid var(--line2);color:var(--muted);background:var(--surface)}
+  .pill.warn{border-color:var(--accent);color:var(--accent-ink);background:transparent}
+
+  /* ---- sticky nav ---- */
+  nav.jump{position:sticky;top:0;z-index:50;background:var(--bg);border-bottom:1px solid var(--line);overflow-x:auto;-webkit-overflow-scrolling:touch}
+  nav.jump .row{display:flex;gap:2px;padding:8px 20px;max-width:1080px;margin:0 auto;white-space:nowrap}
+  nav.jump a{font:600 12px/1 var(--mono);letter-spacing:.04em;text-decoration:none;padding:7px 11px;border-radius:4px;color:var(--muted)}
+  nav.jump a:hover{background:var(--surface2);color:var(--ink)}
+  nav.jump a b{font-weight:700}
+  nav.jump a.r-worker b{color:var(--worker)} nav.jump a.r-driver b{color:var(--driver)}
+  nav.jump a.r-th b{color:var(--th)} nav.jump a.r-sm b{color:var(--sm)} nav.jump a.r-owner b{color:var(--owner)}
+
+  /* ---- sections ---- */
+  section{padding:40px 0 8px}
+  .sec-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;border-left:5px solid var(--ink);padding-left:14px;margin-bottom:6px}
+  .sec-head h2{font-size:24px;margin:0;letter-spacing:-.01em;font-weight:750}
+  .sec-head .scope{font:600 11px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .sec-note{color:var(--muted);margin:6px 0 22px;padding-left:19px;max-width:70ch}
+  section.role-worker .sec-head{border-color:var(--worker)} section.role-worker h2 span{color:var(--worker)}
+  section.role-driver .sec-head{border-color:var(--driver)} section.role-driver h2 span{color:var(--driver)}
+  section.role-th .sec-head{border-color:var(--th)} section.role-th h2 span{color:var(--th)}
+  section.role-sm .sec-head{border-color:var(--sm)} section.role-sm h2 span{color:var(--sm)}
+  section.role-owner .sec-head{border-color:var(--owner)} section.role-owner h2 span{color:var(--owner)}
+
+  /* ---- cards ---- */
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:5px;box-shadow:var(--shadow);margin:0 0 18px;overflow:hidden}
+  .card-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--surface)}
+  .card-h h3{margin:0;font-size:16.5px;font-weight:700;letter-spacing:-.005em}
+  .card-h .route{font:600 11.5px/1 var(--mono);color:var(--muted);background:var(--surface2);border:1px solid var(--line);padding:4px 7px;border-radius:3px}
+  .card-b{padding:14px 16px 16px}
+  .card-b p{margin:0 0 10px;color:var(--muted);max-width:72ch}
+  .card-b p b{color:var(--ink)}
+
+  /* status chips */
+  .chip{display:inline-block;font:700 10px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;padding:4px 7px;border-radius:3px;vertical-align:middle}
+  .chip.new{color:var(--new);background:var(--new-bg)}
+  .chip.rm{color:var(--rm);background:var(--rm-bg)}
+  .chip.kept{color:var(--kept);background:var(--kept-bg)}
+  .chip.later{color:var(--muted);background:var(--surface2);border:1px dashed var(--line2)}
+
+  /* access chips */
+  .acc{display:inline-block;font:700 10px/1 var(--mono);letter-spacing:.06em;padding:3px 6px;border-radius:3px;border:1px solid var(--line2);color:var(--muted);margin:1px 2px 1px 0;white-space:nowrap}
+  .acc.v{border-color:var(--kept);color:var(--kept)}
+  .acc.w{border-color:var(--new);color:var(--new)}
+  .acc.e{border-color:var(--accent);color:var(--accent-ink)}
+  .acc.d{border-color:var(--th);color:var(--th)}
+  .acc.x{border-style:dashed;color:var(--line2)}
+
+  /* cross-link chips */
+  .lnk{display:inline-block;font:600 11px/1.3 var(--mono);text-decoration:none;color:var(--accent-ink);background:transparent;border:1px solid var(--line2);border-radius:3px;padding:3px 7px;margin:2px 3px 2px 0}
+  .lnk:hover{border-color:var(--accent);background:var(--surface2)}
+
+  /* ---- tables ---- */
+  .tblwrap{overflow-x:auto;border:1px solid var(--line);border-radius:4px;margin:10px 0 4px}
+  table{border-collapse:collapse;width:100%;min-width:640px;font-size:13.5px}
+  th{font:700 10.5px/1.3 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);text-align:left;padding:8px 10px;background:var(--surface2);border-bottom:1px solid var(--line)}
+  td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  td.fld{font:600 12.5px/1.4 var(--mono);white-space:nowrap}
+  td.mono{font:500 12.5px/1.5 var(--mono)}
+  td .req{color:var(--rm);font-weight:700}
+  td .opt{color:var(--muted)}
+  tbody tr.newrow td{background:var(--new-bg)}
+  tbody tr.rmrow td{background:var(--rm-bg);color:var(--rm)}
+  tbody tr.rmrow td.fld{text-decoration:line-through}
+  .num{font-variant-numeric:tabular-nums}
+
+  /* role tint stripes on page-cards */
+  .card.pc{border-left:4px solid var(--line2)}
+  section.role-worker .card.pc{border-left-color:var(--worker)}
+  section.role-driver .card.pc{border-left-color:var(--driver)}
+  section.role-th .card.pc{border-left-color:var(--th)}
+  section.role-sm .card.pc{border-left-color:var(--sm)}
+  section.role-owner .card.pc{border-left-color:var(--owner)}
+
+  /* ---- flow diagrams ---- */
+  .flow{display:flex;flex-direction:column;align-items:stretch;gap:0;margin:14px 0}
+  .fbox{background:var(--surface);border:1.5px solid var(--line2);border-radius:5px;padding:10px 14px;font-size:13.5px}
+  .fbox b{font-weight:700}
+  .fbox small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+  .fbox.hl{border-color:var(--accent);background:var(--surface)}
+  .fbox.good{border-color:var(--new);background:var(--new-bg)}
+  .fbox.bad{border-color:var(--rm);background:var(--rm-bg)}
+  .fbox.w{border-color:var(--worker)} .fbox.d{border-color:var(--driver)} .fbox.t{border-color:var(--th)} .fbox.s{border-color:var(--sm)} .fbox.o{border-color:var(--owner)}
+  .farrow{align-self:center;color:var(--muted);font:600 11px/1.4 var(--mono);padding:4px 0;text-align:center}
+  .farrow::before{content:"";display:block;width:1.5px;height:14px;background:var(--line2);margin:0 auto 3px}
+  .fsplit{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .fsplit>div{display:flex;flex-direction:column}
+  @media (max-width:640px){.fsplit{grid-template-columns:1fr}}
+  .flowwrap{background:var(--surface2);border:1px solid var(--line);border-radius:5px;padding:16px 18px;margin:12px 0 20px}
+  .flowwrap h4{margin:0 0 4px;font-size:15px}
+  .flowwrap .cap{color:var(--muted);font-size:13px;margin:0 0 8px}
+
+  /* legend */
+  .legend{display:flex;flex-wrap:wrap;gap:14px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:12px 16px;margin:18px 0}
+  .legend .li{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted)}
+
+  /* matrix dots */
+  .rolechip{display:inline-block;font:700 10px/1 var(--mono);letter-spacing:.06em;padding:4px 7px;border-radius:3px;color:#fff}
+  .rc-w{background:var(--worker)} .rc-d{background:var(--driver)} .rc-t{background:var(--th)} .rc-s{background:var(--sm)} .rc-o{background:var(--owner)}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media (max-width:760px){.grid2{grid-template-columns:1fr}}
+
+  .callout{border:1px solid var(--line2);border-left:4px solid var(--accent);background:var(--surface);border-radius:4px;padding:12px 16px;margin:14px 0;font-size:14px}
+  .callout.red{border-left-color:var(--rm)}
+  .callout b{font-weight:700}
+
+  ul.tight{margin:6px 0;padding-left:20px}
+  ul.tight li{margin:4px 0}
+  .muted{color:var(--muted)}
+
+  footer{border-top:1px solid var(--line);margin-top:48px;padding:20px 0 40px;color:var(--muted);font-size:12.5px}
+  footer .wrap{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  code{font:500 12.5px/1.5 var(--mono);background:var(--surface2);border:1px solid var(--line);border-radius:3px;padding:1px 5px}
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <div class="eyebrow">techBuilder · Phase-1 Web Portal · Role Customization</div>
+    <h1>Role Blueprint — every page, form, field &amp; link</h1>
+    <p class="sub">The full target picture after the role-by-role review: what each role sees, writes, and configures; how sections connect across roles; and what it all means for the database. Source of truth: <span style="font-family:var(--mono);font-size:13px">docs/techBuilder-Role-Customization-Plan.md</span></p>
+    <div class="statusline">
+      <span class="pill warn">Plan only — nothing built yet</span>
+      <span class="pill">Decisions resolved 04 Jul 2026</span>
+      <span class="pill">Build order: shared → backend → web</span>
+    </div>
+  </div>
+</header>
+
+<nav class="jump" aria-label="Sections">
+  <div class="row">
+    <a href="#overview">Overview</a>
+    <a href="#worker" class="r-worker"><b>Worker</b></a>
+    <a href="#driver" class="r-driver"><b>Driver</b></a>
+    <a href="#teamhead" class="r-th"><b>Team Head</b></a>
+    <a href="#sitemanager" class="r-sm"><b>Site Manager</b></a>
+    <a href="#owner" class="r-owner"><b>Owner</b></a>
+    <a href="#flows">Flows</a>
+    <a href="#data">Data model</a>
+  </div>
+</nav>
+
+<main class="wrap">
+
+<!-- ============ OVERVIEW ============ -->
+<section id="overview">
+  <div class="sec-head"><h2>Overview</h2><span class="scope">who does what, at which scope</span></div>
+  <p class="sec-note">One org (company) per deployment in practice. Every role acts inside a fixed <b>scope</b> — the server re-derives it on every request. Drivers report to the <b>Site Manager</b>, not to a Team Head.</p>
+
+  <div class="flowwrap">
+    <h4>Chain of visibility &amp; approval</h4>
+    <p class="cap">Everything a lower role writes rolls up to the roles above it. Requests flow up; decisions flow down.</p>
+    <div class="tblwrap"><table>
+      <thead><tr><th>Role</th><th>Scope</th><th>Sees</th><th>Writes</th><th>Decides</th></tr></thead>
+      <tbody>
+        <tr><td><span class="rolechip rc-w">WORKER</span></td><td class="mono">SELF</td><td>Own ID, own requests, contacts</td><td>Expense <em>requests</em> only</td><td>—</td></tr>
+        <tr><td><span class="rolechip rc-d">DRIVER</span></td><td class="mono">OWN VEHICLE</td><td>Own vehicle, own logs &amp; requests, contacts</td><td>Daily updates, damage, expense &amp; switch requests</td><td>—</td></tr>
+        <tr><td><span class="rolechip rc-t">TEAM HEAD</span></td><td class="mono">OWN CREW</td><td>Crew people + their expenses/progress</td><td>Expenses (≤7d), progress</td><td>Worker expense requests</td></tr>
+        <tr><td><span class="rolechip rc-s">SITE MANAGER</span></td><td class="mono">OWN SITE (one)</td><td>Everything on his site — <b>nothing of any other site</b></td><td>Expenses (any), progress, vehicles, people, config</td><td>All site requests: expense · switch · damage</td></tr>
+        <tr><td><span class="rolechip rc-o">OWNER</span></td><td class="mono">ORG</td><td>Everything, all sites</td><td>(unchanged this phase)</td><td>Org-wide</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="grid2">
+    <div class="card"><div class="card-h"><h3>Cut from this phase</h3><span class="chip rm">removed / commented out</span></div>
+      <div class="card-b">
+        <ul class="tight">
+          <li><b>Attendance</b> — done manually outside the app. Nav + screens commented out (reversible). Worker's month view hidden too.</li>
+          <li><b>Wages</b> — manual. Nav + screens commented out.</li>
+          <li><b>Leave requests</b> — removed from Requests/Approvals for now.</li>
+          <li><b>Material</b> (usage / movement / trucks) — deferred to a later phase.</li>
+          <li><b>Push reminders</b> (driver AM/PM) — forms built now, automated push later.</li>
+        </ul>
+        <p class="muted" style="margin-top:8px">Phase focus: <b>money (expenses) · daily progress · per-person visibility · photos + voice</b>.</p>
+      </div>
+    </div>
+    <div class="card"><div class="card-h"><h3>Locked decisions</h3><span class="chip kept">resolved 04 jul</span></div>
+      <div class="card-b">
+        <ul class="tight">
+          <li>Drivers are <b>site-level</b> → their requests go to the <b>SM</b>, not a Team Head.</li>
+          <li><b>One site per Site Manager</b> — no site switcher.</li>
+          <li>Expense categories: <b>fixed 6-value set</b>, per-site <b>enabled subset + Hindi/English labels</b>.</li>
+          <li>Cap / categories / form-toggles: <b>per-site config with org defaults</b>.</li>
+          <li>Worker dashboard <b>attendance hidden</b>.</li>
+          <li>Driver push reminders <b>deferred</b>.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="legend" aria-label="Legend">
+    <span class="li"><span class="chip new">NEW</span> built in this phase</span>
+    <span class="li"><span class="chip kept">KEPT</span> exists, stays</span>
+    <span class="li"><span class="chip rm">OUT</span> removed / hidden for now</span>
+    <span class="li"><span class="chip later">LATER</span> deferred</span>
+    <span class="li"><span class="acc v">VIEW</span> can see</span>
+    <span class="li"><span class="acc w">WRITE</span> can create</span>
+    <span class="li"><span class="acc e">EDIT</span> can change / configure</span>
+    <span class="li"><span class="acc d">DECIDE</span> approve / reject</span>
+  </div>
+</section>
+
+<!-- ============ WORKER ============ -->
+<section id="worker" class="role-worker">
+  <div class="sec-head"><h2><span>Worker</span></h2><span class="scope">scope: self · read-only except expense requests</span></div>
+  <p class="sec-note">The simplest surface. A worker checks who he is, calls for help, and files an expense request when he spends his own money for the site. He never writes directly to the books.</p>
+
+  <div class="card pc">
+    <div class="card-h"><h3>Dashboard</h3><span class="route">/worker</span><span class="chip kept">kept · recomposed</span></div>
+    <div class="card-b">
+      <div class="tblwrap"><table>
+        <thead><tr><th style="width:26%">Section</th><th>Contents</th><th style="width:14%">Access</th><th style="width:24%">Data from / links to</th></tr></thead>
+        <tbody>
+          <tr><td class="fld">ID card</td><td>Name · WORKER badge · site (name + code) · phone. Filled by SM / seed.</td><td><span class="acc v">VIEW</span></td><td class="mono">people · sites</td></tr>
+          <tr class="newrow"><td class="fld">My expense requests</td><td>Status list: <b>pending / approved / rejected</b> (+ rejection reason from the decider).</td><td><span class="acc v">VIEW</span></td><td><a class="lnk" href="#flow-expense">→ expense flow</a></td></tr>
+          <tr class="newrow"><td class="fld">Emergency contacts (footer)</td><td>Tap-to-call: <b>Site Manager</b> + <b>Team Head</b> (auto-derived) · <b>Police · Ambulance · Hospital · Fire · Site office · Other</b> (curated per site).</td><td><span class="acc v">VIEW</span></td><td><a class="lnk" href="#sm-config">← SM Config fills this</a></td></tr>
+          <tr class="rmrow"><td class="fld">This-month attendance</td><td>Hidden — attendance is manual this phase.</td><td><span class="acc x">—</span></td><td class="mono">—</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <div class="card pc">
+    <div class="card-h"><h3>Expense Addition Request — form</h3><span class="route">/worker/requests</span><span class="chip new">new</span></div>
+    <div class="card-b">
+      <p>Fills a request, <b>not</b> an expense. It sits pending until the Team Head or Site Manager approves it — only then does it become booked money. <a class="lnk" href="#flow-expense">→ full lifecycle</a></p>
+      <div class="tblwrap"><table>
+        <thead><tr><th style="width:20%">Field</th><th style="width:16%">Input</th><th>Rules</th><th style="width:13%">Access</th></tr></thead>
+        <tbody>
+          <tr><td class="fld">amount ₹</td><td>number</td><td><span class="req">required</span> · stored as paise · must be <b>≤ site cap</b> — over cap the form blocks: “ask your Team Head / Site Manager” <a class="lnk" href="#sm-config">cap set by SM</a></td><td><span class="acc w">WRITE</span></td></tr>
+          <tr><td class="fld">date</td><td>date</td><td>auto <b>today</b> (Kolkata) · backdate allowed up to <b>7 days</b> · no future dates</td><td><span class="acc w">WRITE</span></td></tr>
+          <tr><td class="fld">category</td><td>select</td><td>site-enabled subset with Hindi/English labels · <b>decider may change it on approval</b></td><td><span class="acc w">WRITE</span></td></tr>
+          <tr><td class="fld">bill photo</td><td>camera / gallery</td><td>the primary proof — emphasized in UI <span class="opt">(optional at DB level)</span></td><td><span class="acc w">WRITE</span></td></tr>
+          <tr><td class="fld">other photos</td><td>camera / gallery</td><td><span class="opt">optional</span> · up to 2–3 more</td><td><span class="acc w">WRITE</span></td></tr>
+          <tr><td class="fld">remark</td><td>text</td><td><span class="opt">optional</span> free comment</td><td><span class="acc w">WRITE</span></td></tr>
+          <tr><td class="fld">voice note</td><td>audio record</td><td><span class="opt">optional</span> · gated by org <code>voiceNotes</code> flag</td><td><span class="acc w">WRITE</span></td></tr>
+          <tr><td class="fld">site</td><td>—</td><td><b>not shown</b> — derived from the worker's assigned site</td><td><span class="acc x">auto</span></td></tr>
+        </tbody>
+      </table></div>
+      <p style="margin-top:10px">Submit → <span class="acc d">DECIDE</span> by <a class="lnk" href="#th-approvals">Team Head Approvals</a> or <a class="lnk" href="#sm-approvals">SM Approvals</a></p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ DRIVER ============ -->
+<section id="driver" class="role-driver">
+  <div class="sec-head"><h2><span>Driver</span></h2><span class="scope">scope: own vehicle · reports to the site manager</span></div>
+  <p class="sec-note">A day-in-the-life hub: morning start → evening end, with photos as proof. One driver runs <b>one vehicle at a time</b>. All his requests route to the <b>Site Manager</b>.</p>
+
+  <div class="card pc">
+    <div class="card-h"><h3>Dashboard</h3><span class="route">/driver</span><span class="chip kept">kept · recomposed</span></div>
+    <div class="card-b">
+      <div class="tblwrap"><table>
+        <thead><tr><th style="width:26%">Section</th><th>Contents</th><th style="width:14%">Access</th><th style="width:24%">Data from / links to</th></tr></thead>
+        <tbody>
+          <tr class="newrow"><td class="fld">My vehicle card</td><td>Reg no · name · status (<b>fine / maintenance</b>) · <b>today's reading</b> · <b>yesterday's reading</b> (derived from logs).</td><td><span class="acc v">VIEW</span></td><td class="mono">vehicles · vehicle_logs</td></tr>
+          <tr class="newrow"><td class="fld">Morning update (start of day)</td><td>Opens the day's log. See form below.</td><td><span class="acc w">WRITE</span></td><td><a class="lnk" href="#flow-daily">→ daily-update flow</a></td></tr>
+          <tr class="newrow"><td class="fld">Evening update (end of day)</td><td>Closes the day's log with the work summary. See form below.</td><td><span class="acc w">WRITE</span></td><td><a class="lnk" href="#flow-daily">→ daily-update flow</a></td></tr>
+          <tr class="newrow"><td class="fld">Switch request status</td><td>Pending / approved / rejected chip for his vehicle-change request.</td><td><span class="acc v">VIEW</span></td><td><a class="lnk" href="#flow-switch">→ switch flow</a></td></tr>
+          <tr class="newrow"><td class="fld">Emergency contacts (footer)</td><td>Same shared footer as the Worker — SM, TH, police, ambulance, fire…</td><td><span class="acc v">VIEW</span></td><td><a class="lnk" href="#sm-config">← SM Config</a></td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <div class="card pc">
+    <div class="card-h"><h3>Daily vehicle update — two forms, one day-row</h3><span class="chip new">new</span></div>
+    <div class="card-b">
+      <p>Both forms write into <b>one row per vehicle per business-day</b>. A split shift (6 h + 6 h at night) rolls into the same day: hours sum, trips append. Visible to <a class="lnk" href="#teamhead">TH</a> <a class="lnk" href="#sitemanager">SM</a> <a class="lnk" href="#owner">Owner</a>.</p>
+      <div class="tblwrap"><table>
+        <thead><tr><th style="width:12%">When</th><th style="width:22%">Field</th><th style="width:16%">Input</th><th>Rules</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">☀ AM</td><td class="fld">odometer photo</td><td>camera</td><td><span class="req">required</span> — photo of the meter at start</td></tr>
+          <tr><td class="mono">☀ AM</td><td class="fld">start reading</td><td>number</td><td><span class="req">required</span> · km or hours per vehicle type</td></tr>
+          <tr><td class="mono">☀ AM</td><td class="fld">vehicle / site photos</td><td>camera / gallery</td><td><span class="opt">optional</span> — side view, condition</td></tr>
+          <tr><td class="mono">🌙 PM</td><td class="fld">end odometer photo</td><td>camera</td><td><span class="req">required</span></td></tr>
+          <tr><td class="mono">🌙 PM</td><td class="fld">end reading</td><td>number</td><td><span class="req">required</span> · must be ≥ start</td></tr>
+          <tr><td class="mono">🌙 PM</td><td class="fld">hours worked</td><td>number</td><td>sums across sessions in the day</td></tr>
+          <tr><td class="mono">🌙 PM</td><td class="fld">trips / loads count</td><td>number</td><td>“how many trips, how many trucks filled”</td></tr>
+          <tr><td class="mono">🌙 PM</td><td class="fld">day note</td><td>text</td><td><span class="opt">optional</span> — anything that happened</td></tr>
+        </tbody>
+      </table></div>
+      <p class="muted" style="margin-top:8px"><span class="chip later">later</span> automated morning/evening push reminders (forms exist now; the nudge comes in a later phase).</p>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card pc">
+      <div class="card-h"><h3>Vehicle change (switch)</h3><span class="chip kept">kept · reworked</span></div>
+      <div class="card-b">
+        <ul class="tight">
+          <li>Target vehicle's <b>type is in his allowed list</b> → <b>self-switch, instant</b>, no approval.</li>
+          <li>Outside his allowed list → <b>request to the SM</b>; on approval the assignment changes.</li>
+        </ul>
+        <p><a class="lnk" href="#flow-switch">→ switch flow</a> <a class="lnk" href="#sm-approvals">→ decided in SM Approvals</a></p>
+      </div>
+    </div>
+    <div class="card pc">
+      <div class="card-h"><h3>Expense request</h3><span class="chip new">shared form</span></div>
+      <div class="card-b">
+        <p>Same form as the <a class="lnk" href="#worker">Worker's</a>, plus vehicle categories (fuel, toll, repair, parts). Which fields show is <b>configured by the SM</b> per site. Routes to the <b>SM</b> (drivers are site-level).</p>
+        <p><a class="lnk" href="#sm-config">← form config</a> <a class="lnk" href="#flow-expense">→ expense flow</a></p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card pc">
+    <div class="card-h"><h3>Damage report + vehicle history</h3><span class="chip new">new</span></div>
+    <div class="card-b">
+      <div class="tblwrap"><table>
+        <thead><tr><th style="width:20%">Field</th><th style="width:16%">Input</th><th>Rules</th><th style="width:13%">Access</th></tr></thead>
+        <tbody>
+          <tr><td class="fld">severity</td><td>select</td><td>LOW / MEDIUM / HIGH</td><td><span class="acc w">WRITE</span></td></tr>
+          <tr><td class="fld">description</td><td>text</td><td><span class="req">required</span> — what got damaged, how</td><td><span class="acc w">WRITE</span></td></tr>
+          <tr><td class="fld">photos</td><td>camera / gallery</td><td>multiple — the damage, the surroundings</td><td><span class="acc w">WRITE</span></td></tr>
+          <tr><td class="fld">voice note</td><td>audio</td><td><span class="opt">optional</span> — explain in speech</td><td><span class="acc w">WRITE</span></td></tr>
+          <tr><td class="fld">remark</td><td>text</td><td><span class="opt">optional</span></td><td><span class="acc w">WRITE</span></td></tr>
+        </tbody>
+      </table></div>
+      <p style="margin-top:10px"><b>History per vehicle:</b> every past report stays browsable — a damage from 3 months ago shows its photos, voice note and remarks on that vehicle's timeline. Seen by <a class="lnk" href="#sm-fleet">SM fleet drill-down</a> and Owner.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ TEAM HEAD ============ -->
+<section id="teamhead" class="role-th">
+  <div class="sec-head"><h2><span>Team Head</span></h2><span class="scope">scope: own crew (workers only — drivers are the SM's)</span></div>
+  <p class="sec-note">The crew's money-and-progress cockpit. The old single “Records” section splits into two: <b>Expense</b> and <b>Progress</b>. Attendance, leave and material are out this phase.</p>
+
+  <div class="card pc">
+    <div class="card-h"><h3>Dashboard — per-person insights</h3><span class="route">/team-head</span><span class="chip new">new</span></div>
+    <div class="card-b">
+      <p>Crew list; tap a person → that person's own page: “on this day he logged this expense, filed this progress, this much”. Sliced <b>Today / This week / This month</b>. The same insight component serves the <a class="lnk" href="#sitemanager">SM (site)</a> and <a class="lnk" href="#owner">Owner (org)</a>.</p>
+    </div>
+  </div>
+
+  <div class="card pc">
+    <div class="card-h"><h3>Expense — direct entry + crew history</h3><span class="route">/team-head/expense</span><span class="chip new">split from records</span></div>
+    <div class="card-b">
+      <div class="tblwrap"><table>
+        <thead><tr><th style="width:20%">Field</th><th style="width:16%">Input</th><th>Rules</th><th style="width:13%">Access</th></tr></thead>
+        <tbody>
+          <tr><td class="fld">amount ₹</td><td>number</td><td><b>any amount</b> — daily petty / kirana spend books <b>directly, no approval</b></td><td><span class="acc w">WRITE</span></td></tr>
+          <tr><td class="fld">date</td><td>date</td><td>≤ <b>7 days</b> back → books directly · <b>older than 7 days → becomes a request</b> to the SM</td><td><span class="acc w">WRITE</span></td></tr>
+          <tr><td class="fld">category</td><td>select</td><td>site-enabled subset</td><td><span class="acc w">WRITE</span></td></tr>
+          <tr><td class="fld">photo</td><td><b>camera or gallery</b></td><td>both paths — snap the bill or upload it</td><td><span class="acc w">WRITE</span></td></tr>
+          <tr><td class="fld">remark · voice note</td><td>text · audio</td><td><span class="opt">optional</span>, voice encouraged</td><td><span class="acc w">WRITE</span></td></tr>
+        </tbody>
+      </table></div>
+      <p style="margin-top:10px"><b>Crew history:</b> all expenses + requests of his crew's workers — who raised, who approved, what it became. Everything he approves is also visible to the <a class="lnk" href="#sitemanager">SM</a>. <span class="acc v">VIEW</span></p>
+    </div>
+  </div>
+
+  <div class="card pc">
+    <div class="card-h"><h3>Progress report</h3><span class="route">/team-head/progress</span><span class="chip new">split · shared with SM</span></div>
+    <div class="card-b">
+      <div class="tblwrap"><table>
+        <thead><tr><th style="width:22%">Field</th><th style="width:16%">Input</th><th>Rules</th><th style="width:13%">Access</th></tr></thead>
+        <tbody>
+          <tr><td class="fld">site photos</td><td>camera / gallery</td><td>many — up to ~20 per report; “what was done today”</td><td><span class="acc w">WRITE</span></td></tr>
+          <tr><td class="fld">voice note</td><td>audio</td><td>speak the day's progress</td><td><span class="acc w">WRITE</span></td></tr>
+          <tr><td class="fld">text / remark</td><td>text</td><td>what happened, quantities, notes</td><td><span class="acc w">WRITE</span></td></tr>
+          <tr><td class="fld">bill photos</td><td>camera / gallery</td><td>attach any bills collected (from drivers etc.)</td><td><span class="acc w">WRITE</span></td></tr>
+        </tbody>
+      </table></div>
+      <ul class="tight" style="margin-top:10px">
+        <li><b>Twice daily</b> (morning + evening); 2–3 reports per day allowed.</li>
+        <li><b>TH-or-SM covers the day:</b> if either files one, the site/day counts as reported. If nobody files → the day shows <b>“No progress today”</b>. <a class="lnk" href="#flow-progress">→ coverage rule</a></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card pc" id="th-approvals">
+      <div class="card-h"><h3>Approvals</h3><span class="chip kept">kept · narrowed</span></div>
+      <div class="card-b">
+        <p><b>Worker expense requests only</b> (driver requests go to the SM). Sees amount, photos, voice, remark → <b>confirm or change the category</b> → approve books the expense; reject sends the reason back. <span class="acc d">DECIDE</span></p>
+        <p><a class="lnk" href="#flow-expense">→ expense flow</a></p>
+      </div>
+    </div>
+    <div class="card pc">
+      <div class="card-h"><h3>People</h3><span class="chip kept">kept · narrowed</span></div>
+      <div class="card-b">
+        <ul class="tight">
+          <li>View his crew's <b>active people</b>. <span class="acc v">VIEW</span></li>
+          <li><b>Create</b> a person + assign role. <span class="acc w">WRITE</span></li>
+          <li><b>Cannot deactivate</b> anyone — that's the <a class="lnk" href="#sm-people">SM's power</a>. <span class="acc x">no deactivate</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <p><span class="chip rm">out</span>&nbsp; Attendance (manual) · Leave requests · Material — commented out for this phase.</p>
+</section>
+
+<!-- ============ SITE MANAGER ============ -->
+<section id="sitemanager" class="role-sm">
+  <div class="sec-head"><h2><span>Site Manager</span></h2><span class="scope">scope: exactly one site · invisible to every other site</span></div>
+  <p class="sec-note">The site's command center. <b>Hard rule:</b> an SM sees nothing — not a row, not a name — of any other site. (Enforced by per-request scope checks; the DB's row-security is org-level, so every SM read gets an isolation test.)</p>
+
+  <div class="card pc">
+    <div class="card-h"><h3>Dashboard — date-wise insights</h3><span class="route">/site-manager</span><span class="chip new">new</span></div>
+    <div class="card-b">
+      <p>Pick <b>any day</b> → everything for the site that day, each in its own section: all <b>progress reports</b>, all <b>expenses</b>, all <b>requests</b> (who raised · who approved — each request as its own card). Rollups for <b>Today / This week / This month</b>. Same component as the TH's, at site scope; the Owner gets it at org scope.</p>
+      <div class="tblwrap"><table>
+        <thead><tr><th style="width:26%">Section</th><th>Shows</th><th style="width:13%">Access</th></tr></thead>
+        <tbody>
+          <tr><td class="fld">Progress of the day</td><td>every report filed (TH or SM), photos + voice inline</td><td><span class="acc v">VIEW</span></td></tr>
+          <tr><td class="fld">Expenses of the day</td><td>booked expenses + who entered each</td><td><span class="acc v">VIEW</span></td></tr>
+          <tr><td class="fld">Requests of the day</td><td>each request in its own card, with its outcome</td><td><span class="acc v">VIEW</span></td></tr>
+          <tr><td class="fld">Period rollups</td><td>totals by day / week / month, per person and per category</td><td><span class="acc v">VIEW</span></td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card pc">
+      <div class="card-h"><h3>Expense</h3><span class="chip new">split · shared screen</span></div>
+      <div class="card-b">
+        <p>Adds <b>any</b> expense — including big ones — <b>booked directly, no approval</b>. The Owner sees it. Same form as the TH's (camera/gallery, remark, voice). Full site expense history. <span class="acc w">WRITE</span> <span class="acc v">VIEW</span></p>
+      </div>
+    </div>
+    <div class="card pc">
+      <div class="card-h"><h3>Progress</h3><span class="chip new">shared with TH</span></div>
+      <div class="card-b">
+        <p>The same progress form — daily photos of what was done, voice, bills. His filing also “covers the day” for the site. <span class="acc w">WRITE</span> <a class="lnk" href="#flow-progress">→ coverage rule</a></p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card pc" id="sm-approvals">
+    <div class="card-h"><h3>Approvals hub</h3><span class="chip kept">kept · extended</span></div>
+    <div class="card-b">
+      <div class="tblwrap"><table>
+        <thead><tr><th style="width:30%">Request type</th><th style="width:22%">Raised by</th><th>On approve</th></tr></thead>
+        <tbody>
+          <tr><td class="fld">Expense addition</td><td>Worker · Driver · TH (&gt;7 d)</td><td><b>Finalize:</b> confirm/override the category → the expense is booked</td></tr>
+          <tr><td class="fld">Vehicle switch</td><td>Driver (outside allowed types)</td><td>Vehicle reassigned to the driver</td></tr>
+          <tr><td class="fld">Damage report</td><td>Driver</td><td>Acknowledged / resolved; lands in the vehicle's history</td></tr>
+        </tbody>
+      </table></div>
+      <p style="margin-top:8px">Requester ≠ decider is enforced. Leave &amp; material types are out this phase. <span class="acc d">DECIDE</span></p>
+    </div>
+  </div>
+
+  <div class="card pc" id="sm-fleet">
+    <div class="card-h"><h3>Fleet — vehicles as equipment</h3><span class="route">/site-manager/fleet</span><span class="chip new">drill-down new</span></div>
+    <div class="card-b">
+      <div class="tblwrap"><table>
+        <thead><tr><th style="width:28%">Piece</th><th>Contents</th><th style="width:13%">Access</th></tr></thead>
+        <tbody>
+          <tr><td class="fld">Register vehicle</td><td>reg no · type · name — new vehicle joins the site</td><td><span class="acc w">WRITE</span></td></tr>
+          <tr><td class="fld">Vehicle detail (tap a vehicle)</td><td>odometer now + history · fuel taken (litres + ₹) · <b>total expense on this vehicle</b> · trips / load data · <b>damage history with photos &amp; voice</b></td><td><span class="acc v">VIEW</span></td></tr>
+          <tr><td class="fld">Driver detail (tap a driver)</td><td>everything by that driver: daily updates, fuel, trips/loads, expenses</td><td><span class="acc v">VIEW</span></td></tr>
+          <tr class="rmrow"><td class="fld">Self vehicle-log entry</td><td>dropped — drivers do the logging; SM reads &amp; approves</td><td><span class="acc x">—</span></td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card pc" id="sm-people">
+      <div class="card-h"><h3>People</h3><span class="chip kept">kept</span></div>
+      <div class="card-b">
+        <ul class="tight">
+          <li>Create TH / Driver / Worker on his site. <span class="acc w">WRITE</span></li>
+          <li><b>Deactivate</b> — only the SM (and above) can. <span class="acc e">EDIT</span></li>
+        </ul>
+      </div>
+    </div>
+    <div class="card pc">
+      <div class="card-h"><h3>Reports</h3><span class="chip kept">kept</span></div>
+      <div class="card-b"><p>Excel export of the site's data (existing surface, now minus attendance/wages). <span class="acc v">VIEW</span></p></div>
+    </div>
+  </div>
+
+  <div class="card pc" id="sm-config">
+    <div class="card-h"><h3>Site Config — the knobs everyone else feels</h3><span class="chip new">new</span></div>
+    <div class="card-b">
+      <div class="tblwrap"><table>
+        <thead><tr><th style="width:28%">Setting</th><th>What it does</th><th style="width:26%">Felt by</th></tr></thead>
+        <tbody>
+          <tr><td class="fld">Worker expense cap ₹</td><td>Max amount a worker may request; above it the form blocks</td><td><a class="lnk" href="#worker">Worker request form</a></td></tr>
+          <tr><td class="fld">Expense categories</td><td>Enable/disable from the fixed 6 · rename Hindi/English labels</td><td><a class="lnk" href="#worker">Worker</a> <a class="lnk" href="#driver">Driver</a> <a class="lnk" href="#teamhead">TH</a> forms</td></tr>
+          <tr><td class="fld">Expense-form fields</td><td>Boolean toggles: which fields the request form shows</td><td><a class="lnk" href="#driver">Driver</a> / <a class="lnk" href="#worker">Worker</a> forms</td></tr>
+          <tr><td class="fld">Emergency contacts</td><td>Police · Ambulance · Hospital · Fire · Site office · Other (label + number)</td><td>Contacts footer on <a class="lnk" href="#worker">Worker</a> &amp; <a class="lnk" href="#driver">Driver</a></td></tr>
+        </tbody>
+      </table></div>
+      <p class="muted" style="margin-top:8px">All per-site, with org-level defaults as fallback.</p>
+    </div>
+  </div>
+
+  <p><span class="chip rm">out</span>&nbsp; Attendance · Wages · Leave · Material · own vehicle-log entry — commented out for this phase.</p>
+</section>
+
+<!-- ============ OWNER ============ -->
+<section id="owner" class="role-owner">
+  <div class="sec-head"><h2><span>Owner</span></h2><span class="scope">scope: whole org · unchanged this phase</span></div>
+  <p class="sec-note">No redesign now — the Owner automatically inherits everything below, and the new drill-downs are mounted for him at org scope.</p>
+  <div class="card pc">
+    <div class="card-h"><h3>What the Owner gains for free</h3><span class="chip kept">reuse</span></div>
+    <div class="card-b">
+      <ul class="tight">
+        <li><b>All booked expenses</b> — including every SM direct entry — across all sites. <span class="acc v">VIEW</span></li>
+        <li>The <b>date-wise insights</b> surface at org scope (per site → per day → per person).</li>
+        <li><b>Person / vehicle / driver drill-downs</b> reused with org-wide reach.</li>
+        <li>Full request audit: who raised → who approved → what it became.</li>
+        <li>Org-level <b>defaults</b> for the per-site config (cap, categories, form fields).</li>
+      </ul>
+      <p class="muted">Attendance &amp; wages views commented out here too, same as below.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FLOWS ============ -->
+<section id="flows">
+  <div class="sec-head"><h2>Flows — how the pieces link</h2><span class="scope">the four moving parts</span></div>
+
+  <div class="flowwrap" id="flow-expense">
+    <h4>1 · Expense Addition Request — from pocket to books</h4>
+    <p class="cap">The core new flow. A request is not money; it becomes money only on approval.</p>
+    <div class="fsplit">
+      <div>
+        <div class="fbox w"><b>Worker</b> / <b>Driver</b> fills the request form<small>amount ≤ site cap · today ± 7 days · category · bill photo · voice</small></div>
+        <div class="farrow">submit</div>
+        <div class="fbox hl"><b>Request created — PENDING</b><small>photos &amp; voice attached · site derived automatically</small></div>
+        <div class="farrow">routes to</div>
+        <div class="fbox t"><b>Team Head</b> (worker requests) &nbsp;·&nbsp; <b>Site Manager</b> (all)<small>sees everything: amount, photos, voice, remark — no phone call needed</small></div>
+      </div>
+      <div>
+        <div class="fbox bad"><b>Over the cap?</b> Form blocks at submit<small>“Ask your Team Head / Site Manager” — they enter it directly instead</small></div>
+        <div class="farrow">meanwhile, direct entries skip requests entirely</div>
+        <div class="fbox t"><b>TH direct entry</b> — any amount, ≤ 7 days back<small>older than 7 days → converts to a request to the SM</small></div>
+        <div class="farrow">&nbsp;</div>
+        <div class="fbox s"><b>SM direct entry</b> — any amount, booked instantly<small>the Owner sees it</small></div>
+      </div>
+    </div>
+    <div class="farrow">decision</div>
+    <div class="fsplit">
+      <div><div class="fbox good"><b>APPROVE</b> — confirm or change the category<small>→ a real expense row is booked · counted for the site</small></div></div>
+      <div><div class="fbox bad"><b>REJECT</b> — with a reason<small>→ nothing booked · the requester sees why on his dashboard</small></div></div>
+    </div>
+    <div class="farrow">booked money feeds</div>
+    <div class="fbox o"><b>Insights</b> — day / week / month · per person · per vehicle · per site · org<small>Team Head (crew) → Site Manager (site) → Owner (everything)</small></div>
+  </div>
+
+  <div class="flowwrap" id="flow-switch">
+    <h4>2 · Vehicle switch</h4>
+    <p class="cap">One driver, one active vehicle. The allowed-types list decides whether he needs permission.</p>
+    <div class="fsplit">
+      <div>
+        <div class="fbox d"><b>Target type is in his allowed list</b></div>
+        <div class="farrow">instant</div>
+        <div class="fbox good"><b>Self-switch</b> — vehicle reassigned, no approval</div>
+      </div>
+      <div>
+        <div class="fbox d"><b>Target type NOT allowed</b></div>
+        <div class="farrow">request → SM</div>
+        <div class="fbox s"><b>SM approves / rejects</b><small>approve → reassigned · previous vehicle freed</small></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flowwrap" id="flow-daily">
+    <h4>3 · Driver's day</h4>
+    <div class="flow">
+      <div class="fbox d"><b>☀ Morning</b> — odometer photo + start reading<small>opens the day's log for that vehicle</small></div>
+      <div class="farrow">work · trips · (a second session sums into the same day)</div>
+      <div class="fbox d"><b>🌙 Evening</b> — end photo + reading · hours · trips · loads · note<small>closes the day's log</small></div>
+      <div class="farrow">one row per vehicle per day</div>
+      <div class="fbox s"><b>Visible upward</b> — TH · SM (fleet &amp; insights) · Owner<small>feeds the per-vehicle and per-driver drill-downs</small></div>
+    </div>
+  </div>
+
+  <div class="flowwrap" id="flow-progress">
+    <h4>4 · Progress coverage — who owns the day?</h4>
+    <div class="fsplit">
+      <div>
+        <div class="fbox good"><b>TH or SM files ≥ 1 report</b><small>the site/day is covered — no one else is required to file</small></div>
+      </div>
+      <div>
+        <div class="fbox bad"><b>Nobody files</b><small>the day is marked “No progress today” in insights</small></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ DATA ============ -->
+<section id="data">
+  <div class="sec-head"><h2>Data model — what this means in the DB</h2><span class="scope">one contract bump · one migration</span></div>
+  <p class="sec-note">Most of the plan rides on tables that already exist. Green rows are the only new columns/values; everything else is reuse.</p>
+
+  <div class="card">
+    <div class="card-h"><h3>Tables touched</h3></div>
+    <div class="card-b">
+      <div class="tblwrap"><table>
+        <thead><tr><th style="width:22%">Table</th><th style="width:34%">Change</th><th>Serves</th></tr></thead>
+        <tbody>
+          <tr class="newrow"><td class="fld">sites</td><td class="mono">+ emergencyContacts (json)<br>+ workerExpenseCapPaise<br>+ expenseFormConfig (json)</td><td>Contacts footer · worker cap · category subset/labels + field toggles</td></tr>
+          <tr class="newrow"><td class="fld">approval_requests</td><td class="mono">+ type EXPENSE_ADD<br>payload = the draft expense</td><td>The whole expense-request flow (reuses the existing approvals machinery)</td></tr>
+          <tr class="newrow"><td class="fld">vehicle_logs</td><td class="mono">+ hoursWorked · + loadsCount · + note</td><td>Driver evening update (start/end readings already exist)</td></tr>
+          <tr><td class="fld">expenses</td><td class="mono">unchanged</td><td>Stays “booked money only” — a request only becomes a row here on approval</td></tr>
+          <tr><td class="fld">issues</td><td class="mono">reused as-is</td><td>Damage reports — already has vehicle, severity, photos; history = query by vehicle</td></tr>
+          <tr><td class="fld">media</td><td class="mono">reused as-is</td><td>Photos / receipts / <b>voice</b> attach to requests, logs, damage, progress</td></tr>
+          <tr><td class="fld">progress_notes</td><td class="mono">reused as-is</td><td>2–3 reports/day already possible (text + many photos + date)</td></tr>
+          <tr><td class="fld">vehicles · allowed types</td><td class="mono">reused as-is</td><td>Switch flow · one-driver-one-vehicle · fleet drill-down</td></tr>
+          <tr><td class="fld">users / people / crews</td><td class="mono">reused as-is</td><td>ID card · contacts (SM/TH auto-derived) · create-cascade</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-h"><h3>Rules &amp; permissions changing</h3></div>
+    <div class="card-b">
+      <div class="tblwrap"><table>
+        <thead><tr><th style="width:34%">Rule</th><th style="width:22%">Today</th><th>Target</th></tr></thead>
+        <tbody>
+          <tr class="newrow"><td class="fld">Worker may submit requests</td><td>no</td><td><b>yes</b> — expense requests only, self-scope</td></tr>
+          <tr class="newrow"><td class="fld">TH backdate window</td><td class="num">2 days</td><td class="num"><b>7 days</b> (older → request to SM)</td></tr>
+          <tr class="newrow"><td class="fld">TH deactivate people</td><td>allowed (in scope)</td><td><b>removed</b> — SM-only</td></tr>
+          <tr class="newrow"><td class="fld">Approve → book expense</td><td>—</td><td>approval <b>materializes</b> the expense row, decider's category wins</td></tr>
+          <tr class="newrow"><td class="fld">SM site isolation</td><td>org-level row security + scope checks</td><td>+ <b>audit &amp; tests on every SM read</b> (site A must see zero of site B)</td></tr>
+          <tr><td class="fld">Requester ≠ decider</td><td>enforced</td><td>unchanged — applies to the new request type too</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-h"><h3>Who touches what — role × data</h3></div>
+    <div class="card-b">
+      <div class="tblwrap"><table>
+        <thead><tr><th>Data</th><th><span class="rolechip rc-w">W</span></th><th><span class="rolechip rc-d">D</span></th><th><span class="rolechip rc-t">TH</span></th><th><span class="rolechip rc-s">SM</span></th><th><span class="rolechip rc-o">O</span></th></tr></thead>
+        <tbody>
+          <tr><td class="fld">Expense requests</td><td><span class="acc w">WRITE</span></td><td><span class="acc w">WRITE</span></td><td><span class="acc d">DECIDE</span></td><td><span class="acc d">DECIDE</span></td><td><span class="acc v">VIEW</span></td></tr>
+          <tr><td class="fld">Expenses (booked)</td><td><span class="acc x">—</span></td><td><span class="acc x">—</span></td><td><span class="acc w">WRITE</span></td><td><span class="acc w">WRITE</span></td><td><span class="acc v">VIEW</span></td></tr>
+          <tr><td class="fld">Progress reports</td><td><span class="acc x">—</span></td><td><span class="acc x">—</span></td><td><span class="acc w">WRITE</span></td><td><span class="acc w">WRITE</span></td><td><span class="acc v">VIEW</span></td></tr>
+          <tr><td class="fld">Daily vehicle updates</td><td><span class="acc x">—</span></td><td><span class="acc w">WRITE</span></td><td><span class="acc v">VIEW</span></td><td><span class="acc v">VIEW</span></td><td><span class="acc v">VIEW</span></td></tr>
+          <tr><td class="fld">Damage reports</td><td><span class="acc x">—</span></td><td><span class="acc w">WRITE</span></td><td><span class="acc x">—</span></td><td><span class="acc d">DECIDE</span></td><td><span class="acc v">VIEW</span></td></tr>
+          <tr><td class="fld">Vehicle switch</td><td><span class="acc x">—</span></td><td><span class="acc w">WRITE</span></td><td><span class="acc x">—</span></td><td><span class="acc d">DECIDE</span></td><td><span class="acc v">VIEW</span></td></tr>
+          <tr><td class="fld">Vehicles (register)</td><td><span class="acc x">—</span></td><td><span class="acc x">—</span></td><td><span class="acc x">—</span></td><td><span class="acc w">WRITE</span></td><td><span class="acc e">EDIT</span></td></tr>
+          <tr><td class="fld">People (create)</td><td><span class="acc x">—</span></td><td><span class="acc x">—</span></td><td><span class="acc w">WRITE</span></td><td><span class="acc w">WRITE</span></td><td><span class="acc w">WRITE</span></td></tr>
+          <tr><td class="fld">People (deactivate)</td><td><span class="acc x">—</span></td><td><span class="acc x">—</span></td><td><span class="acc x">—</span></td><td><span class="acc e">EDIT</span></td><td><span class="acc e">EDIT</span></td></tr>
+          <tr><td class="fld">Site config (cap · categories · form · contacts)</td><td><span class="acc v">VIEW</span></td><td><span class="acc v">VIEW</span></td><td><span class="acc v">VIEW</span></td><td><span class="acc e">EDIT</span></td><td><span class="acc e">EDIT</span></td></tr>
+          <tr><td class="fld">Insights / drill-downs</td><td><span class="acc x">—</span></td><td><span class="acc x">—</span></td><td><span class="acc v">crew</span></td><td><span class="acc v">site</span></td><td><span class="acc v">org</span></td></tr>
+        </tbody>
+      </table></div>
+      <p class="muted" style="margin-top:8px">Worker/Driver “VIEW” of site config means they feel it (cap, categories, visible fields, contacts) — they never open a config screen.</p>
+    </div>
+  </div>
+
+  <div class="callout">
+    <b>Build order (fixed by dependencies):</b>
+    ① <code>shared/</code> contract bump — new approval type, worker submit permission, site columns, vehicle-log fields, config defaults → one migration &nbsp;
+    ② <code>backend/</code> — materialize-on-approve, cap + 7-day windows, scoped rollups, SM isolation tests, deactivate gating &nbsp;
+    ③ <code>web/</code> — shared components (contacts footer, expense/progress split, request form, insights, drill-downs, finalize modal, config screens) mounted per role; attendance/wages/leave/material commented out.
+  </div>
+  <div class="callout red">
+    <b>Two watch-items:</b> photo &amp; voice uploads need the R2 media keys (forms degrade gracefully without them, exactly like today) · the SM single-site rule rides on per-request scope checks, so it ships with isolation tests, not just code.
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>techBuilder · role customization blueprint · plan of record</span>
+    <span>Full detail: docs/techBuilder-Role-Customization-Plan.md</span>
+  </div>
+</footer>
+
+</body>
+</html>

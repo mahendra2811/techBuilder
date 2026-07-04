@@ -99,7 +99,21 @@ Then open `http://localhost:3000`.
 - **Login returns `VALIDATION_FAILED` on the raw backend curl** → the `/api/v1/auth/login` endpoint requires `deviceId` in the body (the web Route Handler adds this automatically; the raw backend API does not).
 - **Neon feels slow on the first request** → free-tier Neon projects auto-suspend when idle; the first query after idle wakes it (a few seconds), subsequent ones are fast.
 - **Web shows a network/fetch error on login** → confirm the backend is actually up on `:4000` (`curl .../health`) and `web/.env.local`'s `BACKEND_ORIGIN` matches.
-- **Port already in use** → something from a previous session is still running; find it with `lsof -i :4000` / `lsof -i :3000` and stop it, or reuse it instead of starting a duplicate.
+- **Port already in use** (`EADDRINUSE: address already in use :::4000`) → the backend boots fully (you'll see all the `Mapped {...} route` logs and `Nest application successfully started`) and then dies with:
+  ```
+  ERROR [NestApplication] Error: listen EADDRINUSE: address already in use :::4000
+  ...
+  Error: listen EADDRINUSE: address already in use :::4000
+      at Server.setupListenHandle [as _listen2] (node:net:...)
+    code: 'EADDRINUSE', errno: -98, syscall: 'listen', address: '::', port: 4000
+  ```
+  This just means a backend from a previous session is **still running on 4000** — nothing is broken. Either reuse it (it's already linked to Neon; just start `web`), or free the port and restart:
+  ```bash
+  lsof -i :4000            # see what's holding it (PID in the last-but-one column)
+  kill $(lsof -t -i :4000) # graceful stop; add -9 if it won't die
+  # then re-run: (cd backend && npm run build && npm start)
+  ```
+  Same fix for `:3000` (web) — swap the port. Tip: `curl -s http://localhost:4000/api/v1/health` first — if it answers `{"data":{"status":"ok",...}}`, the existing instance is fine and you don't need to restart at all.
 - **Stop everything** → `Ctrl+C` in each terminal (or kill the background job IDs if started via a tool).
 
 ## Related docs
