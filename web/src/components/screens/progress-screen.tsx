@@ -113,7 +113,14 @@ export function ProgressScreen({ role }: { role: EntryRole }) {
           <CardDescription>{m.PROGRESS_UI.subtitle}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
-          <SitePicker sites={sites} isLoading={sitesQ.isPending} value={siteId} onChange={setPickedSiteId} />
+          <SitePicker
+            sites={sites}
+            isLoading={sitesQ.isPending}
+            value={siteId}
+            onChange={setPickedSiteId}
+            error={sitesQ.error}
+            onRetry={() => void sitesQ.refetch()}
+          />
           <DateField id="progress-date" testId="progress-date" value={date} onChange={setDate} max={today} />
 
           {/* Filing another report is NEVER blocked by this — informational only. */}

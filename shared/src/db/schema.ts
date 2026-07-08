@@ -295,7 +295,10 @@ export const progressNotes = pgTable(
     enteredBy: uuid('entered_by').notNull(),
     mediaIds: uuid('media_ids').array(),
   },
-  (t) => [index('progress_site_day_idx').on(t.orgId, t.siteId, t.businessDate)],
+  (t) => [
+    index('progress_site_day_idx').on(t.orgId, t.siteId, t.businessDate),
+    index('progress_entered_by_idx').on(t.orgId, t.enteredBy), // frozen.5: person insights
+  ],
 );
 
 export const vendors = pgTable('vendors', {
@@ -322,7 +325,11 @@ export const expenses = pgTable(
     enteredBy: uuid('entered_by').notNull(),
     void: boolean('void').notNull().default(false),
   },
-  (t) => [index('expenses_site_day_idx').on(t.orgId, t.siteId, t.businessDate)],
+  (t) => [
+    index('expenses_site_day_idx').on(t.orgId, t.siteId, t.businessDate),
+    // frozen.5: person-scoped reads (khata spent, person insights, own-entries filters)
+    index('expenses_entered_by_idx').on(t.orgId, t.enteredBy, t.businessDate),
+  ],
 );
 
 /** Advance/petty-cash ledger: money handed down the chain (GIVE) or returned up (RETURN).
@@ -486,7 +493,10 @@ export const approvalRequests = pgTable(
     decidedAt: timestamp('decided_at', { withTimezone: true }),
     comment: text('comment'),
   },
-  (t) => [index('requests_status_idx').on(t.orgId, t.status)],
+  (t) => [
+    index('requests_status_idx').on(t.orgId, t.status),
+    index('requests_requested_by_idx').on(t.orgId, t.requestedBy), // frozen.5: my-requests/person insights
+  ],
 );
 
 export const notifications = pgTable(

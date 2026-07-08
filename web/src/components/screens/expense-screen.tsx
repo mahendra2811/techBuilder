@@ -116,7 +116,14 @@ export function ExpenseScreen({ role }: { role: EntryRole }) {
           <CardDescription>{m.EXPENSE_UI.subtitle}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
-          <SitePicker sites={sites} isLoading={sitesQ.isPending} value={siteId} onChange={setPickedSiteId} />
+          <SitePicker
+            sites={sites}
+            isLoading={sitesQ.isPending}
+            value={siteId}
+            onChange={setPickedSiteId}
+            error={sitesQ.error}
+            onRetry={() => void sitesQ.refetch()}
+          />
           <DateField id="expense-date" testId="expense-date" value={date} onChange={setDate} max={today} />
 
           <Separator />

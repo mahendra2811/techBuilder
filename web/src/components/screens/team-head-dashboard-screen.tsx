@@ -13,7 +13,7 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { BadgeCheck, ChevronRight, ClipboardCheck, NotebookPen, Send, Users } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import type { Attendance, Person, ProgressNote, Site, UUID } from '@techbuilder/contracts';
 import { api } from '@/lib/api-client';
 import { todayKolkata } from '@/lib/business-date';
@@ -21,7 +21,6 @@ import { useMessages } from '@/lib/i18n/locale-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { KhataCard } from '@/components/khata-card';
 import { SitePicker } from '@/components/entry/site-picker';
-import { QuickActions } from '@/components/dashboard/quick-actions';
 import { LoadingState, ErrorState, Notice } from '@/components/entry/states';
 
 export function TeamHeadDashboardScreen() {
@@ -67,7 +66,14 @@ export function TeamHeadDashboardScreen() {
     <div className="grid gap-4" data-testid="th-dashboard">
       <KhataCard />
 
-      <SitePicker sites={sites} isLoading={sitesQ.isPending} value={siteId} onChange={setPickedSiteId} />
+      <SitePicker
+        sites={sites}
+        isLoading={sitesQ.isPending}
+        value={siteId}
+        onChange={setPickedSiteId}
+        error={sitesQ.error}
+        onRetry={() => void sitesQ.refetch()}
+      />
 
       <Card>
         <CardHeader>
@@ -144,16 +150,6 @@ export function TeamHeadDashboardScreen() {
           </Link>
         </CardContent>
       </Card>
-
-      <QuickActions
-        actions={[
-          { href: '/team-head/attendance', label: m.NAV_LABELS.attendance, icon: ClipboardCheck, testId: 'qa-attendance' },
-          { href: '/team-head/records', label: m.NAV_LABELS.records, icon: NotebookPen, testId: 'qa-records' },
-          { href: '/team-head/requests', label: m.NAV_LABELS.requests, icon: Send, testId: 'qa-requests' },
-          { href: '/team-head/approvals', label: m.NAV_LABELS.approvals, icon: BadgeCheck, testId: 'qa-approvals' },
-          { href: '/team-head/people', label: m.NAV_LABELS.people, icon: Users, testId: 'qa-people' },
-        ]}
-      />
     </div>
   );
 }

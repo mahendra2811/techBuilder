@@ -238,6 +238,10 @@ export const en = {
     qty: "Quantity",
     uom: "Unit",
     note: "Note",
+    amount: "Amount",
+    category: "Category",
+    businessDate: "Date",
+    remark: "Remark",
   },
 
   /** Field-entry screens: attendance, records, fuel. */
@@ -480,7 +484,7 @@ export const en = {
 
     // evening (end-of-day) form — optional
     eveningTitle: "End of day",
-    eveningSubtitle: "Optional — log your closing reading when you finish.",
+    eveningSubtitle: "Optional to fill in — but if you do, the meter photo is required.",
     endReadingRequired: "Enter today's current reading.",
     endReadingTooLow: "Current reading can't be less than the start reading.",
     hoursWorkedLabel: "Hours worked",
@@ -530,6 +534,8 @@ export const en = {
     approvedNotice: "Approved.",
     rejectedNotice: "Rejected.",
     unknownRequester: "Unknown user",
+    finalCategoryLabel: "Final category",
+    rejectReasonRequired: "A reason is required to reject",
   },
 
   /** Raise-request screen (SM / TH / Driver). */

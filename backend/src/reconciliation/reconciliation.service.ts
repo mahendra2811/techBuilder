@@ -2,13 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { and, gte, isNull, lte, type AnyColumn } from 'drizzle-orm';
 import * as schema from '@techbuilder/contracts/db/schema';
 import {
-  parseOrgConfig,
   type DateWindow,
   type FuelReconRow,
   type MaterialReconRow,
   type Reconciliation,
 } from '@techbuilder/contracts';
 import { DbService } from '../db/db.service';
+import { loadOrgConfig } from '../common/org-config.util';
 import type { Principal } from '../common/current-user.decorator';
 import { forbidScope, inSet, loadScope } from '../common/scope.util';
 
@@ -73,7 +73,7 @@ export class ReconciliationService {
       }
 
       // ---- fuel reconciliation: expected (norm × distance/hours) vs actual litres ----
-      const cfg = parseOrgConfig((await tx.select({ config: schema.orgs.config }).from(schema.orgs))[0]?.config ?? {});
+      const cfg = await loadOrgConfig(tx);
       const fuelNorms = cfg.reconciliation.fuelNorms;
       const vtypes = await tx.select().from(schema.vehicleTypes);
       const normOf = new Map<string, number>(); // vehicleTypeId → norm (best-effort match by type name)

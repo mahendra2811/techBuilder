@@ -3,7 +3,7 @@ import { and, desc, eq, gte, isNull, lte, or, sql, type SQL } from 'drizzle-orm'
 import type { PgTable } from 'drizzle-orm/pg-core';
 import * as schema from '@techbuilder/contracts/db/schema';
 import { can, type Action } from '@techbuilder/contracts';
-import { loadExpenseLimits } from '../common/org-config.util';
+import { loadExpenseLimits, loadOrgConfig } from '../common/org-config.util';
 import type {
   CreateProgressNoteInput,
   CreateExpenseInput,
@@ -134,11 +134,12 @@ export class RecordsService {
     return this.dbs.runInTenant(p.orgId, async (tx) => {
       const ctx = await loadScope(tx, p);
       assertSiteInScope(ctx, 'record.enter', input.siteId);
-      await assertBackdateWindow(tx, ctx.role, input.businessDate, RECORD_CREATE_BACKDATE_LIMIT_DAYS);
+      const cfg = await loadOrgConfig(tx); // once — feeds both the window check and the limits
+      await assertBackdateWindow(tx, ctx.role, input.businessDate, RECORD_CREATE_BACKDATE_LIMIT_DAYS, cfg.completion.cutoffLocalTime);
       // Client-plan v1 per-entry direct limits: TH ≤ ₹25k, SM ≤ ₹1L (site-overridable, edited one
       // level above). Over the line → the client converts the entry into an EXPENSE_ADD request.
       if (ctx.role === 'TEAM_HEAD' || ctx.role === 'SITE_MANAGER') {
-        const limits = await loadExpenseLimits(tx, input.siteId);
+        const limits = await loadExpenseLimits(tx, input.siteId, cfg);
         const directLimit = ctx.role === 'TEAM_HEAD' ? limits.thDirectLimitPaise : limits.smDirectLimitPaise;
         if (input.amountPaise > directLimit) {
           throw new ApiException(
@@ -343,8 +344,16 @@ export class RecordsService {
   async createIssue(p: Principal, input: CreateIssueInput): Promise<Issue> {
     return this.dbs.runInTenant(p.orgId, async (tx) => {
       const ctx = await loadScope(tx, p);
-      if (input.siteId) assertSiteInScope(ctx, 'record.enter', input.siteId);
-      else if (input.vehicleId) await assertVehicleInScope(tx, ctx, 'record.enter', input.vehicleId);
+      // Client-plan D-6: drivers report vehicle DAMAGE but hold vehicleLog.enter, never
+      // record.enter — gate their (vehicle-scoped-only) issues on the vehicle action.
+      if (ctx.role === 'DRIVER') {
+        if (!input.vehicleId) forbidScope('Drivers may only report damage on their vehicle');
+        await assertVehicleInScope(tx, ctx, 'vehicleLog.enter', input.vehicleId);
+      } else {
+        if (!can(ctx.role, 'record.enter')) forbidScope(`Role ${ctx.role} cannot record.enter`);
+        if (input.siteId) assertSiteInScope(ctx, 'record.enter', input.siteId);
+        else if (input.vehicleId) await assertVehicleInScope(tx, ctx, 'record.enter', input.vehicleId);
+      }
       await assertBackdateWindow(tx, ctx.role, input.businessDate, RECORD_CREATE_BACKDATE_LIMIT_DAYS);
       const [row] = await tx
         .insert(schema.issues)

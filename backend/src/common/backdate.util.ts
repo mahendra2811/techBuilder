@@ -36,8 +36,10 @@ export async function assertBackdateWindow(
   role: Role,
   businessDate: string,
   limits: Partial<Record<Role, number>>,
+  /** Pass the caller's already-loaded org cutoff to skip a redundant orgs SELECT + parse. */
+  cutoff?: string,
 ): Promise<void> {
-  const today = businessDateNow(new Date(), await loadEodCutoff(tx));
+  const today = businessDateNow(new Date(), cutoff ?? (await loadEodCutoff(tx)));
   const back = daysBetween(businessDate, today); // >0 = past, <0 = future
   if (back < 0) {
     throw new ApiException('VALIDATION_FAILED', 'Business date cannot be in the future', {

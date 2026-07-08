@@ -11,7 +11,6 @@
 import { useMemo, useState } from 'react';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { FileSpreadsheet } from 'lucide-react';
-import * as XLSX from 'xlsx';
 import type { Attendance, Expense, Person, Site, User } from '@techbuilder/contracts';
 import { api, me } from '@/lib/api-client';
 import { addDays, todayKolkata } from '@/lib/business-date';
@@ -66,13 +65,15 @@ export function ReportsScreen() {
 
   const fileName = meQ.data ? exportFileName(meQ.data.org.code, from, today) : null;
 
-  const download = () => {
+  const download = async () => {
     if (!ready || !attendance || !fileName) return;
-    const wb = buildWorkbook(
+    const wb = await buildWorkbook(
       attendanceSheetRows(attendance, sites, peopleQ.data ?? [], usersQ.data ?? [], m),
       expenseSheetRows(expensesQ.data ?? [], sites, usersQ.data ?? [], m),
       m,
     );
+    // SheetJS is lazy-loaded (see lib/export-excel.ts) so it leaves this route's bundle.
+    const XLSX = await import('xlsx');
     XLSX.writeFile(wb, fileName);
     setDownloaded(true);
   };
@@ -133,7 +134,7 @@ export function ReportsScreen() {
           </Notice>
         )}
 
-        <Button type="button" data-testid="report-download" disabled={!ready} onClick={download}>
+        <Button type="button" data-testid="report-download" disabled={!ready} onClick={() => void download()}>
           <FileSpreadsheet className="size-4" aria-hidden="true" />
           {m.OWNER_UI.reportsDownload}
         </Button>

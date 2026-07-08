@@ -201,6 +201,10 @@ export const hi: Messages = {
     qty: "कितना",
     uom: "यूनिट",
     note: "नोट",
+    amount: "रकम",
+    category: "श्रेणी",
+    businessDate: "तारीख",
+    remark: "टिप्पणी",
   },
 
   ENTRY_UI: {
@@ -437,7 +441,7 @@ export const hi: Messages = {
 
     // evening (end-of-day) form — optional
     eveningTitle: "दिन का अंत",
-    eveningSubtitle: "वैकल्पिक — काम खत्म होने पर आखिरी रीडिंग दर्ज करें।",
+    eveningSubtitle: "भरना वैकल्पिक है — भरें तो मीटर की फोटो ज़रूरी",
     endReadingRequired: "आज की मौजूदा रीडिंग डालें।",
     endReadingTooLow: "मौजूदा रीडिंग शुरुआती रीडिंग से कम नहीं हो सकती।",
     hoursWorkedLabel: "काम के घंटे",
@@ -485,6 +489,8 @@ export const hi: Messages = {
     approvedNotice: "मंज़ूर कर दिया।",
     rejectedNotice: "नामंज़ूर कर दिया।",
     unknownRequester: "अनजान यूज़र",
+    finalCategoryLabel: "फ़ाइनल कैटेगरी",
+    rejectReasonRequired: "रिजेक्ट करने के लिए वजह लिखें",
   },
 
   REQUESTS_UI: {

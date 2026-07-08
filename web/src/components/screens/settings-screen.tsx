@@ -9,8 +9,8 @@
  * only displays; a clear localized note says so.
  */
 import { useQuery } from '@tanstack/react-query';
-import type { OrgConfig } from '@techbuilder/contracts';
-import { me } from '@/lib/api-client';
+import type { OrgConfig, VehicleType } from '@techbuilder/contracts';
+import { api, me } from '@/lib/api-client';
 import { useMessages } from '@/lib/i18n/locale-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { LoadingState, ErrorState, EmptyState, Notice } from '@/components/entry/states';
@@ -68,6 +68,11 @@ export function SettingsScreen() {
 
 function ConfigView({ config }: { config: OrgConfig }) {
   const m = useMessages();
+  // The org's actual vehicle types live as DB rows (GET /vehicle-types), not in
+  // OrgConfig.vehicleTypes — that config field is usually empty even when the
+  // org has types set up. Query the real rows; fall back to the config-driven
+  // list only if the DB query comes back empty.
+  const vehicleTypesQ = useQuery({ queryKey: ['vehicle-types'], queryFn: () => api<VehicleType[]>('GET', '/vehicle-types') });
   return (
     <>
       <Card data-testid="settings-brand">
@@ -163,9 +168,24 @@ function ConfigView({ config }: { config: OrgConfig }) {
           <CardTitle>{m.SETTINGS_UI.vehicleTypesTitle}</CardTitle>
         </CardHeader>
         <CardContent>
-          {config.vehicleTypes.length === 0 ? (
-            <EmptyState label={m.SETTINGS_UI.vehicleTypesEmpty} />
-          ) : (
+          {vehicleTypesQ.isPending ? (
+            <LoadingState />
+          ) : vehicleTypesQ.error ? (
+            <ErrorState error={vehicleTypesQ.error} onRetry={() => void vehicleTypesQ.refetch()} />
+          ) : vehicleTypesQ.data && vehicleTypesQ.data.length > 0 ? (
+            <ul className="divide-y">
+              {vehicleTypesQ.data.map((t) => (
+                <li key={t.id} className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0">
+                  <span className="text-sm">{t.name}</span>
+                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
+                    {m.VEHICLE_TRACKING_MODE_LABELS[t.trackingMode]}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : config.vehicleTypes.length > 0 ? (
+            // Fallback: the config-driven list, kept for orgs whose types are
+            // still config-only and haven't been created as DB rows yet.
             <ul className="divide-y">
               {config.vehicleTypes.map((t) => (
                 <li key={t.key} className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0">
@@ -176,6 +196,8 @@ function ConfigView({ config }: { config: OrgConfig }) {
                 </li>
               ))}
             </ul>
+          ) : (
+            <EmptyState label={m.SETTINGS_UI.vehicleTypesEmpty} />
           )}
         </CardContent>
       </Card>

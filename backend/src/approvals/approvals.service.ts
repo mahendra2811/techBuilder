@@ -10,7 +10,7 @@ import { ApiException } from '../common/api-exception';
 import type { Principal } from '../common/current-user.decorator';
 import { forbidScope, inSet, loadScope, type ScopeContext } from '../common/scope.util';
 import { businessDateNow, daysBetween } from '../common/business-date';
-import { loadEodCutoff, loadExpenseLimits } from '../common/org-config.util';
+import { loadExpenseLimits, loadOrgConfig } from '../common/org-config.util';
 
 @Injectable()
 export class ApprovalsService {
@@ -22,6 +22,11 @@ export class ApprovalsService {
       // Client-plan v1: workers hold request.submit for EXPENSE_ADD only.
       if (ctx.role === 'WORKER' && input.type !== 'EXPENSE_ADD') {
         forbidScope('Workers may only submit expense requests');
+      }
+      // Non-EXPENSE_ADD types are phase-parked and shape-unvalidated — at least cap the blob
+      // so nobody can stuff arbitrary megabytes into the payload jsonb column.
+      if (input.type !== 'EXPENSE_ADD' && JSON.stringify(input.payload).length > 4_000) {
+        throw new ApiException('VALIDATION_FAILED', 'Request payload too large', { payload: 'too large' });
       }
       const payload =
         input.type === 'EXPENSE_ADD' ? await validateExpenseAddPayload(tx, ctx, input.payload) : input.payload;
@@ -228,14 +233,15 @@ async function validateExpenseAddPayload(
   }
 
   // Dates: future never allowed; workers/drivers bounded by the request window (today + N back).
-  const today = businessDateNow(new Date(), await loadEodCutoff(tx));
+  const cfg = await loadOrgConfig(tx); // once — feeds both the cutoff and the limits
+  const today = businessDateNow(new Date(), cfg.completion.cutoffLocalTime);
   const back = daysBetween(pl.businessDate, today);
   if (back < 0) {
     throw new ApiException('VALIDATION_FAILED', 'Business date cannot be in the future', {
       businessDate: 'future date',
     });
   }
-  const limits = await loadExpenseLimits(tx, siteId);
+  const limits = await loadExpenseLimits(tx, siteId, cfg);
   if (ctx.role === 'WORKER' || ctx.role === 'DRIVER') {
     if (back > limits.requestBackdateDays) {
       forbidScope(`Backdating window exceeded: up to ${limits.requestBackdateDays} day(s) back`);

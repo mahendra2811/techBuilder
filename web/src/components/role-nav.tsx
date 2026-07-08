@@ -28,7 +28,11 @@ export function RoleNav({ role }: { role: Role }) {
           const Icon = item.icon;
           return (
             <Link
-              key={item.action}
+              // testId is guaranteed unique per nav entry (unlike `action`,
+              // which repeats — e.g. two 'record.enter' entries for
+              // expense/progress, several 'view.all' entries per role —
+              // causing React duplicate-key warnings when keyed on action).
+              key={item.testId}
               href={item.href}
               // Some destinations are not built yet (Phase-3 placeholders) —
               // prefetching them 404s in the console and wastes mobile data.

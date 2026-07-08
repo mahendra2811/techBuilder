@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { z } from 'zod';
 import { CASH_TRANSFER_KINDS } from '@techbuilder/contracts';
 import type { CreateCashTransferInput } from '@techbuilder/contracts';
@@ -34,8 +34,8 @@ export class CashTransfersController {
 
   // ENDPOINTS.cashTransfersList
   @Get()
-  list(@CurrentUser() u: Principal) {
-    return this.cash.list(u);
+  list(@CurrentUser() u: Principal, @Query('limit') limit?: string) {
+    return this.cash.list(u, limit);
   }
 }
 

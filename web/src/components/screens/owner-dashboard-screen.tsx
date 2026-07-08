@@ -21,7 +21,7 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useQueries, useQuery } from '@tanstack/react-query';
-import { ChevronRight, ClipboardCheck, Copy, FileSpreadsheet, Fuel, MessageCircle, NotebookPen } from 'lucide-react';
+import { ChevronRight, Copy, FileSpreadsheet, Fuel, MessageCircle } from 'lucide-react';
 import type { Attendance, Completeness, OwnerDashboard, Site, UUID, Vehicle } from '@techbuilder/contracts';
 import { api, me } from '@/lib/api-client';
 import { addDays, formatBusinessDate, todayKolkata } from '@/lib/business-date';
@@ -228,8 +228,6 @@ export function OwnerDashboardScreen({ variant = 'OWNER' }: { variant?: 'OWNER' 
       {!isOwner && (
         <QuickActions
           actions={[
-            { href: '/site-manager/attendance', label: m.NAV_LABELS.attendance, icon: ClipboardCheck, testId: 'qa-attendance' },
-            { href: '/site-manager/records', label: m.NAV_LABELS.records, icon: NotebookPen, testId: 'qa-records' },
             { href: '/site-manager/vehicle', label: m.NAV_LABELS.vehicleFuel, icon: Fuel, testId: 'qa-vehicle' },
             { href: '/site-manager/reports', label: m.NAV_LABELS.reports, icon: FileSpreadsheet, testId: 'qa-reports' },
           ]}

@@ -16,7 +16,7 @@ const SubmitRequestSchema = z.object({
 
 const DecideRequestSchema = z.object({
   approve: z.boolean(),
-  comment: z.string().optional(),
+  comment: z.string().max(2000).optional(),
   /** EXPENSE_ADD only: decider's final category ("the approver creates the final expense"). */
   categoryOverride: z.enum(EXPENSE_CATEGORIES).optional(),
 });

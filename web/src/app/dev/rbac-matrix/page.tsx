@@ -9,6 +9,7 @@
  * action verbatim (dots kept), e.g. cell-OWNER-record.enter.
  */
 import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
 import { ACTIONS, ROLES, scopeFor } from '@techbuilder/contracts';
 import { requireSession } from '@/lib/server/require-session';
 // Dev-only surface — deliberately pinned to the ENGLISH catalog (no locale).
@@ -21,6 +22,12 @@ const ROLE_LABEL = en.ROLE_LABELS;
 export const metadata: Metadata = { title: RBAC_MATRIX_UI.title };
 
 export default async function Page() {
+  // DEV ONLY — never served in production: renders the Next.js not-found
+  // page (no session/RBAC data is even loaded) when NODE_ENV isn't 'development'.
+  if (process.env.NODE_ENV !== 'development') {
+    notFound();
+  }
+
   const { user } = await requireSession();
 
   return (

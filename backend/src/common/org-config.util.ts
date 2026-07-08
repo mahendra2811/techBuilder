@@ -31,9 +31,8 @@ export interface ExpenseLimits {
   categories: ExpenseCategoryConfig[];
 }
 
-export async function loadExpenseLimits(tx: Tx, siteId: string | null): Promise<ExpenseLimits> {
-  const cfg = await loadOrgConfig(tx);
-  const base = cfg.expense;
+export async function loadExpenseLimits(tx: Tx, siteId: string | null, cfg?: OrgConfig): Promise<ExpenseLimits> {
+  const base = (cfg ?? (await loadOrgConfig(tx))).expense;
   let site: SiteExpenseFormConfig | null = null;
   if (siteId) {
     const [s] = await tx

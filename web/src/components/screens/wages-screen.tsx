@@ -1,6 +1,8 @@
 'use client';
 
 /**
+ * PHASE-PARKED: unrouted since 2026-07; attendance/wages are manual this phase.
+ *
  * Wage / cost summary (Owner + SM — one component, two thin wrappers).
  * READ-ONLY payroll-style view (NOT a payment rail):
  *   - window toggle (7 / 30 days) → GET /reports/wage-summary (auto-scoped:

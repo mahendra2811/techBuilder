@@ -115,31 +115,35 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          {/* DEV ONLY — remove before pilot (see DEV_LOGINS above). */}
-          <div className="mt-6 rounded-lg border border-dashed p-3" data-testid="dev-credentials">
-            <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
-              {m.UI.devCredentialsTitle}
-            </p>
-            <p className="mb-2 text-xs text-muted-foreground">
-              {m.UI.devCredentialsPassword} <code className="rounded bg-muted px-1">{DEV_PASSWORD}</code>
-            </p>
-            <div className="grid grid-cols-2 gap-1.5">
-              {DEV_LOGINS.map((c) => (
-                <button
-                  key={c.username}
-                  type="button"
-                  className="rounded-md border bg-background px-2 py-1.5 text-left text-xs hover:bg-muted"
-                  onClick={() => {
-                    setValue('username', c.username, { shouldValidate: true });
-                    setValue('password', DEV_PASSWORD, { shouldValidate: true });
-                  }}
-                >
-                  <span className="font-medium">{c.username}</span>
-                  <span className="block text-muted-foreground">{c.label}</span>
-                </button>
-              ))}
+          {/* DEV ONLY — never rendered in production (NODE_ENV gate below is
+              statically inlined by Next, so this whole block is stripped from
+              the prod bundle). Remove entirely before any pilot/production build. */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="mt-6 rounded-lg border border-dashed p-3" data-testid="dev-credentials">
+              <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
+                {m.UI.devCredentialsTitle}
+              </p>
+              <p className="mb-2 text-xs text-muted-foreground">
+                {m.UI.devCredentialsPassword} <code className="rounded bg-muted px-1">{DEV_PASSWORD}</code>
+              </p>
+              <div className="grid grid-cols-2 gap-1.5">
+                {DEV_LOGINS.map((c) => (
+                  <button
+                    key={c.username}
+                    type="button"
+                    className="rounded-md border bg-background px-2 py-1.5 text-left text-xs hover:bg-muted"
+                    onClick={() => {
+                      setValue('username', c.username, { shouldValidate: true });
+                      setValue('password', DEV_PASSWORD, { shouldValidate: true });
+                    }}
+                  >
+                    <span className="font-medium">{c.username}</span>
+                    <span className="block text-muted-foreground">{c.label}</span>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </CardContent>
       </Card>
     </main>

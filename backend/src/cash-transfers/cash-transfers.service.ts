@@ -127,7 +127,9 @@ export class CashTransfersService {
   }
 
   /** Transfers the caller may see: own (from/to) + (SM) any transfer touching a user at their site + (OWNER) all. */
-  async list(p: Principal): Promise<CashTransfer[]> {
+  async list(p: Principal, limitParam?: string): Promise<CashTransfer[]> {
+    // Bounded by default — this was the app's one truly unbounded lifetime-history read.
+    const limit = Math.min(Math.max(parseInt(limitParam ?? '', 10) || 100, 1), 200);
     return this.dbs.runInTenant(p.orgId, async (tx) => {
       const ctx = await loadScope(tx, p);
       let filter: SQL | undefined;
@@ -156,7 +158,8 @@ export class CashTransfersService {
         .select()
         .from(schema.cashTransfers)
         .where(and(isNull(schema.cashTransfers.deletedAt), filter))
-        .orderBy(desc(schema.cashTransfers.createdAt));
+        .orderBy(desc(schema.cashTransfers.createdAt))
+        .limit(limit);
       return rows.map(mapCashTransfer);
     });
   }

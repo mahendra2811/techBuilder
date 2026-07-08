@@ -8,7 +8,7 @@
  * version > 1 was corrected after first save → catalog "yes" in the Corrected
  * column. Headers/labels come from the ACTIVE locale's catalog (passed in).
  */
-import * as XLSX from 'xlsx';
+import type * as XLSX from 'xlsx';
 import type { Attendance, BusinessDate, Expense, Person, Site, User } from '@techbuilder/contracts';
 import type { Messages } from './i18n/messages';
 
@@ -78,8 +78,11 @@ export function expenseSheetRows(expenses: Expense[], sites: Site[], users: User
   ];
 }
 
-/** Two-sheet workbook: Attendance + Expenses. Amount column formatted 2dp. */
-export function buildWorkbook(attRows: Cell[][], expRows: Cell[][], m: Messages): XLSX.WorkBook {
+/** Two-sheet workbook: Attendance + Expenses. Amount column formatted 2dp.
+ * SheetJS is lazy-imported here (not at module top) so it leaves the initial
+ * route bundle and only loads when an export is actually triggered. */
+export async function buildWorkbook(attRows: Cell[][], expRows: Cell[][], m: Messages): Promise<XLSX.WorkBook> {
+  const XLSX = await import('xlsx');
   const wb = XLSX.utils.book_new();
   const attWs = XLSX.utils.aoa_to_sheet(attRows);
   const expWs = XLSX.utils.aoa_to_sheet(expRows);

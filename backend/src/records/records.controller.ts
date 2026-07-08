@@ -20,11 +20,15 @@ import { CurrentUser, type Principal } from '../common/current-user.decorator';
 
 // ---- Zod schemas ----
 
+// A malformed date string would make daysBetween() return NaN and silently DISABLE the
+// backdate-window guard (NaN comparisons are all false) — so every schema pins the shape.
+const BusinessDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
 const CreateProgressNoteSchema = z.object({
   id: z.string().uuid(),
   siteId: z.string().uuid(),
   text: z.string().min(1),
-  businessDate: z.string(),
+  businessDate: BusinessDateSchema,
   mediaIds: z.array(z.string().uuid()).optional(),
 });
 
@@ -34,11 +38,11 @@ const CreateExpenseSchema = z.object({
   category: z.enum(EXPENSE_CATEGORIES),
   amountPaise: z.number().int(),
   vendorId: z.string().uuid().optional(),
-  billNo: z.string().optional(),
+  billNo: z.string().max(120).optional(),
   receiptMediaId: z.string().uuid().optional(),
   paidVia: z.enum(PAYMENT_MODES).optional(), // WO-0: CASH (default) | VENDOR_CREDIT
   remark: z.string().max(2000).optional(), // frozen.4
-  businessDate: z.string(),
+  businessDate: BusinessDateSchema,
 });
 
 const CreateFuelLogSchema = z.object({
@@ -48,7 +52,7 @@ const CreateFuelLogSchema = z.object({
   litres: z.number(),
   reading: z.number(),
   receiptMediaId: z.string().uuid().optional(),
-  businessDate: z.string(),
+  businessDate: BusinessDateSchema,
 });
 
 const CreateVehicleLogSchema = z.object({
@@ -60,7 +64,7 @@ const CreateVehicleLogSchema = z.object({
   hoursWorked: z.number().nonnegative().optional(), // WO-0/D-3: driver evening update
   loadsCount: z.number().int().nonnegative().optional(),
   note: z.string().max(2000).optional(),
-  businessDate: z.string(),
+  businessDate: BusinessDateSchema,
 });
 
 const CreateTripSchema = z.object({
@@ -68,9 +72,9 @@ const CreateTripSchema = z.object({
   vehicleId: z.string().uuid(),
   fromText: z.string().min(1),
   toText: z.string().min(1),
-  purpose: z.string().optional(),
+  purpose: z.string().max(500).optional(),
   materialTxnId: z.string().uuid().optional(),
-  businessDate: z.string(),
+  businessDate: BusinessDateSchema,
 });
 
 const CreateMaterialTxnSchema = z.object({
@@ -82,7 +86,7 @@ const CreateMaterialTxnSchema = z.object({
   siteId: z.string().uuid(),
   counterpartSiteId: z.string().uuid().optional(),
   relatedTxnId: z.string().uuid().optional(),
-  businessDate: z.string(),
+  businessDate: BusinessDateSchema,
 });
 
 const CreateIssueSchema = z.object({
@@ -91,7 +95,7 @@ const CreateIssueSchema = z.object({
   vehicleId: z.string().uuid().optional(),
   severity: z.enum(['LOW', 'MEDIUM', 'HIGH']),
   description: z.string().min(1),
-  businessDate: z.string(),
+  businessDate: BusinessDateSchema,
   mediaIds: z.array(z.string().uuid()).optional(),
 });
 
@@ -166,7 +170,9 @@ export class RecordsController {
     return this.records.createMaterialTxn(u, body);
   }
 
-  @RequireAction('record.enter')
+  // No @RequireAction: DRIVERS file vehicle-damage issues under vehicleLog.enter (they never
+  // hold record.enter), so a fixed decorator would 403 every driver damage report (QA bug).
+  // The service branches by role: driver → own-vehicle only; others → record.enter as before.
   @Post('issue')
   createIssue(
     @CurrentUser() u: Principal,

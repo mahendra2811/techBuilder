@@ -9,21 +9,28 @@ import type { Site, UUID } from '@techbuilder/contracts';
 import { useMessages } from '@/lib/i18n/locale-context';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
-import { LoadingState, EmptyState } from './states';
+import { LoadingState, EmptyState, ErrorState } from './states';
 
 export function SitePicker({
   sites,
   isLoading,
   value,
   onChange,
+  error,
+  onRetry,
 }: {
   sites: Site[] | undefined;
   isLoading: boolean;
   value: UUID | '';
   onChange: (siteId: UUID) => void;
+  /** When set, renders the shared ErrorState instead of the "no sites" empty
+   * state — a network blip must never read as "you have no sites". */
+  error?: unknown;
+  onRetry?: () => void;
 }) {
   const m = useMessages();
   if (isLoading) return <LoadingState />;
+  if (error) return <ErrorState error={error} onRetry={onRetry} />;
   if (!sites || sites.length === 0) return <EmptyState label={m.ENTRY_UI.noSites} />;
 
   const single = sites.length === 1 ? sites[0] : undefined;

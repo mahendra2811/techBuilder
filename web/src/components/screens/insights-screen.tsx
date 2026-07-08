@@ -63,7 +63,14 @@ export function InsightsScreen({ role }: { role: InsightsRole }) {
           <CardDescription>{i.subtitle}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
-          <SitePicker sites={sites} isLoading={sitesQ.isPending} value={siteId} onChange={setPickedSiteId} />
+          <SitePicker
+            sites={sites}
+            isLoading={sitesQ.isPending}
+            value={siteId}
+            onChange={setPickedSiteId}
+            error={sitesQ.error}
+            onRetry={() => void sitesQ.refetch()}
+          />
           <DatePresets today={today} value={range} onChange={setRange} testIdPrefix="insights-date" />
         </CardContent>
       </Card>

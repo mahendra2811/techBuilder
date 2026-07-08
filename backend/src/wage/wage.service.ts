@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { and, eq, gte, isNull, lte } from 'drizzle-orm';
 import * as schema from '@techbuilder/contracts/db/schema';
 import {
-  parseOrgConfig,
   type Advance,
   type CreateAdvanceInput,
   type DateWindow,
@@ -11,6 +10,7 @@ import {
   type WageSummary,
 } from '@techbuilder/contracts';
 import { DbService, type Tx } from '../db/db.service';
+import { loadOrgConfig } from '../common/org-config.util';
 import { ApiException } from '../common/api-exception';
 import type { Principal } from '../common/current-user.decorator';
 import { forbidScope, inSet, loadScope } from '../common/scope.util';
@@ -83,7 +83,7 @@ export class WageService {
   /** Read-only wage/cost summary. NOT a payment rail. net = round(rate × (present + 0.5·half)) + OT − person advances. */
   async getWageSummary(p: Principal, window: DateWindow): Promise<WageSummary> {
     return this.dbs.runInTenant(p.orgId, async (tx) => {
-      const otMultiplier = await loadOtMultiplier(tx, p.orgId);
+      const otMultiplier = await loadOtMultiplier(tx);
 
       // WP-1: the summary aggregates from attendance, which is site-stamped — an SM's
       // summary is therefore their site(s) only. Owner sees the org.
@@ -125,10 +125,9 @@ export class WageService {
   }
 }
 
-async function loadOtMultiplier(tx: Tx, orgId: string): Promise<number> {
-  const [o] = await tx.select({ config: schema.orgs.config }).from(schema.orgs).where(eq(schema.orgs.id, orgId));
-  if (!o) return 1.5;
-  return parseOrgConfig(o.config).wage.otMultiplier;
+async function loadOtMultiplier(tx: Tx): Promise<number> {
+  // Single source: the shared loader (any future caching/defaults fix applies here too).
+  return (await loadOrgConfig(tx)).wage.otMultiplier;
 }
 
 function mapWageRate(r: typeof schema.wageRates.$inferSelect): WageRate {

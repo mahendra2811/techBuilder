@@ -187,7 +187,7 @@ When the user asks for a change, classify it and jump to the recipe:
 
 ## 11. Known gaps (decide before relying on them)
 - **No crews API** — crews are only created by the seed (§8). In-app crew create/list/membership isn't possible yet; a Team Head created in-app has no crew until one is seeded. To add: a `crews` module (list/create + crew_members management) copying the `sites/` pattern, + endpoints in `api.ts`, + a web screen.
-- **No org-config update endpoint** — the Settings screen (`/owner/settings`) is **read-only**. To make it editable: add a `config.manage`-gated `PATCH /orgs/current` that merges a partial `OrgConfig` and re-validates via `parseOrgConfig`, then a form on the settings screen.
+- **No ORG-config update endpoint** — `/owner/settings` org-level values (brand, roles, features, org defaults incl. the SM ₹1L threshold default) are **read-only**. Per-SITE settings ARE editable (2026-07-08): `PATCH /sites/:id/config` + the SM settings screen cover worker/driver caps, TH limit, categories, form-field toggles, and emergency contacts. To finish the story: add a `config.manage`-gated `PATCH /orgs/current` (merge partial `OrgConfig`, re-validate via `parseOrgConfig`) + an Owner form — this is also where the Owner would edit a per-site `smDirectLimitPaise` override (backend already permits OWNER to set it via the site PATCH; only the UI is missing).
 - **Media/photos** — `POST /media/presign` returns a stub locally (no R2 configured); real photo upload needs Cloudflare R2 keys in `backend/.env` (`R2_*`) + a real presigned-PUT. Web already degrades gracefully (saves record without photo).
 - **Monitoring (Sentry)** — deferred by choice.
 

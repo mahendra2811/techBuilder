@@ -7,20 +7,35 @@
  * mirrors the backend rules exactly so users never hit a surprise 403:
  *   - never your OWN request (backend SELF_APPROVAL/FORBIDDEN),
  *   - Owner decides anything; SM decides in-scope site requests; TH decides
- *     ONLY VEHICLE_SWITCH from their own crew (never LEAVE/MATERIAL),
+ *     ONLY VEHICLE_SWITCH + EXPENSE_ADD from their own crew (never LEAVE/MATERIAL),
  *   - a requester in the scoped GET /users list ⟺ in-scope (the users list is
  *     scope-filtered identically to the requests list), so presence proxies scope.
  * A decided request cannot be re-decided (CONFLICT) → we refetch + notify.
+ *
+ * EXPENSE_ADD gets two extras mirroring the backend (approvals.service.ts):
+ *   - a category-override select (the decider sets the FINAL category on approve),
+ *   - a required-comment client check on reject (the backend also rejects an
+ *     empty comment for EXPENSE_ADD with VALIDATION_FAILED {comment:'required'}).
  */
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { ApprovalRequest, ApprovalStatus, DecideRequestInput, User, UUID } from '@techbuilder/contracts';
+import { EXPENSE_CATEGORIES } from '@techbuilder/contracts';
+import type {
+  ApprovalRequest,
+  ApprovalStatus,
+  DecideRequestInput,
+  ExpenseCategory,
+  User,
+  UUID,
+} from '@techbuilder/contracts';
 import { ApiClientError, api, me } from '@/lib/api-client';
 import { formatKolkataDateTime } from '@/lib/business-date';
 import { apiErrorMessage } from '@/lib/i18n/messages';
 import { useMessages } from '@/lib/i18n/locale-context';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { NativeSelect } from '@/components/ui/native-select';
 import { Textarea } from '@/components/ui/textarea';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
 import { PayloadSummary, RequestStatusBadge } from '@/components/requests/request-bits';
@@ -34,6 +49,8 @@ export function ApprovalsScreen({ role }: { role: DecideRole }) {
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<Filter>('PENDING');
   const [comments, setComments] = useState<Record<UUID, string>>({});
+  const [categoryOverrides, setCategoryOverrides] = useState<Record<UUID, ExpenseCategory>>({});
+  const [rejectErrors, setRejectErrors] = useState<Record<UUID, string>>({});
   const [conflict, setConflict] = useState(false);
   const [done, setDone] = useState<{ id: UUID; approved: boolean } | null>(null);
 
@@ -57,13 +74,37 @@ export function ApprovalsScreen({ role }: { role: DecideRole }) {
     if (r.status !== 'PENDING') return false;
     if (!myUserId || r.requestedBy === myUserId) return false;
     if (role === 'OWNER') return true;
-    if (role === 'TEAM_HEAD' && r.type !== 'VEHICLE_SWITCH') return false;
+    if (role === 'TEAM_HEAD' && r.type !== 'VEHICLE_SWITCH' && r.type !== 'EXPENSE_ADD') return false;
     return usersById.has(r.requestedBy); // in-scope requester ⟺ present in scoped users list
   };
 
+  /** EXPENSE_ADD category-override select: the decider's pick, defaulting to the payload's category. */
+  const categoryFor = (r: ApprovalRequest): ExpenseCategory => {
+    const chosen = categoryOverrides[r.id];
+    if (chosen) return chosen;
+    const fromPayload = r.payload.category;
+    return typeof fromPayload === 'string' && (EXPENSE_CATEGORIES as readonly string[]).includes(fromPayload)
+      ? (fromPayload as ExpenseCategory)
+      : 'MISC';
+  };
+
   const decide = useMutation({
-    mutationFn: ({ id, approve, comment }: { id: UUID; approve: boolean; comment?: string }) => {
-      const body: DecideRequestInput = { approve, ...(comment ? { comment } : {}) };
+    mutationFn: ({
+      id,
+      approve,
+      comment,
+      categoryOverride,
+    }: {
+      id: UUID;
+      approve: boolean;
+      comment?: string;
+      categoryOverride?: ExpenseCategory;
+    }) => {
+      const body: DecideRequestInput = {
+        approve,
+        ...(comment ? { comment } : {}),
+        ...(categoryOverride ? { categoryOverride } : {}),
+      };
       return api<ApprovalRequest>('POST', `/requests/${id}/decide`, body);
     },
     onSuccess: (updated) => {
@@ -74,25 +115,55 @@ export function ApprovalsScreen({ role }: { role: DecideRole }) {
         delete next[updated.id];
         return next;
       });
+      setRejectErrors((e) => {
+        if (!(updated.id in e)) return e;
+        const next = { ...e };
+        delete next[updated.id];
+        return next;
+      });
       void queryClient.invalidateQueries({ queryKey: ['requests'] });
     },
-    onError: (err) => {
+    onError: (err, variables) => {
       setDone(null);
       if (err instanceof ApiClientError && err.code === 'CONFLICT') {
         setConflict(true);
         void queryClient.invalidateQueries({ queryKey: ['requests'] });
+        return;
+      }
+      // Backend requires a non-empty comment when rejecting EXPENSE_ADD — surface the
+      // specific reason inline instead of the generic "future date" VALIDATION_FAILED copy.
+      if (err instanceof ApiClientError && err.code === 'VALIDATION_FAILED' && err.fields?.comment === 'required') {
+        setRejectErrors((e) => ({ ...e, [variables.id]: m.APPROVALS_UI.rejectReasonRequired }));
       }
     },
   });
 
-  const submitDecision = (id: UUID, approve: boolean) => {
+  const submitDecision = (r: ApprovalRequest, approve: boolean) => {
     setDone(null);
     setConflict(false);
-    decide.mutate({ id, approve, comment: comments[id]?.trim() || undefined });
+    const comment = comments[r.id]?.trim() || undefined;
+    if (!approve && r.type === 'EXPENSE_ADD' && !comment) {
+      setRejectErrors((e) => ({ ...e, [r.id]: m.APPROVALS_UI.rejectReasonRequired }));
+      return;
+    }
+    setRejectErrors((e) => {
+      if (!(r.id in e)) return e;
+      const next = { ...e };
+      delete next[r.id];
+      return next;
+    });
+    decide.mutate({
+      id: r.id,
+      approve,
+      comment,
+      categoryOverride: approve && r.type === 'EXPENSE_ADD' ? categoryFor(r) : undefined,
+    });
   };
 
   const serverError =
-    decide.error instanceof ApiClientError && decide.error.code !== 'CONFLICT'
+    decide.error instanceof ApiClientError &&
+    decide.error.code !== 'CONFLICT' &&
+    !(decide.error.code === 'VALIDATION_FAILED' && decide.error.fields?.comment === 'required')
       ? apiErrorMessage(m, decide.error.code)
       : decide.error && !(decide.error instanceof ApiClientError)
         ? apiErrorMessage(m)
@@ -190,21 +261,54 @@ export function ApprovalsScreen({ role }: { role: DecideRole }) {
 
                     {decidable && (
                       <div className="grid gap-2">
+                        {r.type === 'EXPENSE_ADD' && (
+                          <div className="grid gap-1.5">
+                            <Label htmlFor={`approval-category-${r.id}`}>{m.APPROVALS_UI.finalCategoryLabel}</Label>
+                            <NativeSelect
+                              id={`approval-category-${r.id}`}
+                              data-testid={`approval-category-${r.id}`}
+                              value={categoryFor(r)}
+                              onChange={(e) =>
+                                setCategoryOverrides((c) => ({ ...c, [r.id]: e.target.value as ExpenseCategory }))
+                              }
+                            >
+                              {EXPENSE_CATEGORIES.map((cat) => (
+                                <option key={cat} value={cat}>
+                                  {m.EXPENSE_CATEGORY_LABELS[cat]}
+                                </option>
+                              ))}
+                            </NativeSelect>
+                          </div>
+                        )}
                         <Textarea
                           aria-label={m.APPROVALS_UI.commentLabel}
                           placeholder={m.APPROVALS_UI.commentPlaceholder}
                           className="min-h-16"
                           data-testid={`approval-comment-${r.id}`}
                           value={comments[r.id] ?? ''}
-                          onChange={(e) => setComments((c) => ({ ...c, [r.id]: e.target.value }))}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setComments((c) => ({ ...c, [r.id]: value }));
+                            setRejectErrors((err) => {
+                              if (!(r.id in err)) return err;
+                              const next = { ...err };
+                              delete next[r.id];
+                              return next;
+                            });
+                          }}
                         />
+                        {rejectErrors[r.id] && (
+                          <p className="text-sm text-destructive" role="alert" data-testid={`approval-reject-error-${r.id}`}>
+                            {rejectErrors[r.id]}
+                          </p>
+                        )}
                         <div className="grid grid-cols-2 gap-2">
                           <Button
                             type="button"
                             variant="destructive"
                             data-testid={`approval-reject-${r.id}`}
                             disabled={busy}
-                            onClick={() => submitDecision(r.id, false)}
+                            onClick={() => submitDecision(r, false)}
                           >
                             {busy ? m.APPROVALS_UI.deciding : m.APPROVALS_UI.reject}
                           </Button>
@@ -213,7 +317,7 @@ export function ApprovalsScreen({ role }: { role: DecideRole }) {
                             className={cn('bg-emerald-600 text-white hover:bg-emerald-600/90')}
                             data-testid={`approval-approve-${r.id}`}
                             disabled={busy}
-                            onClick={() => submitDecision(r.id, true)}
+                            onClick={() => submitDecision(r, true)}
                           >
                             {busy ? m.APPROVALS_UI.deciding : m.APPROVALS_UI.approve}
                           </Button>

@@ -105,7 +105,7 @@ export class InsightsService {
       assertInsightsRole(ctx);
       const target = await loadTargetUser(tx, userId);
       await assertPersonAccessible(tx, ctx, target);
-      const rows = await fetchPersonRows(tx, userId, from, to);
+      const rows = await fetchPersonRows(tx, target.id, from, to);
       const { totals, days } = buildPeriod(from, to, rows.progress, rows.expenses, rows.requests);
       return { userId: target.id, personId: target.personId, name: target.name, days, totals };
     });
@@ -125,16 +125,25 @@ interface TargetUser {
 }
 
 async function loadTargetUser(tx: Tx, userId: string): Promise<TargetUser> {
-  const [u] = await tx
-    .select({
-      id: schema.users.id,
-      name: schema.users.name,
-      personId: schema.users.personId,
-      assignedSiteId: schema.users.assignedSiteId,
-      crewId: schema.users.crewId,
-    })
+  const cols = {
+    id: schema.users.id,
+    name: schema.users.name,
+    personId: schema.users.personId,
+    assignedSiteId: schema.users.assignedSiteId,
+    crewId: schema.users.crewId,
+  };
+  let [u] = await tx
+    .select(cols)
     .from(schema.users)
     .where(and(eq(schema.users.id, userId), isNull(schema.users.deletedAt)));
+  if (!u) {
+    // People lists mix login USERS and labour-master PERSONS — accept a person id too
+    // (QA: a people-row link passed people.id here and got NOT_FOUND).
+    [u] = await tx
+      .select(cols)
+      .from(schema.users)
+      .where(and(eq(schema.users.personId, userId), isNull(schema.users.deletedAt)));
+  }
   if (!u) throw new ApiException('NOT_FOUND', 'Person not found');
   return { id: u.id, name: u.name, personId: u.personId ?? null, assignedSiteId: u.assignedSiteId ?? null, crewId: u.crewId ?? null };
 }

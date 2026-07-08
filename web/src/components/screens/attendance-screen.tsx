@@ -1,6 +1,8 @@
 'use client';
 
 /**
+ * PHASE-PARKED: unrouted since 2026-07; attendance/wages are manual this phase.
+ *
  * Attendance roster (Owner + SM + TH — one component, three thin route
  * wrappers). Role differences are entirely data-driven: GET /sites (Owner all,
  * SM own, TH one) feeds the picker, GET /people pre-scopes the roster, and
@@ -203,6 +205,8 @@ export function AttendanceScreen({ role }: { role: EntryRole }) {
               mark.reset();
               setPickedSiteId(id);
             }}
+            error={sitesQ.error}
+            onRetry={() => void sitesQ.refetch()}
           />
 
           <Separator />

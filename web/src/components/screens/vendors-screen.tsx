@@ -25,7 +25,7 @@ import { ApiClientError, api } from '@/lib/api-client';
 import { todayKolkata } from '@/lib/business-date';
 import { apiErrorMessage } from '@/lib/i18n/messages';
 import { useMessages } from '@/lib/i18n/locale-context';
-import { formatPaise, rupeesToPaise } from '@/lib/money';
+import { formatPaise, formatSignedPaise, rupeesToPaise } from '@/lib/money';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -256,7 +256,7 @@ function VendorDetail({ vendorId, vendorName, onBack }: { vendorId: UUID; vendor
                 <div>
                   <p className="text-xs text-muted-foreground">{m.VENDOR_UI.balanceLabel}</p>
                   <p className="text-sm font-semibold" data-testid="vendor-ledger-balance">
-                    {formatPaise(ledgerQ.data.balancePaise)}
+                    {formatSignedPaise(ledgerQ.data.balancePaise)}
                   </p>
                 </div>
               </div>

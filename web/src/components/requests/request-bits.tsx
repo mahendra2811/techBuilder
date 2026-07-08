@@ -8,7 +8,9 @@
  * canonical ids — approvers such as a Team Head cannot resolve a vehicleId
  * (they have no fleet scope), so the readable label must travel in the payload.
  */
-import type { ApprovalStatus, ApprovalType, LeaveType, Uom } from '@techbuilder/contracts';
+import type { ApprovalStatus, ApprovalType, ExpenseCategory, LeaveType, PaymentMode, Uom } from '@techbuilder/contracts';
+import { formatBusinessDate } from '@/lib/business-date';
+import { formatPaise } from '@/lib/money';
 import { useMessages } from '@/lib/i18n/locale-context';
 import type { Messages } from '@/lib/i18n/messages';
 import { cn } from '@/lib/utils';
@@ -67,27 +69,56 @@ function linesFor(m: Messages, type: ApprovalType, p: Record<string, unknown>): 
     const uom = str(p.uom);
     push(f.qty, qty ? `${qty}${uom ? ` ${m.UOM_LABELS[uom as Uom] ?? uom}` : ''}` : undefined);
     push(f.note, str(p.note));
+  } else if (type === 'EXPENSE_ADD') {
+    const amountPaise = typeof p.amountPaise === 'number' ? p.amountPaise : undefined;
+    push(f.amount, amountPaise !== undefined ? formatPaise(amountPaise) : undefined);
+    const category = str(p.category);
+    push(f.category, category ? (m.EXPENSE_CATEGORY_LABELS[category as ExpenseCategory] ?? category) : undefined);
+    const businessDate = str(p.businessDate);
+    push(f.businessDate, businessDate ? formatBusinessDate(businessDate) : undefined);
+    push(f.remark, str(p.remark));
   }
 
   // Fallback: if nothing known matched, show the raw entries so data is never hidden.
-  if (out.length === 0) {
+  // EXPENSE_ADD is excluded on purpose — its payload also carries siteId/mediaIds, which
+  // must never render as a raw key/value dump.
+  if (out.length === 0 && type !== 'EXPENSE_ADD') {
     for (const [k, v] of Object.entries(p)) push(k, str(v));
   }
   return out;
 }
 
+/** Small badge for EXPENSE_ADD's payment mode — sits alongside the payload lines. */
+function PaidViaChip({ paidVia, m }: { paidVia: PaymentMode; m: Messages }) {
+  const label = paidVia === 'VENDOR_CREDIT' ? m.VENDOR_UI.paidByCredit : m.VENDOR_UI.paidByCash;
+  return (
+    <span
+      data-testid="request-paid-via"
+      className="inline-block w-fit shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground"
+    >
+      {m.VENDOR_UI.paidByLabel}: {label}
+    </span>
+  );
+}
+
 export function PayloadSummary({ type, payload }: { type: ApprovalType; payload: Record<string, unknown> }) {
   const m = useMessages();
   const lines = linesFor(m, type, payload);
-  if (lines.length === 0) return null;
+  const paidVia = type === 'EXPENSE_ADD' && typeof payload.paidVia === 'string' ? (payload.paidVia as PaymentMode) : undefined;
+  if (lines.length === 0 && !paidVia) return null;
   return (
-    <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm" data-testid="request-payload">
-      {lines.map((l) => (
-        <div key={l.label} className="col-span-2 grid grid-cols-subgrid">
-          <dt className="text-muted-foreground">{l.label}</dt>
-          <dd className="min-w-0 break-words">{l.value}</dd>
-        </div>
-      ))}
-    </dl>
+    <div className="grid gap-2" data-testid="request-payload">
+      {lines.length > 0 && (
+        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+          {lines.map((l) => (
+            <div key={l.label} className="col-span-2 grid grid-cols-subgrid">
+              <dt className="text-muted-foreground">{l.label}</dt>
+              <dd className="min-w-0 break-words">{l.value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {paidVia && <PaidViaChip paidVia={paidVia} m={m} />}
+    </div>
   );
 }
