@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { z } from 'zod';
+import { EXPENSE_CATEGORIES, PAYMENT_MODES } from '@techbuilder/contracts';
 import type {
   CreateProgressNoteInput,
   CreateExpenseInput,
@@ -28,11 +29,13 @@ const CreateProgressNoteSchema = z.object({
 const CreateExpenseSchema = z.object({
   id: z.string().uuid(),
   siteId: z.string().uuid(),
-  category: z.enum(['FOOD', 'SUPPLIES', 'TRANSPORT', 'LABOUR', 'REPAIR', 'MISC']),
+  category: z.enum(EXPENSE_CATEGORIES),
   amountPaise: z.number().int(),
   vendorId: z.string().uuid().optional(),
   billNo: z.string().optional(),
   receiptMediaId: z.string().uuid().optional(),
+  paidVia: z.enum(PAYMENT_MODES).optional(), // WO-0: CASH (default) | VENDOR_CREDIT
+  remark: z.string().max(2000).optional(), // frozen.4
   businessDate: z.string(),
 });
 
@@ -52,6 +55,9 @@ const CreateVehicleLogSchema = z.object({
   driverPersonId: z.string().uuid(),
   startReading: z.number(),
   endReading: z.number().optional(),
+  hoursWorked: z.number().nonnegative().optional(), // WO-0/D-3: driver evening update
+  loadsCount: z.number().int().nonnegative().optional(),
+  note: z.string().max(2000).optional(),
   businessDate: z.string(),
 });
 

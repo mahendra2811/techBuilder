@@ -1,0 +1,6 @@
+import { SmSettingsScreen } from '@/components/screens/sm-settings-screen';
+
+// Auth + role pinning + shell come from the parent site-manager/layout.tsx.
+export default function Page() {
+  return <SmSettingsScreen />;
+}

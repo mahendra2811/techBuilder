@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { z } from 'zod';
+import { APPROVAL_TYPES, EXPENSE_CATEGORIES } from '@techbuilder/contracts';
 import type { SubmitRequestInput, DecideRequestInput, ApprovalStatus } from '@techbuilder/contracts';
 import { ApprovalsService } from './approvals.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -9,13 +10,15 @@ import { CurrentUser, type Principal } from '../common/current-user.decorator';
 
 const SubmitRequestSchema = z.object({
   id: z.string().uuid(),
-  type: z.enum(['VEHICLE_SWITCH', 'LEAVE', 'MATERIAL']),
+  type: z.enum(APPROVAL_TYPES),
   payload: z.record(z.string(), z.unknown()),
 });
 
 const DecideRequestSchema = z.object({
   approve: z.boolean(),
   comment: z.string().optional(),
+  /** EXPENSE_ADD only: decider's final category ("the approver creates the final expense"). */
+  categoryOverride: z.enum(EXPENSE_CATEGORIES).optional(),
 });
 
 @UseGuards(JwtAuthGuard, RbacGuard)

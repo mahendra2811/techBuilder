@@ -3,7 +3,14 @@
  * Validated with zod at app boot AND on backend org-load; invalid config FAILS LOUDLY (CONFIG_INVALID).
  */
 import { z } from 'zod';
-import { LOCALES, ROLES, RECORD_TYPES, VEHICLE_TRACKING_MODES } from './enums';
+import {
+  EMERGENCY_CONTACT_KINDS,
+  EXPENSE_CATEGORIES,
+  LOCALES,
+  ROLES,
+  RECORD_TYPES,
+  VEHICLE_TRACKING_MODES,
+} from './enums';
 
 const hexColor = z.string().regex(/^#([0-9a-fA-F]{6})$/, 'must be a #RRGGBB hex color');
 
@@ -26,6 +33,54 @@ export const VehicleTypeConfigSchema = z.object({
     .default([]),
 });
 export type VehicleTypeConfig = z.infer<typeof VehicleTypeConfigSchema>;
+
+export const ExpenseCategoryConfigSchema = z.object({
+  key: z.enum(EXPENSE_CATEGORIES),
+  labelHi: z.string().min(1),
+  labelEn: z.string().min(1),
+  enabled: z.boolean().default(true),
+});
+export type ExpenseCategoryConfig = z.infer<typeof ExpenseCategoryConfigSchema>;
+
+export const DEFAULT_EXPENSE_CATEGORIES: ExpenseCategoryConfig[] = [
+  { key: 'FOOD', labelHi: 'खाना', labelEn: 'Food', enabled: true },
+  { key: 'SUPPLIES', labelHi: 'सामान', labelEn: 'Supplies', enabled: true },
+  { key: 'TRANSPORT', labelHi: 'यातायात', labelEn: 'Transport', enabled: true },
+  { key: 'LABOUR', labelHi: 'मज़दूरी', labelEn: 'Labour', enabled: true },
+  { key: 'REPAIR', labelHi: 'मरम्मत', labelEn: 'Repair', enabled: true },
+  { key: 'MISC', labelHi: 'अन्य', labelEn: 'Other', enabled: true },
+];
+
+export const EmergencyContactSchema = z.object({
+  kind: z.enum(EMERGENCY_CONTACT_KINDS),
+  label: z.string().min(1),
+  phone: z.string().min(3),
+});
+export type EmergencyContact = z.infer<typeof EmergencyContactSchema>;
+
+/** Per-site overrides stored in sites.expense_form_config (jsonb). Everything optional — org defaults apply.
+ *  Limit-editing rule: each threshold is edited by the role ONE level above the one it binds. */
+export const SiteExpenseFormConfigSchema = z.object({
+  /** Worker/driver expense-request cap (paise). */
+  requestCapPaise: z.number().int().nonnegative().optional(),
+  /** Team-Head direct-entry per-entry limit (paise) — above it routes as a request to the SM. */
+  thDirectLimitPaise: z.number().int().nonnegative().optional(),
+  /** SM direct-entry per-entry limit (paise) — above it routes as a request to the Owner. Owner-edited. */
+  smDirectLimitPaise: z.number().int().nonnegative().optional(),
+  /** Site category subset/labels; falls back to org expense.categories. */
+  categories: z.array(ExpenseCategoryConfigSchema).optional(),
+  /** Boolean toggles for which boxes the worker/driver request form shows. */
+  fields: z
+    .object({
+      billPhoto: z.boolean().optional(),
+      extraPhotos: z.boolean().optional(),
+      remark: z.boolean().optional(),
+      voiceNote: z.boolean().optional(),
+      vendor: z.boolean().optional(),
+    })
+    .optional(),
+});
+export type SiteExpenseFormConfig = z.infer<typeof SiteExpenseFormConfigSchema>;
 
 export const OrgConfigSchema = z.object({
   brand: z.object({
@@ -61,6 +116,17 @@ export const OrgConfigSchema = z.object({
     model: z.literal('daily').default('daily'),
     otMultiplier: z.number().positive().default(1.5),
   }),
+  /** Org-level expense defaults; per-site overrides live on sites.expense_form_config. */
+  expense: z
+    .object({
+      requestCapPaise: z.number().int().nonnegative().default(200_000), // ₹2,000 worker/driver request cap
+      thDirectLimitPaise: z.number().int().nonnegative().default(2_500_000), // ₹25,000 TH per-entry
+      smDirectLimitPaise: z.number().int().nonnegative().default(10_000_000), // ₹1,00,000 SM per-entry
+      requestBackdateDays: z.number().int().min(0).default(2), // worker/driver: today + 2 days back
+      thBackdateDays: z.number().int().min(0).default(7),
+      categories: z.array(ExpenseCategoryConfigSchema).default(DEFAULT_EXPENSE_CATEGORIES),
+    })
+    .default({}),
   reconciliation: z.object({
     /** litres-or-units-per-km/hour norm, keyed by vehicleType.key */
     fuelNorms: z.record(z.string(), z.number().positive()).default({}),

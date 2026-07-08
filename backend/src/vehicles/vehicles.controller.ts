@@ -46,4 +46,11 @@ export class VehiclesController {
   list(@CurrentUser() u: Principal) {
     return this.vehicles.list(u);
   }
+
+  // WO-7: driver dashboard vehicle card (own vehicle only — see VehiclesService.mySnapshot).
+  @RequireAction('vehicleLog.enter')
+  @Get('my-snapshot')
+  mySnapshot(@CurrentUser() u: Principal) {
+    return this.vehicles.mySnapshot(u);
+  }
 }

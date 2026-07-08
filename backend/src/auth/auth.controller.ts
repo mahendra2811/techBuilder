@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { z } from 'zod';
-import type { AuthSession, ChangePasswordInput, LoginInput } from '@techbuilder/contracts';
+import type { AuthSession, ChangePasswordInput, ContactPanel, LoginInput } from '@techbuilder/contracts';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { ZodBody } from '../common/zod-body.pipe';
@@ -52,5 +52,12 @@ export class MeController {
   @Get('me')
   me(@CurrentUser() u: Principal) {
     return this.auth.me(u.orgId, u.userId);
+  }
+
+  /** ENDPOINTS.meContacts — any authenticated user; no RBAC action (self-scoped read). */
+  @UseGuards(JwtAuthGuard)
+  @Get('me/contacts')
+  contacts(@CurrentUser() u: Principal): Promise<ContactPanel> {
+    return this.auth.contacts(u.orgId, u.userId);
   }
 }

@@ -16,6 +16,8 @@ import { AttendanceModule } from './attendance/attendance.module';
 import { LeaveModule } from './leave/leave.module';
 import { RecordsModule } from './records/records.module';
 import { ApprovalsModule } from './approvals/approvals.module';
+import { CashTransfersModule } from './cash-transfers/cash-transfers.module';
+import { VendorsModule } from './vendors/vendors.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { MediaModule } from './media/media.module';
 import { AllExceptionsFilter } from './common/all-exceptions.filter';
@@ -37,6 +39,8 @@ import { HealthController } from './health.controller';
     LeaveModule,
     RecordsModule,
     ApprovalsModule,
+    CashTransfersModule,
+    VendorsModule,
     NotificationsModule,
     MediaModule,
     WageModule,

@@ -70,6 +70,37 @@ export const ENDPOINTS = {
   // notifications
   notificationsList: { method: 'GET', path: '/notifications' },
   notificationRead: { method: 'POST', path: '/notifications/:id/read' },
+
+  // contacts & cash ledger (client-plan v1)
+  meContacts: { method: 'GET', path: '/me/contacts' },
+  myBalance: { method: 'GET', path: '/me/balance' },
+  cashTransferCreate: { method: 'POST', path: '/cash-transfers' },
+  cashTransfersList: { method: 'GET', path: '/cash-transfers' },
+  ledgerRollup: { method: 'GET', path: '/ledger/rollup' },
+
+  // vendors (udhaar khata)
+  vendorsList: { method: 'GET', path: '/vendors' },
+  vendorsCreate: { method: 'POST', path: '/vendors' },
+  vendorPaymentCreate: { method: 'POST', path: '/vendors/:id/payments' },
+  vendorLedger: { method: 'GET', path: '/vendors/:id/ledger' },
+
+  // site config (SM-scoped narrow update)
+  siteConfigUpdate: { method: 'PATCH', path: '/sites/:id/config' },
+
+  // damage lifecycle
+  issueResolve: { method: 'POST', path: '/records/issue/:id/resolve' },
+  issueClose: { method: 'POST', path: '/records/issue/:id/close' },
+
+  // vehicles: switch + drill-downs
+  vehicleSelfSwitch: { method: 'POST', path: '/vehicles/:id/switch' },
+  vehicleSnapshot: { method: 'GET', path: '/vehicles/my-snapshot' },
+  vehicleDetail: { method: 'GET', path: '/vehicles/:id/detail' },
+  driverDetail: { method: 'GET', path: '/users/:id/driver-detail' },
+
+  // insights (day/period/person — scoped per caller role)
+  insightsDay: { method: 'GET', path: '/insights/day' },
+  insightsPeriod: { method: 'GET', path: '/insights/period' },
+  insightsPerson: { method: 'GET', path: '/insights/person/:id' },
 } as const satisfies Record<string, { method: 'GET' | 'POST' | 'PATCH' | 'DELETE'; path: string }>;
 
 export type EndpointKey = keyof typeof ENDPOINTS;

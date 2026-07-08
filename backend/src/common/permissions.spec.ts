@@ -46,6 +46,8 @@ describe('RBAC matrix snapshot (frozen contracts)', () => {
         'view.all': 'OWN_VEHICLE',
       },
       WORKER: {
+        // frozen.3 (client-plan v1): workers may submit EXPENSE_ADD requests (type-restricted in approvals.service)
+        'request.submit': 'SELF',
         'view.all': 'SELF',
       },
     });

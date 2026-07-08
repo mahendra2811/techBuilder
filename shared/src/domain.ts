@@ -25,8 +25,10 @@ import type {
   CompletenessScope,
   CompletenessState,
   Locale,
+  PaymentMode,
+  CashTransferKind,
 } from './enums';
-import type { OrgConfig } from './config';
+import type { OrgConfig, EmergencyContact, SiteExpenseFormConfig } from './config';
 
 export interface Org {
   id: UUID;
@@ -85,6 +87,8 @@ export interface Site extends AuditFields {
   expectedEndDate: BusinessDate | null;
   budgetPaise: Paise | null;
   siteManagerId: UUID | null;
+  emergencyContacts: EmergencyContact[];
+  expenseFormConfig: SiteExpenseFormConfig | null;
 }
 
 export interface SiteHoliday {
@@ -175,8 +179,10 @@ export interface ProgressNote extends AuditFields {
 export interface Vendor extends AuditFields {
   id: UUID;
   orgId: UUID;
+  siteId: UUID | null;
   name: string;
   phone: string | null;
+  sells: string | null;
 }
 
 export interface Expense extends AuditFields {
@@ -188,6 +194,8 @@ export interface Expense extends AuditFields {
   vendorId: UUID | null;
   billNo: string | null;
   receiptMediaId: UUID | null;
+  paidVia: PaymentMode;
+  remark: string | null;
   businessDate: BusinessDate;
   enteredBy: UUID;
   void: boolean;
@@ -211,6 +219,9 @@ export interface VehicleLog extends AuditFields {
   driverPersonId: UUID;
   startReading: number;
   endReading: number | null;
+  hoursWorked: number | null;
+  loadsCount: number | null;
+  note: string | null;
   businessDate: BusinessDate;
 }
 
@@ -263,6 +274,9 @@ export interface Issue extends AuditFields {
   severity: IssueSeverity;
   description: string;
   status: IssueStatus;
+  resolvedBy: UUID | null;
+  resolutionNote: string | null;
+  closingNote: string | null;
   businessDate: BusinessDate;
   mediaIds: UUID[];
 }
@@ -390,6 +404,137 @@ export interface OwnerDashboard {
   };
   completeness: Completeness[];
   costRollup: CostRollup;
+}
+
+// ---- Client-plan v1 read models: contacts · ledger · vendors · insights · vehicle drill-downs ----
+
+export interface ContactPerson {
+  name: string;
+  phone: string | null;
+}
+/** Resolved tap-to-call panel for the calling user (worker/driver dashboards). */
+export interface ContactPanel {
+  siteManager: ContactPerson | null;
+  teamHead: ContactPerson | null;
+  emergency: EmergencyContact[];
+}
+
+export interface CashTransfer extends AuditFields {
+  id: UUID;
+  orgId: UUID;
+  fromUserId: UUID;
+  toUserId: UUID;
+  amountPaise: Paise;
+  kind: CashTransferKind;
+  businessDate: BusinessDate;
+  note: string | null;
+}
+
+/** My khata: balance = received − given − approved CASH expenses. */
+export interface MyBalance {
+  receivedPaise: Paise;
+  givenPaise: Paise;
+  spentPaise: Paise;
+  balancePaise: Paise;
+}
+
+export interface LedgerRollupRow {
+  userId: UUID;
+  name: string;
+  role: Role;
+  receivedPaise: Paise;
+  givenPaise: Paise;
+  spentPaise: Paise;
+  balancePaise: Paise;
+  byCategory: Partial<Record<ExpenseCategory, Paise>>;
+}
+
+export interface VendorPayment extends AuditFields {
+  id: UUID;
+  orgId: UUID;
+  vendorId: UUID;
+  amountPaise: Paise;
+  businessDate: BusinessDate;
+  note: string | null;
+}
+
+/** Shop khata: purchased (credit expenses) vs paid, month-wise ('YYYY-MM'). */
+export interface VendorLedger {
+  vendorId: UUID;
+  name: string;
+  purchasedPaise: Paise;
+  paidPaise: Paise;
+  balancePaise: Paise;
+  months: Array<{ month: string; purchasedPaise: Paise; paidPaise: Paise }>;
+}
+
+export interface DayInsights {
+  businessDate: BusinessDate;
+  progress: ProgressNote[];
+  expenses: Expense[];
+  requests: ApprovalRequest[];
+  noProgress: boolean;
+  totalExpensePaise: Paise;
+}
+
+export interface PeriodTotals {
+  from: BusinessDate;
+  to: BusinessDate;
+  totalExpensePaise: Paise;
+  byCategory: Partial<Record<ExpenseCategory, Paise>>;
+  progressDays: number;
+  noProgressDays: number;
+  requestsPending: number;
+  requestsApproved: number;
+  requestsRejected: number;
+}
+
+/** Per-person drill-down (TH crew / SM site / Owner org scope). */
+export interface PersonInsights {
+  userId: UUID | null;
+  personId: UUID | null;
+  name: string;
+  days: DayInsights[];
+  totals: PeriodTotals;
+}
+
+/** Driver dashboard vehicle card. */
+export interface VehicleSnapshot {
+  vehicle: Vehicle;
+  currentReading: number | null;
+  previousReading: number | null;
+  pendingSwitchRequestId: UUID | null;
+}
+
+export interface VehicleAnalytics {
+  vehicleId: UUID;
+  avgRunPerDay7: number | null;
+  avgRunPerDay30: number | null;
+  avgRunPerDay90: number | null;
+  fuelLitres30: number;
+  fuelPaise30: Paise;
+  monthlyCostPaise: Paise;
+  totalExpensePaise: Paise;
+}
+
+export interface VehicleDetail {
+  vehicle: Vehicle;
+  analytics: VehicleAnalytics;
+  logs: VehicleLog[];
+  fuel: FuelLog[];
+  expenses: Expense[];
+  trips: Trip[];
+  damages: Issue[];
+}
+
+export interface DriverDetail {
+  user: User;
+  person: Person | null;
+  vehicle: Vehicle | null;
+  logs: VehicleLog[];
+  fuel: FuelLog[];
+  trips: Trip[];
+  expenses: Expense[];
 }
 
 export interface AuthSession {

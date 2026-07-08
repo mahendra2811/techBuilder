@@ -1,7 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import * as schema from '@techbuilder/contracts/db/schema';
-import type { CreateSiteInput, Site } from '@techbuilder/contracts';
+import type {
+  CreateSiteInput,
+  EmergencyContact,
+  Site,
+  SiteExpenseFormConfig,
+  UpdateSiteConfigInput,
+} from '@techbuilder/contracts';
 import { DbService } from '../db/db.service';
 import { ApiException } from '../common/api-exception';
 import type { Principal } from '../common/current-user.decorator';
@@ -67,6 +73,60 @@ export class SitesService {
       return mapSite(row);
     });
   }
+
+  /**
+   * WO-8: narrow per-site config update — NOT the full `site.manage` action.
+   * OWNER: any site, all fields. SITE_MANAGER: ONLY his own site (managed or
+   * assigned, per loadScope), and never `smDirectLimitPaise` (that threshold is
+   * "one level above" him — Owner-edited only). `emergencyContacts` and
+   * `expenseFormConfig` are wholesale replaces when provided (screen always
+   * sends the complete object).
+   */
+  async updateConfig(p: Principal, id: string, input: UpdateSiteConfigInput): Promise<Site> {
+    return this.dbs.runInTenant(p.orgId, async (tx) => {
+      const ctx = await loadScope(tx, p);
+      if (ctx.role !== 'OWNER' && ctx.role !== 'SITE_MANAGER') {
+        forbidScope(`Role ${ctx.role} cannot edit site config`);
+      }
+      if (ctx.role === 'SITE_MANAGER') {
+        if (!ctx.siteIds.includes(id)) forbidScope('Site out of scope');
+        if (input.expenseFormConfig?.smDirectLimitPaise !== undefined) {
+          throw new ApiException('FORBIDDEN', 'your limit is set by the Owner');
+        }
+      }
+
+      const [existing] = await tx
+        .select({ id: schema.sites.id, expenseFormConfig: schema.sites.expenseFormConfig })
+        .from(schema.sites)
+        .where(and(eq(schema.sites.id, id), isNull(schema.sites.deletedAt)));
+      if (!existing) throw new ApiException('NOT_FOUND', 'Site not found');
+
+      const set: Record<string, unknown> = {
+        updatedBy: p.userId,
+        updatedAt: new Date(),
+        version: sql`${schema.sites.version} + 1`,
+      };
+      if (input.emergencyContacts !== undefined) set.emergencyContacts = input.emergencyContacts;
+      if (input.expenseFormConfig !== undefined) {
+        // An SM save can never carry smDirectLimitPaise (rejected above) — but it must also not
+        // WIPE an Owner-set override via the wholesale replace. Carry the existing value forward.
+        const prior = existing.expenseFormConfig as SiteExpenseFormConfig | null;
+        const next = { ...input.expenseFormConfig };
+        if (ctx.role === 'SITE_MANAGER' && prior?.smDirectLimitPaise !== undefined) {
+          next.smDirectLimitPaise = prior.smDirectLimitPaise;
+        }
+        set.expenseFormConfig = next;
+      }
+
+      const [row] = await tx
+        .update(schema.sites)
+        .set(set as never)
+        .where(eq(schema.sites.id, id))
+        .returning();
+      if (!row) throw new ApiException('NOT_FOUND', 'Site not found');
+      return mapSite(row);
+    });
+  }
 }
 
 function mapSite(s: typeof schema.sites.$inferSelect): Site {
@@ -83,6 +143,8 @@ function mapSite(s: typeof schema.sites.$inferSelect): Site {
     expectedEndDate: s.expectedEndDate,
     budgetPaise: s.budgetPaise,
     siteManagerId: s.siteManagerId,
+    emergencyContacts: (s.emergencyContacts as EmergencyContact[] | null) ?? [],
+    expenseFormConfig: (s.expenseFormConfig as SiteExpenseFormConfig | null) ?? null,
     createdAt: s.createdAt.toISOString(),
     updatedAt: s.updatedAt.toISOString(),
     createdBy: s.createdBy ?? s.id,

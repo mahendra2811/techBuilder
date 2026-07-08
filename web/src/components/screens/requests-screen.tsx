@@ -15,28 +15,22 @@
  * VEHICLE_SWITCH needs an in-scope vehicle; a TH has no fleet scope, so the
  * vehicle list is empty for them and that type stays disabled with a notice.
  */
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { uuidv7 } from 'uuidv7';
-import { LEAVE_TYPES, UOMS } from '@techbuilder/contracts';
 import type {
   ApprovalRequest,
   ApprovalType,
-  LeaveType,
-  Person,
   SubmitRequestInput,
-  Uom,
   UUID,
   Vehicle,
   VehicleType,
 } from '@techbuilder/contracts';
 import { ApiClientError, api, me } from '@/lib/api-client';
-import { todayKolkata } from '@/lib/business-date';
 import { apiErrorMessage } from '@/lib/i18n/messages';
 import { useMessages } from '@/lib/i18n/locale-context';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
 import { Separator } from '@/components/ui/separator';
@@ -48,32 +42,21 @@ type SubmitRole = 'SITE_MANAGER' | 'TEAM_HEAD' | 'DRIVER';
 
 const TYPES_FOR: Record<SubmitRole, ApprovalType[]> = {
   DRIVER: ['VEHICLE_SWITCH'],
-  SITE_MANAGER: ['LEAVE', 'MATERIAL', 'VEHICLE_SWITCH'],
-  TEAM_HEAD: ['LEAVE', 'MATERIAL', 'VEHICLE_SWITCH'],
+  // Phase-scoping 2026-07: LEAVE & MATERIAL are manual for now (see docs/techBuilder-Build-WorkOrders.md WO-1)
+  SITE_MANAGER: ['VEHICLE_SWITCH'], // ['LEAVE', 'MATERIAL', 'VEHICLE_SWITCH'],
+  TEAM_HEAD: ['VEHICLE_SWITCH'], // ['LEAVE', 'MATERIAL', 'VEHICLE_SWITCH'],
 };
 
 export function RequestsScreen({ role }: { role: SubmitRole }) {
   const m = useMessages();
   const queryClient = useQueryClient();
-  const today = useMemo(() => todayKolkata(), []);
   const allowedTypes = TYPES_FOR[role];
   const [type, setType] = useState<ApprovalType>(allowedTypes[0]!);
 
-  // VEHICLE_SWITCH
+  // VEHICLE_SWITCH (only active type in this phase; LEAVE/MATERIAL commented out)
   const [vehicleId, setVehicleId] = useState<UUID | ''>('');
   const [desiredTypeId, setDesiredTypeId] = useState<UUID | ''>('');
   const [vehicleReason, setVehicleReason] = useState('');
-  // LEAVE
-  const [leavePersonId, setLeavePersonId] = useState<UUID | ''>(''); // '' = myself
-  const [fromDate, setFromDate] = useState(today);
-  const [toDate, setToDate] = useState(today);
-  const [leaveType, setLeaveType] = useState<LeaveType>('CASUAL');
-  const [leaveReason, setLeaveReason] = useState('');
-  // MATERIAL
-  const [material, setMaterial] = useState('');
-  const [qty, setQty] = useState('');
-  const [uom, setUom] = useState<Uom>('BAG');
-  const [note, setNote] = useState('');
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
@@ -82,10 +65,8 @@ export function RequestsScreen({ role }: { role: SubmitRole }) {
   const requestsQ = useQuery({ queryKey: ['requests', 'ALL'], queryFn: () => api<ApprovalRequest[]>('GET', '/requests') });
   const vehiclesQ = useQuery({ queryKey: ['vehicles'], queryFn: () => api<Vehicle[]>('GET', '/vehicles') });
   const vehicleTypesQ = useQuery({ queryKey: ['vehicle-types'], queryFn: () => api<VehicleType[]>('GET', '/vehicle-types') });
-  const peopleQ = useQuery({ queryKey: ['people'], queryFn: () => api<Person[]>('GET', '/people') });
 
   const myUserId = meQ.data?.user.id;
-  const myName = meQ.data?.user.name ?? '';
   const vehicles = vehiclesQ.data ?? [];
   const myRequests = (requestsQ.data ?? []).filter((r) => r.requestedBy === myUserId);
 
@@ -103,15 +84,6 @@ export function RequestsScreen({ role }: { role: SubmitRole }) {
       setVehicleId('');
       setDesiredTypeId('');
       setVehicleReason('');
-      setLeavePersonId('');
-      setFromDate(today);
-      setToDate(today);
-      setLeaveType('CASUAL');
-      setLeaveReason('');
-      setMaterial('');
-      setQty('');
-      setUom('BAG');
-      setNote('');
       void queryClient.invalidateQueries({ queryKey: ['requests'] });
     },
     onError: () => setSubmitted(false),
@@ -121,30 +93,17 @@ export function RequestsScreen({ role }: { role: SubmitRole }) {
     const errs: Record<string, string> = {};
     let payload: Record<string, unknown> = {};
 
-    if (type === 'VEHICLE_SWITCH') {
-      if (!vehicleId) errs.vehicle = m.REQUESTS_UI.vehicleRequired;
-      if (!vehicleReason.trim()) errs.reason = m.REQUESTS_UI.reasonRequired;
-      const veh = vehicles.find((v) => v.id === vehicleId);
-      const desired = vehicleTypesQ.data?.find((t) => t.id === desiredTypeId);
-      payload = {
-        vehicleId,
-        vehicleRegNo: veh?.regNo,
-        reason: vehicleReason.trim(),
-        ...(desiredTypeId ? { desiredVehicleTypeId: desiredTypeId, desiredVehicleTypeName: desired?.name } : {}),
-      };
-    } else if (type === 'LEAVE') {
-      if (!fromDate || !toDate) errs.dates = m.REQUESTS_UI.datesRequired;
-      else if (toDate < fromDate) errs.dates = m.REQUESTS_UI.dateOrderInvalid;
-      const person = peopleQ.data?.find((p) => p.id === leavePersonId);
-      payload = leavePersonId
-        ? { personId: leavePersonId, personName: person?.name, fromDate, toDate, type: leaveType, reason: leaveReason.trim() || undefined }
-        : { self: true, personName: myName, fromDate, toDate, type: leaveType, reason: leaveReason.trim() || undefined };
-    } else {
-      if (!material.trim()) errs.material = m.REQUESTS_UI.materialRequired;
-      const qtyNum = Number(qty);
-      if (!qty.trim() || !Number.isFinite(qtyNum) || qtyNum <= 0) errs.qty = m.REQUESTS_UI.qtyInvalid;
-      payload = { material: material.trim(), qty: qtyNum, uom, note: note.trim() || undefined };
-    }
+    // Phase-scoping 2026-07: only VEHICLE_SWITCH is active (see docs/techBuilder-Build-WorkOrders.md WO-1)
+    if (!vehicleId) errs.vehicle = m.REQUESTS_UI.vehicleRequired;
+    if (!vehicleReason.trim()) errs.reason = m.REQUESTS_UI.reasonRequired;
+    const veh = vehicles.find((v) => v.id === vehicleId);
+    const desired = vehicleTypesQ.data?.find((t) => t.id === desiredTypeId);
+    payload = {
+      vehicleId,
+      vehicleRegNo: veh?.regNo,
+      reason: vehicleReason.trim(),
+      ...(desiredTypeId ? { desiredVehicleTypeId: desiredTypeId, desiredVehicleTypeName: desired?.name } : {}),
+    };
     return { payload, errs };
   };
 
@@ -255,6 +214,7 @@ export function RequestsScreen({ role }: { role: SubmitRole }) {
               </>
             )}
 
+            {/* Phase-scoping 2026-07: LEAVE type is hidden (see docs/techBuilder-Build-WorkOrders.md WO-1)
             {type === 'LEAVE' && (
               <>
                 <div className="grid gap-2">
@@ -327,7 +287,9 @@ export function RequestsScreen({ role }: { role: SubmitRole }) {
                 </div>
               </>
             )}
+            */}
 
+            {/* Phase-scoping 2026-07: MATERIAL type is hidden (see docs/techBuilder-Build-WorkOrders.md WO-1)
             {type === 'MATERIAL' && (
               <>
                 <div className="grid gap-2">
@@ -386,6 +348,7 @@ export function RequestsScreen({ role }: { role: SubmitRole }) {
                 </div>
               </>
             )}
+            */}
 
             {serverError && (
               <Notice tone="error" testId="request-error">

@@ -10,27 +10,19 @@
  * Digital-ID-style card (who am I, where do I work) + this month's attendance
  * so a worker can check their days without asking the team head.
  */
-import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { CircleUserRound } from 'lucide-react';
-import type { Attendance, AttendanceStatus, Person, Site } from '@techbuilder/contracts';
+import type { Person, Site } from '@techbuilder/contracts';
 import { api } from '@/lib/api-client';
-import { formatBusinessDateShort, todayKolkata } from '@/lib/business-date';
 import { useMessages } from '@/lib/i18n/locale-context';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { roleHome } from '@/lib/roles';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ContactPanel } from '@/components/contact-panel';
 import { LoadingState, EmptyState, ErrorState } from '@/components/entry/states';
-import { cn } from '@/lib/utils';
-
-const STATUS_TEXT_CLASS: Record<AttendanceStatus, string> = {
-  PRESENT: 'text-emerald-700 dark:text-emerald-400',
-  HALF_DAY: 'text-amber-800 dark:text-amber-400',
-  ABSENT: 'text-destructive',
-};
+import { MyExpenseRequestsSummary } from '@/components/requests/my-requests';
 
 export function WorkerDashboardScreen() {
   const m = useMessages();
-  const today = useMemo(() => todayKolkata(), []);
-  const monthStart = `${today.slice(0, 7)}-01`;
 
   const peopleQ = useQuery({ queryKey: ['people'], queryFn: () => api<Person[]>('GET', '/people') });
   const sitesQ = useQuery({ queryKey: ['sites'], queryFn: () => api<Site[]>('GET', '/sites') });
@@ -38,21 +30,6 @@ export function WorkerDashboardScreen() {
   // Scoped lists: exactly one person row (self) and their assigned site.
   const person = peopleQ.data?.[0];
   const site = sitesQ.data?.[0];
-
-  const attendanceQ = useQuery({
-    queryKey: ['attendance', site?.id, monthStart, today],
-    queryFn: () => {
-      const qs = new URLSearchParams({ siteId: site!.id, from: monthStart, to: today });
-      return api<Attendance[]>('GET', `/attendance?${qs}`);
-    },
-    enabled: !!site,
-  });
-
-  const rows = useMemo(
-    () => [...(attendanceQ.data ?? [])].sort((a, b) => (a.businessDate < b.businessDate ? 1 : -1)),
-    [attendanceQ.data],
-  );
-  const count = (s: AttendanceStatus) => rows.filter((r) => r.status === s).length;
 
   return (
     <div className="grid gap-4" data-testid="worker-dashboard">
@@ -89,54 +66,9 @@ export function WorkerDashboardScreen() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{m.DASH_UI.workerAttTitle}</CardTitle>
-          <CardDescription>{m.DASH_UI.workerAttSubtitle}</CardDescription>
-        </CardHeader>
-        <CardContent className="grid min-h-24 content-start gap-3">
-          {sitesQ.isPending || (!!site && attendanceQ.isPending) ? (
-            <LoadingState />
-          ) : attendanceQ.error ? (
-            <ErrorState error={attendanceQ.error} onRetry={() => void attendanceQ.refetch()} />
-          ) : !site || rows.length === 0 ? (
-            <EmptyState label={m.DASH_UI.workerAttEmpty} />
-          ) : (
-            <>
-              <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground" data-testid="worker-att-counts">
-                <li>
-                  {m.ATTENDANCE_STATUS_LABELS.PRESENT}{' '}
-                  <span className="font-medium tabular-nums" data-testid="worker-present-count">
-                    {count('PRESENT')}
-                  </span>
-                </li>
-                <li>
-                  {m.ATTENDANCE_STATUS_LABELS.HALF_DAY} <span className="font-medium tabular-nums">{count('HALF_DAY')}</span>
-                </li>
-                <li>
-                  {m.ATTENDANCE_STATUS_LABELS.ABSENT} <span className="font-medium tabular-nums">{count('ABSENT')}</span>
-                </li>
-              </ul>
-              <ul className="divide-y" data-testid="worker-att-list">
-                {rows.map((a) => (
-                  <li key={a.id} className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0">
-                    <span className="text-sm">{formatBusinessDateShort(a.businessDate)}</span>
-                    <span className={cn('text-sm font-medium', STATUS_TEXT_CLASS[a.status])}>
-                      {m.ATTENDANCE_STATUS_LABELS[a.status]}
-                      {a.otHours > 0 && (
-                        <span className="ml-2 font-normal text-muted-foreground">
-                          {m.OWNER_UI.otPrefix} {a.otHours}
-                        </span>
-                      )}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-          <p className="text-xs text-muted-foreground">{m.DASH_UI.workerViewOnly}</p>
-        </CardContent>
-      </Card>
+      <MyExpenseRequestsSummary href={`${roleHome('WORKER')}/requests`} />
+
+      <ContactPanel />
     </div>
   );
 }

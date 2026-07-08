@@ -22,7 +22,7 @@ BEGIN
   FOREACH t IN ARRAY ARRAY[
     'people','users','sites','site_holidays','crews','crew_members','refresh_tokens',
     'vehicle_types','vehicles','driver_allowed_types','attendance','leaves','wage_rates',
-    'advances','progress_notes','vendors','expenses','fuel_logs','vehicle_logs','trips',
+    'advances','progress_notes','vendors','expenses','cash_transfers','vendor_payments','fuel_logs','vehicle_logs','trips',
     'materials','material_balances','material_txns','issues','media','approval_requests',
     'notifications','audit_logs','completeness'
   ]

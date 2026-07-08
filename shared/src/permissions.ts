@@ -62,6 +62,7 @@ export const PERMISSIONS: Record<Role, Partial<Record<Action, Scope>>> = {
     'view.all': 'OWN_VEHICLE',
   },
   WORKER: {
+    'request.submit': 'SELF', // EXPENSE_ADD requests only — the type restriction is enforced in approvals.service
     'view.all': 'SELF',
   },
 };

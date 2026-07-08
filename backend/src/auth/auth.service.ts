@@ -1,12 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { createHash, randomBytes } from 'node:crypto';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { uuidv7 } from 'uuidv7';
 import * as schema from '@techbuilder/contracts/db/schema';
 import {
   type AuthSession,
   type ChangePasswordInput,
+  type ContactPanel,
+  type ContactPerson,
+  type EmergencyContact,
   type LoginInput,
   type Org,
   type User,
@@ -91,6 +94,53 @@ export class AuthService {
 
   async me(orgId: string, userId: string): Promise<{ user: User; org: Org }> {
     return this.loadUserOrg(orgId, userId);
+  }
+
+  /**
+   * WO-4: resolved tap-to-call panel for the calling user (worker/driver
+   * dashboards). Best-effort by design — a broken link (missing site/crew/SM/TH
+   * row) yields null members / an empty list, NEVER an error: a contacts footer
+   * must not break a dashboard.
+   */
+  async contacts(orgId: string, userId: string): Promise<ContactPanel> {
+    return this.dbs.runInTenant(orgId, async (tx) => {
+      const loadUser = async (id: string) => {
+        const [u] = await tx
+          .select()
+          .from(schema.users)
+          .where(and(eq(schema.users.id, id), isNull(schema.users.deletedAt)));
+        return u;
+      };
+      const toPerson = (u: { name: string; phone: string | null } | undefined): ContactPerson | null =>
+        u ? { name: u.name, phone: u.phone } : null;
+
+      const me = await loadUser(userId);
+      if (!me) return { siteManager: null, teamHead: null, emergency: [] };
+
+      let siteManager: ContactPerson | null = null;
+      let emergency: EmergencyContact[] = [];
+      if (me.assignedSiteId) {
+        const [site] = await tx
+          .select()
+          .from(schema.sites)
+          .where(and(eq(schema.sites.id, me.assignedSiteId), isNull(schema.sites.deletedAt)));
+        if (site) {
+          emergency = (site.emergencyContacts as EmergencyContact[] | null) ?? [];
+          if (site.siteManagerId) siteManager = toPerson(await loadUser(site.siteManagerId));
+        }
+      }
+
+      let teamHead: ContactPerson | null = null;
+      if (me.crewId) {
+        const [crew] = await tx
+          .select()
+          .from(schema.crews)
+          .where(and(eq(schema.crews.id, me.crewId), isNull(schema.crews.deletedAt)));
+        if (crew) teamHead = toPerson(await loadUser(crew.teamHeadUserId));
+      }
+
+      return { siteManager, teamHead, emergency };
+    });
   }
 
   // --- helpers ---

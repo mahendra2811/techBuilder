@@ -16,7 +16,10 @@ import type {
   IssueSeverity,
   ApprovalType,
   VehicleDocKind,
+  PaymentMode,
+  CashTransferKind,
 } from './enums';
+import type { EmergencyContact, SiteExpenseFormConfig } from './config';
 
 export interface LoginInput {
   username: string;
@@ -135,6 +138,8 @@ export interface CreateExpenseInput {
   vendorId?: UUID;
   billNo?: string;
   receiptMediaId?: UUID;
+  paidVia?: PaymentMode; // default CASH
+  remark?: string;
   businessDate: BusinessDate;
 }
 export interface CreateFuelLogInput {
@@ -152,6 +157,9 @@ export interface CreateVehicleLogInput {
   driverPersonId: UUID;
   startReading: number;
   endReading?: number;
+  hoursWorked?: number;
+  loadsCount?: number;
+  note?: string;
   businessDate: BusinessDate;
 }
 export interface CreateTripInput {
@@ -192,6 +200,59 @@ export interface SubmitRequestInput {
 export interface DecideRequestInput {
   approve: boolean;
   comment?: string;
+  /** EXPENSE_ADD only: decider's final category override ("the SM creates the final expense"). */
+  categoryOverride?: ExpenseCategory;
+}
+
+/** Payload for type='EXPENSE_ADD' requests. siteId is derived server-side for workers/drivers. */
+export interface ExpenseRequestPayload {
+  siteId?: UUID;
+  category: ExpenseCategory;
+  amountPaise: Paise;
+  businessDate: BusinessDate;
+  paidVia?: PaymentMode; // default CASH
+  vendorId?: UUID;
+  billNo?: string;
+  remark?: string;
+  mediaIds?: UUID[];
+}
+
+export interface CreateCashTransferInput {
+  id: UUID;
+  toUserId: UUID;
+  amountPaise: Paise;
+  kind: CashTransferKind;
+  businessDate: BusinessDate;
+  note?: string;
+}
+
+export interface CreateVendorInput {
+  id: UUID;
+  name: string;
+  phone?: string;
+  siteId?: UUID;
+  sells?: string;
+}
+
+export interface CreateVendorPaymentInput {
+  id: UUID;
+  vendorId: UUID;
+  amountPaise: Paise;
+  businessDate: BusinessDate;
+  note?: string;
+}
+
+/** SM-scoped narrow site-config update (NOT full site.manage). */
+export interface UpdateSiteConfigInput {
+  emergencyContacts?: EmergencyContact[];
+  expenseFormConfig?: SiteExpenseFormConfig;
+}
+
+export interface ResolveIssueInput {
+  resolutionNote: string;
+}
+export interface CloseIssueInput {
+  closingNote?: string;
 }
 
 /** Presigned upload request → backend returns a PUT url + the media row id. */

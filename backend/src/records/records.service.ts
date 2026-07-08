@@ -3,6 +3,7 @@ import { and, desc, eq, gte, isNull, lte, or, sql, type SQL } from 'drizzle-orm'
 import type { PgTable } from 'drizzle-orm/pg-core';
 import * as schema from '@techbuilder/contracts/db/schema';
 import { can, type Action } from '@techbuilder/contracts';
+import { loadExpenseLimits } from '../common/org-config.util';
 import type {
   CreateProgressNoteInput,
   CreateExpenseInput,
@@ -132,6 +133,19 @@ export class RecordsService {
       const ctx = await loadScope(tx, p);
       assertSiteInScope(ctx, 'record.enter', input.siteId);
       await assertBackdateWindow(tx, ctx.role, input.businessDate, RECORD_CREATE_BACKDATE_LIMIT_DAYS);
+      // Client-plan v1 per-entry direct limits: TH ≤ ₹25k, SM ≤ ₹1L (site-overridable, edited one
+      // level above). Over the line → the client converts the entry into an EXPENSE_ADD request.
+      if (ctx.role === 'TEAM_HEAD' || ctx.role === 'SITE_MANAGER') {
+        const limits = await loadExpenseLimits(tx, input.siteId);
+        const directLimit = ctx.role === 'TEAM_HEAD' ? limits.thDirectLimitPaise : limits.smDirectLimitPaise;
+        if (input.amountPaise > directLimit) {
+          throw new ApiException(
+            'VALIDATION_FAILED',
+            'Amount exceeds your direct-entry limit — submit it as a request for approval',
+            { amountPaise: 'OVER_DIRECT_LIMIT' },
+          );
+        }
+      }
       const [row] = await tx
         .insert(schema.expenses)
         .values({
@@ -143,6 +157,8 @@ export class RecordsService {
           vendorId: input.vendorId ?? null,
           billNo: input.billNo ?? null,
           receiptMediaId: input.receiptMediaId ?? null,
+          paidVia: input.paidVia ?? 'CASH',
+          remark: input.remark ?? null,
           businessDate: input.businessDate,
           enteredBy: p.userId,
           void: false,
@@ -221,6 +237,9 @@ export class RecordsService {
           driverPersonId: input.driverPersonId,
           startReading: input.startReading,
           endReading: input.endReading ?? null,
+          hoursWorked: input.hoursWorked ?? null,
+          loadsCount: input.loadsCount ?? null,
+          note: input.note ?? null,
           businessDate: input.businessDate,
           createdBy: p.userId,
           updatedBy: p.userId,
@@ -231,6 +250,9 @@ export class RecordsService {
             driverPersonId: input.driverPersonId,
             startReading: input.startReading,
             endReading: input.endReading ?? null,
+            hoursWorked: input.hoursWorked ?? null,
+            loadsCount: input.loadsCount ?? null,
+            note: input.note ?? null,
             updatedBy: p.userId,
             updatedAt: new Date(),
             version: sql`${schema.vehicleLogs.version} + 1`,
@@ -598,6 +620,8 @@ function mapExpense(r: typeof schema.expenses.$inferSelect): Expense {
     amountPaise: r.amountPaise ?? 0,
     vendorId: r.vendorId ?? null,
     billNo: r.billNo ?? null,
+    paidVia: r.paidVia,
+    remark: r.remark ?? null,
     receiptMediaId: r.receiptMediaId ?? null,
     businessDate: r.businessDate,
     enteredBy: r.enteredBy,
@@ -638,6 +662,9 @@ function mapVehicleLog(r: typeof schema.vehicleLogs.$inferSelect): VehicleLog {
     driverPersonId: r.driverPersonId,
     startReading: r.startReading,
     endReading: r.endReading ?? null,
+    hoursWorked: r.hoursWorked ?? null,
+    loadsCount: r.loadsCount ?? null,
+    note: r.note ?? null,
     businessDate: r.businessDate,
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),
@@ -698,6 +725,9 @@ function mapIssue(r: typeof schema.issues.$inferSelect): Issue {
     severity: r.severity,
     description: r.description,
     status: r.status,
+    resolvedBy: r.resolvedBy ?? null,
+    resolutionNote: r.resolutionNote ?? null,
+    closingNote: r.closingNote ?? null,
     businessDate: r.businessDate,
     mediaIds: r.mediaIds ?? [],
     createdAt: r.createdAt.toISOString(),

@@ -28,8 +28,20 @@ export type MaterialTxnStatus = (typeof MATERIAL_TXN_STATUSES)[number];
 export const UOMS = ['BAG', 'KG', 'CFT', 'NOS', 'MT', 'LITRE'] as const;
 export type Uom = (typeof UOMS)[number];
 
-export const APPROVAL_TYPES = ['VEHICLE_SWITCH', 'LEAVE', 'MATERIAL'] as const;
+export const APPROVAL_TYPES = ['VEHICLE_SWITCH', 'LEAVE', 'MATERIAL', 'EXPENSE_ADD'] as const;
 export type ApprovalType = (typeof APPROVAL_TYPES)[number];
+
+/** How an expense was paid: cash (cuts the spender's advance balance) or on vendor credit (udhaar). */
+export const PAYMENT_MODES = ['CASH', 'VENDOR_CREDIT'] as const;
+export type PaymentMode = (typeof PAYMENT_MODES)[number];
+
+/** Cash-ledger transfer direction: GIVE = down the chain; RETURN = balance handed back up (leave/settlement). */
+export const CASH_TRANSFER_KINDS = ['GIVE', 'RETURN'] as const;
+export type CashTransferKind = (typeof CASH_TRANSFER_KINDS)[number];
+
+/** Site emergency-contact kinds (jsonb content in sites.emergency_contacts — intentionally NOT a pgEnum). */
+export const EMERGENCY_CONTACT_KINDS = ['POLICE', 'AMBULANCE', 'HOSPITAL', 'FIRE', 'SITE_OFFICE', 'OTHER'] as const;
+export type EmergencyContactKind = (typeof EMERGENCY_CONTACT_KINDS)[number];
 
 export const APPROVAL_STATUSES = ['PENDING', 'APPROVED', 'REJECTED'] as const;
 export type ApprovalStatus = (typeof APPROVAL_STATUSES)[number];

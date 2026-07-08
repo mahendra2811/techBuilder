@@ -1,6 +1,7 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { z } from 'zod';
-import type { CreateSiteInput } from '@techbuilder/contracts';
+import type { CreateSiteInput, UpdateSiteConfigInput } from '@techbuilder/contracts';
+import { EmergencyContactSchema, SiteExpenseFormConfigSchema } from '@techbuilder/contracts';
 import { SitesService } from './sites.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RbacGuard, RequireAction } from '../common/rbac.guard';
@@ -19,6 +20,14 @@ const CreateSiteSchema = z.object({
   expectedEndDate: z.string().optional(),
   budgetPaise: z.number().int().optional(),
   siteManagerId: z.string().uuid().optional(),
+});
+
+// WO-8: narrow per-site config update (emergency contacts + expense form config).
+// NOT gated by `site.manage` (Owner-only) — any authenticated user may hit the route;
+// SitesService.updateConfig enforces the OWNER/SITE_MANAGER-own-site + "one level above" rule.
+const UpdateSiteConfigSchema = z.object({
+  emergencyContacts: z.array(EmergencyContactSchema).optional(),
+  expenseFormConfig: SiteExpenseFormConfigSchema.optional(),
 });
 
 @UseGuards(JwtAuthGuard, RbacGuard)
@@ -42,5 +51,16 @@ export class SitesController {
   @Get(':id')
   get(@CurrentUser() u: Principal, @Param('id') id: string) {
     return this.sites.get(u, id);
+  }
+
+  // No @RequireAction: any authenticated user may call this route — the service
+  // enforces the narrow OWNER/SITE_MANAGER-own-site rule (WP-1 scope pattern).
+  @Patch(':id/config')
+  updateConfig(
+    @CurrentUser() u: Principal,
+    @Param('id') id: string,
+    @Body(new ZodBody(UpdateSiteConfigSchema)) body: UpdateSiteConfigInput,
+  ) {
+    return this.sites.updateConfig(u, id, body);
   }
 }

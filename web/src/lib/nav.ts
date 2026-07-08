@@ -15,17 +15,17 @@ import { can } from '@techbuilder/contracts';
 import type { LucideIcon } from 'lucide-react';
 import {
   BadgeCheck,
-  ClipboardCheck,
   FileSpreadsheet,
   Fuel,
+  IndianRupee,
   LayoutDashboard,
   MapPinned,
   NotebookPen,
   Send,
   Settings,
+  Store,
   Truck,
   Users,
-  Wallet,
 } from 'lucide-react';
 import { roleHome } from './roles';
 import type { Messages } from '@/lib/i18n/messages';
@@ -38,12 +38,19 @@ interface NavDef {
   /** Sub-path inside the role area; '' = the role home itself. */
   path: string;
   icon: LucideIcon;
+  /** Extra role filter for entries whose RBAC action alone is too broad (e.g. SM settings). */
+  roles?: Role[];
+  /** Override when the action-derived testid would collide with another entry. */
+  testId?: string;
 }
 
 /** Declaration order = display order: home first, day-to-day, then admin. */
 const NAV_DEFS: NavDef[] = [
   { action: 'view.all', labelKey: 'dashboard', path: '', icon: LayoutDashboard },
-  { action: 'attendance.mark', labelKey: 'attendance', path: '/attendance', icon: ClipboardCheck },
+  // Phase-scoping 2026-07: attendance & wages are manual for now (see docs/techBuilder-Build-WorkOrders.md WO-1)
+  // { action: 'attendance.mark', labelKey: 'attendance', path: '/attendance', icon: ClipboardCheck },
+  // WO-6: the Records split — Expense is its own section; Progress replaces `records` in WO-14.
+  { action: 'record.enter', labelKey: 'expense', path: '/expense', icon: IndianRupee, testId: 'nav-expense' },
   { action: 'record.enter', labelKey: 'records', path: '/records', icon: NotebookPen },
   { action: 'vehicleLog.enter', labelKey: 'vehicleFuel', path: '/vehicle', icon: Fuel },
   { action: 'request.submit', labelKey: 'requests', path: '/requests', icon: Send },
@@ -51,9 +58,14 @@ const NAV_DEFS: NavDef[] = [
   { action: 'user.create', labelKey: 'people', path: '/people', icon: Users },
   { action: 'site.manage', labelKey: 'sites', path: '/sites', icon: MapPinned },
   { action: 'vehicle.manage', labelKey: 'fleet', path: '/fleet', icon: Truck },
-  { action: 'wage.view', labelKey: 'wages', path: '/wages', icon: Wallet },
+  // { action: 'wage.view', labelKey: 'wages', path: '/wages', icon: Wallet },
   { action: 'report.export', labelKey: 'reports', path: '/reports', icon: FileSpreadsheet },
   { action: 'config.manage', labelKey: 'settings', path: '/settings', icon: Settings },
+  // WO-10: shops / udhaar khata — SM manages his site's vendor list + payments (service-gated).
+  { action: 'view.all', labelKey: 'vendors', path: '/vendors', icon: Store, roles: ['SITE_MANAGER'], testId: 'nav-vendors' },
+  // WO-8: SM site settings (limits · categories · form fields · emergency contacts). The SM holds
+  // no config.manage — the PATCH is service-gated to his own site, so the nav entry is role-filtered.
+  { action: 'view.all', labelKey: 'settings', path: '/settings', icon: Settings, roles: ['SITE_MANAGER'], testId: 'nav-settings-sm' },
 ];
 
 export interface NavItem {
@@ -76,12 +88,12 @@ export function navTestId(action: Action): string {
  * Labels come from the active locale's catalog (passed in by the caller). */
 export function navItemsFor(role: Role, labels: Messages['NAV_LABELS']): NavItem[] {
   const home = roleHome(role);
-  return NAV_DEFS.filter((def) => can(role, def.action)).map((def) => ({
+  return NAV_DEFS.filter((def) => can(role, def.action) && (!def.roles || def.roles.includes(role))).map((def) => ({
     action: def.action,
     label: labels[def.labelKey],
     href: `${home}${def.path}`,
     icon: def.icon,
     exact: def.path === '',
-    testId: navTestId(def.action),
+    testId: def.testId ?? navTestId(def.action),
   }));
 }

@@ -40,6 +40,8 @@ import {
   MEDIA_KINDS,
   APPROVAL_TYPES,
   APPROVAL_STATUSES,
+  PAYMENT_MODES,
+  CASH_TRANSFER_KINDS,
   NOTIFICATION_TYPES,
   COMPLETENESS_SCOPES,
   COMPLETENESS_STATES,
@@ -63,6 +65,8 @@ export const issueStatusEnum = pgEnum('issue_status', ISSUE_STATUSES);
 export const mediaKindEnum = pgEnum('media_kind', MEDIA_KINDS);
 export const approvalTypeEnum = pgEnum('approval_type', APPROVAL_TYPES);
 export const approvalStatusEnum = pgEnum('approval_status', APPROVAL_STATUSES);
+export const paymentModeEnum = pgEnum('payment_mode', PAYMENT_MODES);
+export const cashTransferKindEnum = pgEnum('cash_transfer_kind', CASH_TRANSFER_KINDS);
 export const notificationTypeEnum = pgEnum('notification_type', NOTIFICATION_TYPES);
 export const completenessScopeEnum = pgEnum('completeness_scope', COMPLETENESS_SCOPES);
 export const completenessStateEnum = pgEnum('completeness_state', COMPLETENESS_STATES);
@@ -138,6 +142,10 @@ export const sites = pgTable(
     expectedEndDate: date('expected_end_date'),
     budgetPaise: money('budget_paise'),
     siteManagerId: uuid('site_manager_id'),
+    /** EmergencyContact[] (config.ts EmergencyContactSchema) — curated by the SM, shown to workers/drivers. */
+    emergencyContacts: jsonb('emergency_contacts').notNull().default('[]'),
+    /** SiteExpenseFormConfig (config.ts) — per-site limits/categories/field-toggles; null = org defaults. */
+    expenseFormConfig: jsonb('expense_form_config'),
   },
   (t) => [uniqueIndex('sites_org_code_uq').on(t.orgId, t.code)],
 );
@@ -292,8 +300,10 @@ export const progressNotes = pgTable(
 
 export const vendors = pgTable('vendors', {
   ...base(),
+  siteId: uuid('site_id'), // per-site shop list (null = org-wide/legacy vendor)
   name: text('name').notNull(),
   phone: text('phone'),
+  sells: text('sells'), // what the shop sells (hardware, kirana, diesel…)
 });
 
 export const expenses = pgTable(
@@ -306,11 +316,46 @@ export const expenses = pgTable(
     vendorId: uuid('vendor_id'),
     billNo: text('bill_no'),
     receiptMediaId: uuid('receipt_media_id'),
+    paidVia: paymentModeEnum('paid_via').notNull().default('CASH'),
+    remark: text('remark'), // frozen.4: free note on direct entries (requests carried it in payload)
     businessDate: date('business_date').notNull(),
     enteredBy: uuid('entered_by').notNull(),
     void: boolean('void').notNull().default(false),
   },
   (t) => [index('expenses_site_day_idx').on(t.orgId, t.siteId, t.businessDate)],
+);
+
+/** Advance/petty-cash ledger: money handed down the chain (GIVE) or returned up (RETURN).
+ *  Balance = transfers received − transfers given − approved CASH expenses. Distinct from wage `advances`. */
+export const cashTransfers = pgTable(
+  'cash_transfers',
+  {
+    ...base(),
+    fromUserId: uuid('from_user_id').notNull(),
+    toUserId: uuid('to_user_id').notNull(),
+    amountPaise: money('amount_paise').notNull(),
+    kind: cashTransferKindEnum('kind').notNull(),
+    businessDate: date('business_date').notNull(),
+    note: text('note'),
+  },
+  (t) => [
+    index('cash_transfers_org_date_idx').on(t.orgId, t.businessDate),
+    index('cash_transfers_to_idx').on(t.orgId, t.toUserId),
+    index('cash_transfers_from_idx').on(t.orgId, t.fromUserId),
+  ],
+);
+
+/** Payments made TO a vendor/shop against its credit (udhaar) account. */
+export const vendorPayments = pgTable(
+  'vendor_payments',
+  {
+    ...base(),
+    vendorId: uuid('vendor_id').notNull(),
+    amountPaise: money('amount_paise').notNull(),
+    businessDate: date('business_date').notNull(),
+    note: text('note'),
+  },
+  (t) => [index('vendor_payments_vendor_idx').on(t.orgId, t.vendorId, t.businessDate)],
 );
 
 export const fuelLogs = pgTable(
@@ -335,6 +380,9 @@ export const vehicleLogs = pgTable(
     driverPersonId: uuid('driver_person_id').notNull(),
     startReading: doublePrecision('start_reading').notNull(),
     endReading: doublePrecision('end_reading'),
+    hoursWorked: doublePrecision('hours_worked'), // sums across same-day sessions
+    loadsCount: integer('loads_count'), // trips/trucks filled (driver evening update)
+    note: text('note'),
     businessDate: date('business_date').notNull(),
   },
   (t) => [uniqueIndex('vehicle_log_day_uq').on(t.orgId, t.vehicleId, t.businessDate)],
@@ -399,6 +447,9 @@ export const issues = pgTable(
     severity: issueSeverityEnum('severity').notNull(),
     description: text('description').notNull(),
     status: issueStatusEnum('status').notNull().default('OPEN'),
+    resolvedBy: uuid('resolved_by'), // SM who resolved (damage lifecycle)
+    resolutionNote: text('resolution_note'), // SM's what-was-repaired remark
+    closingNote: text('closing_note'), // driver's optional closing remark
     businessDate: date('business_date').notNull(),
     mediaIds: uuid('media_ids').array(),
   },
@@ -486,7 +537,7 @@ export const completeness = pgTable(
 export const TENANT_TABLES = [
   'people', 'users', 'sites', 'site_holidays', 'crews', 'crew_members', 'refresh_tokens',
   'vehicle_types', 'vehicles', 'driver_allowed_types', 'attendance', 'leaves', 'wage_rates',
-  'advances', 'progress_notes', 'vendors', 'expenses', 'fuel_logs', 'vehicle_logs', 'trips',
+  'advances', 'progress_notes', 'vendors', 'expenses', 'cash_transfers', 'vendor_payments', 'fuel_logs', 'vehicle_logs', 'trips',
   'materials', 'material_balances', 'material_txns', 'issues', 'media', 'approval_requests',
   'notifications', 'audit_logs', 'completeness',
 ] as const;

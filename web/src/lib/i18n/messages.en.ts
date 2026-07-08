@@ -14,6 +14,7 @@ import type {
   ApprovalType,
   AttendanceStatus,
   CompletenessState,
+  EmergencyContactKind,
   ErrorCode,
   ExpenseCategory,
   LeaveType,
@@ -98,6 +99,7 @@ export const en = {
   NAV_LABELS: {
     dashboard: "Dashboard",
     attendance: "Attendance",
+    expense: "Expense",
     records: "Records",
     vehicleFuel: "Vehicle / Fuel",
     requests: "Requests",
@@ -107,6 +109,7 @@ export const en = {
     people: "People",
     sites: "Sites",
     fleet: "Fleet",
+    vendors: "Shops",
     settings: "Settings",
   },
 
@@ -132,6 +135,7 @@ export const en = {
     VEHICLE_SWITCH: "Vehicle change",
     LEAVE: "Leave",
     MATERIAL: "Material",
+    EXPENSE_ADD: "Expense request",
   } satisfies Record<ApprovalType, string>,
 
   /** Approval status labels (enum values come from the frozen contracts). */
@@ -299,6 +303,25 @@ export const en = {
     litresInvalid: "Enter the litres filled.",
   },
 
+  /** Multi-photo picker + voice-note recorder (shared "media kit" fields). */
+  MEDIA_UI: {
+    // multi-photo picker
+    photos: "Photos (optional)",
+    camera: "Camera",
+    gallery: "Gallery",
+    photoRemove: "Remove photo",
+    photosMaxReached: "Maximum photos reached.",
+
+    // voice-note recorder
+    voiceNote: "Voice note (optional)",
+    recordStart: "Record",
+    recordStop: "Stop",
+    recordDelete: "Delete recording",
+    recordingLabel: "Recording",
+    micPermissionDenied: "Microphone access was denied. Allow microphone access to record a voice note.",
+    micUnsupported: "Voice recording is not supported on this device.",
+  },
+
   /** Completeness state labels — always shown as TEXT next to the color. */
   COMPLETENESS_STATE_LABELS: {
     COMPLETE: "Complete",
@@ -429,6 +452,57 @@ export const en = {
     workerAttSubtitle: "This month, day by day.",
     workerAttEmpty: "No attendance marked this month yet.",
     workerViewOnly: "View only — your team head marks the attendance.",
+  },
+
+  /** Driver's day (WO-7): vehicle snapshot card + morning start / evening end forms. */
+  DRIVER_DAY_UI: {
+    // vehicle snapshot card
+    currentReadingLabel: "Current reading",
+    yesterdayReadingLabel: "Yesterday's reading",
+    noReadingYet: "No reading yet",
+    noVehicleAssigned: "No vehicle is assigned to you yet. Contact your site manager.",
+
+    // morning (start-of-day) form
+    morningBanner: "Morning update pending — fill before starting",
+    morningTitle: "Start of day",
+    morningSubtitle: "Log your meter reading before you start.",
+    meterPhotoLabel: "Meter photo",
+    meterPhotoRequired: "Take a photo of the meter before saving.",
+    startReadingLabel: "Start reading",
+    startReadingRequired: "Enter today's start reading.",
+    extraPhotosLabel: "Vehicle / site photos (optional)",
+    morningSubmit: "Save start reading",
+
+    // evening (end-of-day) form — optional
+    eveningTitle: "End of day",
+    eveningSubtitle: "Optional — log your closing reading when you finish.",
+    endReadingRequired: "Enter today's current reading.",
+    endReadingTooLow: "Current reading can't be less than the start reading.",
+    hoursWorkedLabel: "Hours worked",
+    hoursWorkedHint: "Two shifts? Add the hours together.",
+    hoursWorkedInvalid: "Enter a valid number of hours.",
+    loadsCountLabel: "Trips / truckloads",
+    loadsCountInvalid: "Enter a valid number.",
+    noteLabel: "Note (optional)",
+    eveningSubmit: "Save end of day",
+    eveningSaved: "End-of-day update saved.",
+  },
+
+  /** Emergency & contacts tap-to-call footer (worker + driver dashboards). */
+  CONTACTS_UI: {
+    title: "Emergency & contacts",
+    people: "People",
+    emergency: "Emergency",
+    siteManager: "Site Manager",
+    teamHead: "Team Head",
+    KIND_LABELS: {
+      POLICE: "Police",
+      AMBULANCE: "Ambulance",
+      HOSPITAL: "Hospital",
+      FIRE: "Fire brigade",
+      SITE_OFFICE: "Site office",
+      OTHER: "Other",
+    } satisfies Record<EmergencyContactKind, string>,
   },
 
   /** Approvals inbox (Owner / SM / TH). */
@@ -635,6 +709,168 @@ export const en = {
     denied: "—",
     deniedLegend: "— = denied (NONE)",
     yourRole: "you",
+  },
+
+  /** Worker/Driver expense-addition request form + "my requests" (WO-5). */
+  EXPENSE_REQUEST_UI: {
+    title: "New expense request",
+    subtitle: "Ask your Team Head / Site Manager to add an expense.",
+    noSite: "No site is assigned to your account yet.",
+    amountLabel: "Amount (₹)",
+    amountInvalid: "Enter an amount greater than 0.",
+    amountOverCapPrefix: "This is over your request limit of",
+    amountOverCapSuffix: " — ask your Team Head / Site Manager to enter it directly.",
+    dateLabel: "Date",
+    dateToday: "Today",
+    dateYesterday: "Yesterday",
+    categoryLabel: "Category",
+    categoryRequired: "Pick a category.",
+    photosLabel: "Bill photo + extra photos (optional)",
+    remarkLabel: "Remark (optional)",
+    remarkPlaceholder: "Anything to add?",
+    submit: "Send request",
+    submitting: "Sending…",
+    submitted: "Request sent.",
+    mediaNotUploaded: "Sent, but some photos or the voice note could not be uploaded.",
+    myRequestsTitle: "My expense requests",
+    myRequestsEmpty: "You haven't sent any expense requests yet.",
+    rejectedReasonPrefix: "Reason:",
+    summaryTitle: "My requests",
+    summaryPendingLabel: "Pending",
+    summaryApprovedLabel: "Approved",
+    summaryRejectedLabel: "Rejected",
+    summaryEmpty: "No requests yet.",
+    summaryViewAll: "View all / raise a request",
+  },
+
+  /** Site-Manager Settings — per-site expense limits/categories/form-fields + emergency contacts (WO-8). */
+  SM_SETTINGS_UI: {
+    noSite: "No site is assigned to you yet.",
+
+    limitsTitle: "Limits",
+    limitsSubtitle: "Amounts your workers/drivers and Team Head can enter directly.",
+    requestCapLabel: "Worker / driver request cap (₹)",
+    thLimitLabel: "Team Head per-entry limit (₹)",
+    smLimitLabel: "Your (Site Manager) per-entry limit (₹)",
+    smLimitReadOnlyNote: "Set by the Owner — you cannot change this.",
+    effectivePrefix: "Currently:",
+    defaultHint: "default",
+    customHint: "custom",
+    limitInvalid: "Enter a valid amount (0 or more), or leave blank to use the default.",
+
+    categoriesTitle: "Expense categories",
+    categoriesSubtitle: "Turn categories on or off and edit their Hindi/English labels.",
+    categoryOn: "On",
+    categoryOff: "Off",
+    categoryHiLabel: "Hindi label",
+    categoryEnLabel: "English label",
+    categoryLabelRequired: "Every category needs both a Hindi and an English label.",
+
+    fieldsTitle: "Request-form fields",
+    fieldsSubtitle: "Choose which boxes show on the worker/driver expense-request form.",
+    fieldLabels: {
+      billPhoto: "Bill photo",
+      extraPhotos: "Extra photos",
+      remark: "Remark",
+      voiceNote: "Voice note",
+      vendor: "Vendor",
+    },
+    fieldShown: "Shown",
+    fieldHidden: "Hidden",
+
+    saveExpenseSettings: "Save settings",
+    savingExpenseSettings: "Saving…",
+    expenseSettingsSaved: "Settings saved.",
+
+    contactsTitle: "Emergency contacts",
+    contactsSubtitle: "Shown to workers and drivers at your site.",
+    contactsEmpty: "No emergency contacts added yet.",
+    contactKindLabel: "Type",
+    contactLabelLabel: "Label",
+    contactPhoneLabel: "Phone",
+    contactLabelRequired: "Enter a label.",
+    contactPhoneRequired: "Enter a valid phone number.",
+    addContact: "Add contact",
+    removeContact: "Remove",
+    saveContacts: "Save contacts",
+    savingContacts: "Saving…",
+    contactsSaved: "Contacts saved.",
+  },
+
+  /** SM/TH direct-expense screen (WO-6) — limit-aware: booked at once under the
+   *  cap, sent as an EXPENSE_ADD approval request over it. */
+  EXPENSE_UI: {
+    title: "Expense",
+    subtitle: "Log a site expense — booked at once if it's within your limit, otherwise sent for approval.",
+    category: "Category",
+    categoryRequired: "Pick a category.",
+    amountRupees: "Amount (₹)",
+    amountInvalid: "Enter an amount greater than 0.",
+    limitHintPrefix: "Your direct-entry limit:",
+    overLimitBanner: "Above your limit — this will go for approval.",
+    billPhotoLabel: "Bill / receipt photo (optional)",
+    extraPhotosLabel: "More photos (optional)",
+    remark: "Remark (optional)",
+    remarkPlaceholder: "Anything to add?",
+    overLimitServerNotice: "This needs approval, or the date is outside your direct-entry window.",
+    sendAsRequest: "Send for approval instead",
+    submittingRequest: "Sending…",
+    saving: "Saving…",
+    submitDirect: "Save expense",
+    submitRequest: "Send for approval",
+    savedDirect: "Expense saved.",
+    savedRequest: "Sent for approval.",
+    photoNotUploaded: "Saved, but some photos or the voice note could not be uploaded.",
+    enteredByPrefix: "by",
+    unknownUser: "unknown user",
+  },
+
+  /** Vendor / shop accounts — udhaar khata (WO-10): SM shop list + ledger + payments,
+   *  plus the shared "paid by cash / on credit" selector on both expense forms. */
+  VENDOR_UI: {
+    title: "Shops (Udhaar Khata)",
+    subtitle: "Shops you buy from on credit — track what's owed and record payments.",
+    listTitle: "Shops",
+    listEmpty: "No shops added yet.",
+    sellsUnknown: "General store",
+    phoneUnknown: "No phone",
+    viewLedger: "View khata",
+    backToList: "Back to shops",
+
+    addShopTitle: "Add a shop",
+    nameLabel: "Shop name",
+    nameRequired: "Enter the shop name.",
+    phoneLabel: "Phone (optional)",
+    sellsLabel: "What they sell (optional)",
+    addShopSubmit: "Add shop",
+    addingShop: "Saving…",
+    shopAdded: "Shop added.",
+
+    ledgerTitle: "Khata",
+    purchasedLabel: "Total purchased",
+    paidLabel: "Total paid",
+    balanceLabel: "Balance (owed)",
+    monthsTitle: "Month-wise",
+    monthsEmpty: "No purchases or payments yet.",
+    monthPurchased: "Purchased",
+    monthPaid: "Paid",
+
+    recordPaymentTitle: "Record a payment",
+    amountLabel: "Amount paid (₹)",
+    amountInvalid: "Enter an amount greater than 0.",
+    noteLabel: "Note (optional)",
+    paymentSubmit: "Save payment",
+    savingPayment: "Saving…",
+    paymentSaved: "Payment recorded.",
+
+    // Shared "paid by" selector on the SM/TH direct-expense form + the worker/driver
+    // expense-request form (only shown when the site has >=1 shop).
+    paidByLabel: "Paid by",
+    paidByCash: "Cash",
+    paidByCredit: "On credit at shop",
+    shopLabel: "Shop",
+    selectShop: "Select shop",
+    shopRequired: "Pick a shop.",
   },
 };
 

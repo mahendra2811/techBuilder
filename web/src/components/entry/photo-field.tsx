@@ -15,16 +15,19 @@ export function PhotoField({
   file,
   onChange,
   testId,
+  label,
 }: {
   file: File | null;
   onChange: (file: File | null) => void;
   testId: string;
+  /** Override the default "Receipt photo (optional)" label — e.g. a required meter photo. */
+  label?: string;
 }) {
   const m = useMessages();
   const inputRef = useRef<HTMLInputElement>(null);
   return (
     <div className="grid gap-2">
-      <Label>{m.ENTRY_UI.photo}</Label>
+      <Label>{label ?? m.ENTRY_UI.photo}</Label>
       <input
         ref={inputRef}
         type="file"

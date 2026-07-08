@@ -72,3 +72,52 @@ export async function uploadPhoto(file: File, opts: UploadPhotoOpts): Promise<UU
     return null;
   }
 }
+
+/**
+ * Sequential best-effort upload of several photos (multi-photo picker).
+ * Never throws; a failed photo is simply skipped, so the returned array of
+ * mediaIds may be shorter than `files` (caller decides whether to warn).
+ */
+export async function uploadPhotos(files: File[], opts: UploadPhotoOpts): Promise<UUID[]> {
+  const mediaIds: UUID[] = [];
+  for (const file of files) {
+    const mediaId = await uploadPhoto(file, opts);
+    if (mediaId) mediaIds.push(mediaId);
+  }
+  return mediaIds;
+}
+
+export interface UploadVoiceOpts {
+  /** Entity family of the record the media belongs to, e.g. "progressNote". */
+  parentType: string;
+  /** Client-generated id of the record being created (known before POST). */
+  parentId: UUID;
+}
+
+/**
+ * Best-effort voice-note upload. No downscaling (audio, not an image).
+ * Returns the mediaId to stick on the record, or null when presign/upload
+ * failed (caller proceeds WITHOUT the voice note).
+ */
+export async function uploadVoice(blob: Blob, opts: UploadVoiceOpts): Promise<UUID | null> {
+  try {
+    const contentType = blob.type || 'audio/webm';
+    const input: PresignMediaInput = {
+      id: uuidv7(),
+      kind: 'VOICE',
+      parentType: opts.parentType,
+      parentId: opts.parentId,
+      contentType,
+    };
+    const presigned = await api<PresignMediaResult>('POST', '/media/presign', input);
+    const res = await fetch(presigned.uploadUrl, {
+      method: 'PUT',
+      headers: { 'content-type': contentType },
+      body: blob,
+    });
+    if (!res.ok) return null;
+    return presigned.mediaId;
+  } catch {
+    return null;
+  }
+}
