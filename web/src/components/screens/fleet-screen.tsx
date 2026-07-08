@@ -12,8 +12,9 @@
  *       no separate admin-only screen needed for this small a form).
  */
 import { useState } from 'react';
+import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Truck } from 'lucide-react';
+import { ChevronRight, Truck } from 'lucide-react';
 import { uuidv7 } from 'uuidv7';
 import { VEHICLE_STATUSES, VEHICLE_TRACKING_MODES } from '@techbuilder/contracts';
 import type {
@@ -55,7 +56,13 @@ export function FleetScreen({ role }: { role: FleetRole }) {
         </CardHeader>
       </Card>
 
-      <VehicleList vehiclesQ={vehiclesQ} vehicleTypes={vehicleTypesQ.data ?? []} sites={sitesQ.data ?? []} people={peopleQ.data ?? []} />
+      <VehicleList
+        role={role}
+        vehiclesQ={vehiclesQ}
+        vehicleTypes={vehicleTypesQ.data ?? []}
+        sites={sitesQ.data ?? []}
+        people={peopleQ.data ?? []}
+      />
 
       <CreateVehicleForm
         role={role}
@@ -78,17 +85,20 @@ export function FleetScreen({ role }: { role: FleetRole }) {
 // ---------------------------------------------------------------------------
 
 function VehicleList({
+  role,
   vehiclesQ,
   vehicleTypes,
   sites,
   people,
 }: {
+  role: FleetRole;
   vehiclesQ: ReturnType<typeof useQuery<Vehicle[]>>;
   vehicleTypes: VehicleType[];
   sites: Site[];
   people: Person[];
 }) {
   const m = useMessages();
+  const basePath = role === 'OWNER' ? '/owner/fleet' : '/site-manager/fleet';
   const typeName = (id: UUID) => vehicleTypes.find((t) => t.id === id)?.name;
   const trackingMode = (id: UUID) => vehicleTypes.find((t) => t.id === id)?.trackingMode;
   const siteName = (id: UUID | null) => (id ? sites.find((s) => s.id === id)?.name : undefined);
@@ -109,25 +119,35 @@ function VehicleList({
         ) : (
           <ul className="divide-y">
             {vehiclesQ.data.map((v) => (
-              <li key={v.id} className="grid gap-1 py-3 first:pt-0 last:pb-0" data-testid={`vehicle-row-${v.id}`}>
-                <div className="flex items-baseline justify-between gap-3">
-                  <p className="min-w-0 truncate text-sm font-medium">
-                    {v.regNo}
-                    {v.name && <span className="ml-1.5 font-normal text-muted-foreground">· {v.name}</span>}
-                  </p>
-                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
-                    {m.VEHICLE_STATUS_LABELS[v.status]}
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {typeName(v.vehicleTypeId) ?? '—'}
-                  {trackingMode(v.vehicleTypeId) && ` (${m.VEHICLE_TRACKING_MODE_LABELS[trackingMode(v.vehicleTypeId)!]})`}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {m.FLEET_UI.assignedSite}: {siteName(v.assignedSiteId) ?? m.FLEET_UI.noSite}
-                  {' · '}
-                  {m.FLEET_UI.assignedDriver}: {driverName(v.assignedDriverPersonId) ?? m.FLEET_UI.noDriver}
-                </p>
+              <li key={v.id}>
+                <Link
+                  href={`${basePath}/${v.id}`}
+                  data-testid={`vehicle-row-${v.id}`}
+                  className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
+                >
+                  <div className="grid min-w-0 flex-1 gap-1">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <p className="min-w-0 truncate text-sm font-medium">
+                        {v.regNo}
+                        {v.name && <span className="ml-1.5 font-normal text-muted-foreground">· {v.name}</span>}
+                      </p>
+                      <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
+                        {m.VEHICLE_STATUS_LABELS[v.status]}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {typeName(v.vehicleTypeId) ?? '—'}
+                      {trackingMode(v.vehicleTypeId) &&
+                        ` (${m.VEHICLE_TRACKING_MODE_LABELS[trackingMode(v.vehicleTypeId)!]})`}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {m.FLEET_UI.assignedSite}: {siteName(v.assignedSiteId) ?? m.FLEET_UI.noSite}
+                      {' · '}
+                      {m.FLEET_UI.assignedDriver}: {driverName(v.assignedDriverPersonId) ?? m.FLEET_UI.noDriver}
+                    </p>
+                  </div>
+                  <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                </Link>
               </li>
             ))}
           </ul>

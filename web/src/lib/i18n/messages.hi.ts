@@ -78,6 +78,7 @@ export const hi: Messages = {
     dashboard: "डैशबोर्ड",
     attendance: "हाज़िरी",
     expense: "ख़र्च",
+    progress: "आज का काम",
     records: "रिकॉर्ड",
     vehicleFuel: "गाड़ी / तेल",
     requests: "रिक्वेस्ट",
@@ -88,6 +89,8 @@ export const hi: Messages = {
     sites: "साइटें",
     fleet: "गाड़ियाँ",
     vendors: "दुकानें",
+    ledger: "खाता",
+    insights: "दिन का हिसाब",
     settings: "सेटिंग",
   },
 
@@ -815,5 +818,205 @@ export const hi: Messages = {
     shopLabel: "दुकान",
     selectShop: "दुकान चुनें",
     shopRequired: "दुकान चुनें।",
+  },
+
+  PROGRESS_UI: {
+    title: "आज का काम",
+    subtitle: "आज साइट पर क्या हुआ — सुबह हो या शाम, जितनी बार चाहें भरें।",
+    textLabel: "आज क्या काम हुआ",
+    textPlaceholder: "आज का काम यहाँ लिखें…",
+    textRequired: "कुछ लिखें, या फ़ोटो लगाएं।",
+    sitePhotosLabel: "साइट की फ़ोटो (ज़रूरी नहीं, अधिकतम 20)",
+    billPhotosLabel: "बिल की फ़ोटो (ज़रूरी नहीं)",
+    saving: "सेव हो रहा है…",
+    submit: "रिपोर्ट सेव करें",
+    saved: "काम की रिपोर्ट सेव हो गई।",
+    photoNotUploaded: "सेव हो गया, पर कुछ फ़ोटो या वॉइस नोट अपलोड नहीं हो पाए।",
+    unknownUser: "अनजान यूज़र",
+    coveredBannerPrefix: "आज का काम भर दिया गया — भरा:",
+    todaysReportsTitle: "आज की रिपोर्ट",
+    todaysReportsEmpty: "आज अभी तक कोई रिपोर्ट नहीं भरी गई।",
+    historyTitle: "पिछले 7 दिन",
+    historyEmpty: "पिछले 7 दिनों में कोई रिपोर्ट नहीं मिली।",
+    attachmentsLabel: "अटैचमेंट",
+  },
+
+  LEDGER_UI: {
+    cardTitle: "मेरा खाता",
+    balanceLabel: "मेरे पास बाकी रक़म",
+    receivedLabel: "मिले",
+    spentLabel: "खर्च हुए",
+    givenLabel: "दिए",
+
+    title: "पैसों का खाता",
+    subtitle: "किसे कितने पैसे दिए, कितने वापस मिले, और किसके पास कितना है।",
+
+    formTitle: "पैसे दिए / वापस मिले",
+    formSubtitle: "जो नकद दिया या वापस मिला, यहां दर्ज करें।",
+    personLabel: "किसको / किससे",
+    selectPerson: "आदमी चुनें",
+    personRequired: "आदमी चुनें।",
+    noPeople: "अभी आपके नीचे पैसे देने के लिए कोई नहीं है।",
+    kindLabel: "क्या हुआ?",
+    kindGive: "पैसे दिए",
+    kindReturn: "वापस मिले",
+    kindGiveHint: "आपने इस आदमी को नकद दिया।",
+    kindReturnHint: "इस आदमी ने आपको नकद वापस किया।",
+    amountLabel: "रक़म (₹)",
+    amountInvalid: "0 से ज़्यादा रक़म भरें।",
+    noteLabel: "टिप्पणी (ज़रूरी नहीं)",
+    submit: "एंट्री सेव करें",
+    submitting: "सेव हो रहा है…",
+    saved: "एंट्री सेव हो गई।",
+
+    historyTitle: "लेन-देन",
+    historyEmpty: "अभी कोई एंट्री नहीं है।",
+    kindChipGive: "दिए",
+    kindChipReturn: "वापस",
+
+    rollupTitle: "किसके पास कितना है",
+    rollupSubtitle: "हर आदमी का हिसाब — पैसा कहां गया।",
+    rollupEmpty: "अभी कोई लेन-देन नहीं है।",
+    rollupReceived: "मिले",
+    rollupGiven: "आगे दिए",
+    rollupSpent: "खर्च किए",
+  },
+
+  VEHICLE_WAVE_UI: {
+    SEVERITY_LABELS: {
+      LOW: "छोटी",
+      MEDIUM: "मध्यम",
+      HIGH: "बड़ी",
+    },
+    STATUS_LABELS: {
+      OPEN: "खुला",
+      RESOLVED: "ठीक हो गया",
+    },
+
+    // driver: switch section
+    switchTitle: "गाड़ी बदलें",
+    switchSubtitle: "अपनी साइट की किसी और गाड़ी पर जाएं।",
+    switchListEmpty: "अभी आपकी साइट पर कोई और गाड़ी नहीं है।",
+    currentVehicleBadge: "अभी की गाड़ी",
+    switchNow: "अभी बदलें",
+    switchNowBusy: "बदल रहे हैं…",
+    switchNowDone: "अब आप इस गाड़ी पर हैं।",
+    needsApproval: "इजाज़त चाहिए",
+    requestSwitchLink: "इस गाड़ी के लिए कहें",
+
+    // driver: damage report form
+    reportDamageTitle: "नुकसान बताएं",
+    reportDamageSubtitle: "गाड़ी में क्या हुआ, बताएं।",
+    severityLabel: "कितना बड़ा नुकसान?",
+    descriptionLabel: "क्या हुआ?",
+    descriptionRequired: "क्या हुआ, यह लिखें।",
+    reportSubmit: "नुकसान भेजें",
+    reportSubmitting: "सेव हो रहा है…",
+    reportSaved: "नुकसान की रिपोर्ट भेज दी गई।",
+
+    // damage timeline (shared: driver history + vehicle-detail tab)
+    damageHistoryTitle: "नुकसान की रिपोर्ट",
+    damageHistoryEmpty: "अभी कोई नुकसान की रिपोर्ट नहीं है।",
+    timelineRaised: "रिपोर्ट की गई",
+    timelineResolved: "ठीक हो गया",
+    timelineClosed: "ड्राइवर ने बंद किया",
+
+    // driver: closing remark (on a RESOLVED issue they raised)
+    closeButton: "बंद करने की टिप्पणी डालें",
+    closeFormTitle: "बंद करने की टिप्पणी",
+    closeNoteLabel: "टिप्पणी (ज़रूरी नहीं)",
+    closeSubmit: "बंद करें",
+    closeSubmitting: "सेव हो रहा है…",
+    closeSaved: "बंद कर दिया गया।",
+
+    // SM / Owner: resolve form (on an OPEN issue)
+    resolveButton: "ठीक हो गया बताएं",
+    resolveFormTitle: "यह नुकसान ठीक करें",
+    resolutionNoteLabel: "क्या ठीक किया गया?",
+    resolutionNoteRequired: "क्या ठीक किया गया, यह लिखें।",
+    resolveSubmit: "ठीक हो गया बताएं",
+    resolveSubmitting: "सेव हो रहा है…",
+    resolveSaved: "ठीक हो गया बता दिया।",
+
+    // vehicle detail screen (Owner + SM)
+    vehicleDetailBack: "फ्लीट पर वापस",
+    vehicleNotFound: "गाड़ी नहीं मिली।",
+    analyticsTitle: "गाड़ी की परफ़ॉर्मेंस",
+    avgRunPerDay7: "औसत / दिन (7 दिन)",
+    avgRunPerDay30: "औसत / दिन (30 दिन)",
+    avgRunPerDay90: "औसत / दिन (90 दिन)",
+    noData: "अभी डेटा नहीं है",
+    fuel30Title: "डीज़ल/पेट्रोल (30 दिन)",
+    fuelLitresSuffix: "लीटर",
+    monthlyCostTitle: "इस महीने का खर्च",
+    totalCostTitle: "कुल ईंधन खर्च (अब तक)",
+    logsTitle: "गाड़ी की एंट्री",
+    logsEmpty: "अभी कोई एंट्री नहीं है।",
+    fuelTitle: "डीज़ल/पेट्रोल एंट्री",
+    fuelEmpty: "अभी कोई एंट्री नहीं है।",
+    tripsTitle: "ट्रिप",
+    tripsEmpty: "अभी कोई ट्रिप नहीं है।",
+    currentDriverLabel: "अभी का ड्राइवर",
+    viewDriverLink: "ड्राइवर की जानकारी देखें",
+    noDriverAssigned: "कोई ड्राइवर नहीं है",
+
+    // driver detail screen (Owner + SM)
+    driverDetailBack: "वापस",
+    driverDetailTitle: "ड्राइवर की जानकारी",
+    driverNotFound: "ड्राइवर नहीं मिला।",
+    driverPhoneLabel: "फ़ोन",
+    driverVehicleLabel: "अभी की गाड़ी",
+    driverNoVehicle: "कोई गाड़ी नहीं है",
+    driverExpensesTitle: "डाला गया खर्च",
+    driverExpensesEmpty: "अभी कोई खर्च नहीं है।",
+  },
+
+  /**
+   * WO-13 — दिन के हिसाब से insights (client plan S-1/T-1/O-1): Owner/SM/TH insights
+   * स्क्रीन + person drill-down + दोनों dashboard embeds।
+   */
+  INSIGHTS_UI: {
+    title: "दिन के हिसाब से जानकारी",
+    subtitle: "कोई भी दिन चुनें और उस दिन का सब कुछ देखें।",
+    unknownUser: "अनजान यूज़र",
+
+    // date presets
+    chipToday: "आज",
+    chipYesterday: "कल (बीता हुआ)",
+    chipDayBefore: "परसों (बीता हुआ)",
+    chipLast7: "पिछले 7 दिन",
+    chipLast30: "पिछले 30 दिन",
+    customDateLabel: "कोई और तारीख",
+
+    // single-day view
+    noProgressBanner: "इस दिन कोई प्रोग्रेस रिपोर्ट नहीं भरी गई।",
+    progressTitle: "प्रोग्रेस",
+    progressEmpty: "इस दिन कोई प्रोग्रेस नोट नहीं है।",
+    attachmentsSuffix: "अटैचमेंट",
+    expensesTitle: "खर्च",
+    expensesEmpty: "इस दिन कोई खर्च नहीं है।",
+    expenseTotalPrefix: "कुल",
+    requestsTitle: "रिक्वेस्ट",
+    requestsEmpty: "इस दिन कोई रिक्वेस्ट नहीं है।",
+
+    // period view
+    periodTotalSpend: "कुल खर्च",
+    periodProgressLabel: "प्रोग्रेस भरे गए दिन",
+    periodNoProgressLabel: "बिना प्रोग्रेस वाले दिन",
+    dayListTitle: "दिन के हिसाब से",
+    dayListNoteCount: "नोट",
+    periodEmpty: "इस अवधि में कुछ भी दर्ज नहीं है।",
+
+    // dashboard embeds
+    crewTodayStripTitle: "टीम — आज",
+    crewTodayStripSubtitle: "आज या किसी भी दिन आपकी टीम ने जो भरा, वह सब देखें।",
+    dashboardLinkTitle: "दिन के हिसाब से जानकारी",
+    dashboardLinkSubtitle: "कोई भी दिन चुनें और उस दिन का सब कुछ देखें।",
+
+    // person drill-down
+    personTitle: "व्यक्ति की जानकारी",
+    personBack: "लोगों की सूची पर वापस",
+    personTotalsTitle: "कुल जानकारी",
+    personDaysTitle: "दिन के हिसाब से",
   },
 };

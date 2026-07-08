@@ -11,13 +11,15 @@
  * write today's note?" — then shortcuts to the screens where they act.
  */
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { BadgeCheck, ClipboardCheck, NotebookPen, Send, Users } from 'lucide-react';
+import { BadgeCheck, ChevronRight, ClipboardCheck, NotebookPen, Send, Users } from 'lucide-react';
 import type { Attendance, Person, ProgressNote, Site, UUID } from '@techbuilder/contracts';
 import { api } from '@/lib/api-client';
 import { todayKolkata } from '@/lib/business-date';
 import { useMessages } from '@/lib/i18n/locale-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { KhataCard } from '@/components/khata-card';
 import { SitePicker } from '@/components/entry/site-picker';
 import { QuickActions } from '@/components/dashboard/quick-actions';
 import { LoadingState, ErrorState, Notice } from '@/components/entry/states';
@@ -63,6 +65,8 @@ export function TeamHeadDashboardScreen() {
 
   return (
     <div className="grid gap-4" data-testid="th-dashboard">
+      <KhataCard />
+
       <SitePicker sites={sites} isLoading={sitesQ.isPending} value={siteId} onChange={setPickedSiteId} />
 
       <Card>
@@ -125,6 +129,19 @@ export function TeamHeadDashboardScreen() {
               {noteDone ? m.DASH_UI.thProgressDone : m.DASH_UI.thProgressPending}
             </Notice>
           )}
+        </CardContent>
+      </Card>
+
+      {/* WO-13: compact link into the day-wise insights screen, scoped to this TH's crew. */}
+      <Card data-testid="th-crew-today-strip">
+        <CardContent>
+          <Link href="/team-head/insights" data-testid="th-crew-today-link" className="flex items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium">{m.INSIGHTS_UI.crewTodayStripTitle}</p>
+              <p className="truncate text-xs text-muted-foreground">{m.INSIGHTS_UI.crewTodayStripSubtitle}</p>
+            </div>
+            <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          </Link>
         </CardContent>
       </Card>
 

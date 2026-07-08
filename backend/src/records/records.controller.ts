@@ -9,6 +9,8 @@ import type {
   CreateTripInput,
   CreateMaterialTxnInput,
   CreateIssueInput,
+  ResolveIssueInput,
+  CloseIssueInput,
 } from '@techbuilder/contracts';
 import { RecordsService } from './records.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -93,6 +95,14 @@ const CreateIssueSchema = z.object({
   mediaIds: z.array(z.string().uuid()).optional(),
 });
 
+const ResolveIssueSchema = z.object({
+  resolutionNote: z.string().min(1),
+});
+
+const CloseIssueSchema = z.object({
+  closingNote: z.string().max(2000).optional(),
+});
+
 const UpdateRecordSchema = z.record(z.unknown());
 
 // ---- Controller ----
@@ -163,6 +173,28 @@ export class RecordsController {
     @Body(new ZodBody(CreateIssueSchema)) body: CreateIssueInput,
   ) {
     return this.records.createIssue(u, body);
+  }
+
+  // WO-11/WO-12 damage lifecycle. No @RequireAction: OWNER has no `record.enter` scope in the
+  // RBAC matrix (only SM=OWN_SITE / TH=OWN_CREW do), so a fixed decorator would wrongly lock the
+  // Owner out of resolving/closing — the service enforces role + site/vehicle-site scope +
+  // creator-only, same reasoning as updateRecord/voidRecord just below.
+  @Post('issue/:id/resolve')
+  resolveIssue(
+    @CurrentUser() u: Principal,
+    @Param('id') id: string,
+    @Body(new ZodBody(ResolveIssueSchema)) body: ResolveIssueInput,
+  ) {
+    return this.records.resolveIssue(u, id, body);
+  }
+
+  @Post('issue/:id/close')
+  closeIssue(
+    @CurrentUser() u: Principal,
+    @Param('id') id: string,
+    @Body(new ZodBody(CloseIssueSchema)) body: CloseIssueInput,
+  ) {
+    return this.records.closeIssue(u, id, body);
   }
 
   // No @RequireAction here: the action depends on the entity family (fuel/vehicle-log/trip →

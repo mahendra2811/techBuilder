@@ -44,4 +44,11 @@ export class UsersController {
     await this.users.deactivate(u, id);
     return { ok: true };
   }
+
+  // WO-12: driver drill-down (SM own-site / OWNER any — service-enforced, like vendors/vehicles).
+  @RequireAction('view.all')
+  @Get(':id/driver-detail')
+  driverDetail(@CurrentUser() u: Principal, @Param('id') id: string) {
+    return this.users.driverDetail(u, id);
+  }
 }

@@ -12,6 +12,8 @@ import type {
   CreateTripInput,
   CreateMaterialTxnInput,
   CreateIssueInput,
+  ResolveIssueInput,
+  CloseIssueInput,
   ProgressNote,
   Expense,
   FuelLog,
@@ -370,6 +372,80 @@ export class RecordsService {
         throw new ApiException('CONFLICT', 'Could not create issue');
       }
       return mapIssue(row);
+    });
+  }
+
+  /**
+   * WO-11/WO-12 damage lifecycle step 1 — SM (own site, or the site of the issue's vehicle) /
+   * OWNER (any) marks an OPEN issue RESOLVED with a note on what was repaired. Mirrors
+   * ApprovalsService.assertDecideScope's vehicle-site fallback (issues, like vehicle-switch
+   * requests, may be vehicle-stamped rather than site-stamped). NOT gated by `record.enter` —
+   * the OWNER has no `record.enter` scope in the RBAC matrix, so a fixed decorator would wrongly
+   * lock the Owner out (same reasoning as updateRecord/voidRecord below).
+   */
+  async resolveIssue(p: Principal, id: string, input: ResolveIssueInput): Promise<Issue> {
+    return this.dbs.runInTenant(p.orgId, async (tx) => {
+      const ctx = await loadScope(tx, p);
+      const [row] = await tx.select().from(schema.issues).where(and(eq(schema.issues.id, id), isNull(schema.issues.deletedAt)));
+      if (!row) throw new ApiException('NOT_FOUND', 'Issue not found');
+      if (row.status !== 'OPEN') throw new ApiException('CONFLICT', 'Issue is not open');
+
+      if (ctx.role !== 'OWNER') {
+        if (ctx.role !== 'SITE_MANAGER') forbidScope('Only a Site Manager or Owner may resolve a damage report');
+        let inScope = !!row.siteId && ctx.siteIds.includes(row.siteId);
+        if (!inScope && row.vehicleId) {
+          const [v] = await tx
+            .select({ siteId: schema.vehicles.assignedSiteId })
+            .from(schema.vehicles)
+            .where(and(eq(schema.vehicles.id, row.vehicleId), isNull(schema.vehicles.deletedAt)));
+          inScope = !!v?.siteId && ctx.siteIds.includes(v.siteId);
+        }
+        if (!inScope) forbidScope('Issue is outside your site scope');
+      }
+
+      const [updated] = await tx
+        .update(schema.issues)
+        .set({
+          status: 'RESOLVED',
+          resolvedBy: p.userId,
+          resolutionNote: input.resolutionNote,
+          updatedBy: p.userId,
+          updatedAt: new Date(),
+          version: sql`${schema.issues.version} + 1`,
+        })
+        .where(eq(schema.issues.id, id))
+        .returning();
+      if (!updated) throw new ApiException('NOT_FOUND', 'Issue not found');
+      return mapIssue(updated);
+    });
+  }
+
+  /**
+   * WO-11/WO-12 damage lifecycle step 2 — the issue's CREATOR (the one who raised it, usually
+   * the driver) may add an optional closing remark once it is RESOLVED. There is no separate
+   * CLOSED status in the frozen `ISSUE_STATUSES` enum — closing is just the creator's
+   * acknowledgement note; status stays RESOLVED. Not gated by `record.enter` for the same
+   * reason as resolveIssue (a driver holds `vehicleLog.enter`, not `record.enter`).
+   */
+  async closeIssue(p: Principal, id: string, input: CloseIssueInput): Promise<Issue> {
+    return this.dbs.runInTenant(p.orgId, async (tx) => {
+      const [row] = await tx.select().from(schema.issues).where(and(eq(schema.issues.id, id), isNull(schema.issues.deletedAt)));
+      if (!row) throw new ApiException('NOT_FOUND', 'Issue not found');
+      if (row.createdBy !== p.userId) forbidScope('Only the person who raised this issue may close it');
+      if (row.status !== 'RESOLVED') throw new ApiException('CONFLICT', 'Issue must be resolved before it can be closed');
+
+      const [updated] = await tx
+        .update(schema.issues)
+        .set({
+          closingNote: input.closingNote ?? null,
+          updatedBy: p.userId,
+          updatedAt: new Date(),
+          version: sql`${schema.issues.version} + 1`,
+        })
+        .where(eq(schema.issues.id, id))
+        .returning();
+      if (!updated) throw new ApiException('NOT_FOUND', 'Issue not found');
+      return mapIssue(updated);
     });
   }
 

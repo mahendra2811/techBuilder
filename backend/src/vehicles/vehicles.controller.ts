@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { z } from 'zod';
 import type { CreateVehicleInput } from '@techbuilder/contracts';
 import { VehiclesService } from './vehicles.service';
@@ -52,5 +52,21 @@ export class VehiclesController {
   @Get('my-snapshot')
   mySnapshot(@CurrentUser() u: Principal) {
     return this.vehicles.mySnapshot(u);
+  }
+
+  // WO-11: driver self-switch onto another vehicle of an allowed type (no body — target is the
+  // route param). Same action as vehicleLog.enter (DRIVER=OWN_VEHICLE); the service enforces
+  // DRIVER-only + the allowed-types check.
+  @RequireAction('vehicleLog.enter')
+  @Post(':id/switch')
+  selfSwitch(@CurrentUser() u: Principal, @Param('id') id: string) {
+    return this.vehicles.selfSwitch(u, id);
+  }
+
+  // WO-12: fleet drill-down (SM own-site / OWNER any — service-enforced, like vendors).
+  @RequireAction('view.all')
+  @Get(':id/detail')
+  detail(@CurrentUser() u: Principal, @Param('id') id: string) {
+    return this.vehicles.detail(u, id);
   }
 }

@@ -18,6 +18,7 @@ import { RecordsModule } from './records/records.module';
 import { ApprovalsModule } from './approvals/approvals.module';
 import { CashTransfersModule } from './cash-transfers/cash-transfers.module';
 import { VendorsModule } from './vendors/vendors.module';
+import { InsightsModule } from './insights/insights.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { MediaModule } from './media/media.module';
 import { AllExceptionsFilter } from './common/all-exceptions.filter';
@@ -41,6 +42,7 @@ import { HealthController } from './health.controller';
     ApprovalsModule,
     CashTransfersModule,
     VendorsModule,
+    InsightsModule,
     NotificationsModule,
     MediaModule,
     WageModule,

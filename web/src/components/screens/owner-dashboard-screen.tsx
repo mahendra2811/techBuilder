@@ -29,9 +29,11 @@ import { buildTodayDigest, whatsappShareUrl, type DigestSiteLine } from '@/lib/d
 import { useMessages } from '@/lib/i18n/locale-context';
 import type { Messages } from '@/lib/i18n/messages';
 import { formatPaise } from '@/lib/money';
+import { roleHome } from '@/lib/roles';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { CompletenessBadge, CompletenessDots } from '@/components/owner/completeness';
+import { KhataCard } from '@/components/khata-card';
 import { WindowToggle } from '@/components/owner/window-toggle';
 import { QuickActions } from '@/components/dashboard/quick-actions';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
@@ -131,6 +133,25 @@ export function OwnerDashboardScreen({ variant = 'OWNER' }: { variant?: 'OWNER' 
           <Kpi testId="kpi-approvals" value={String(kpis.pendingApprovals)} label={m.OWNER_UI.kpiPendingApprovals} />
         </div>
       ) : null}
+
+      {/* My cash khata (WO-9) — one mount covers BOTH the owner home and the
+          SM home (/site-manager renders this screen with variant="SITE_MANAGER"). */}
+      <KhataCard />
+
+      {/* WO-13: day-wise insights link — role-aware href via the same variant this
+          screen already uses for the owner/SM split (roleHome() from the shared
+          Role → URL-slug map, not a redefinition of it). */}
+      <Card data-testid="insights-link-card">
+        <CardContent>
+          <Link href={`${roleHome(variant)}/insights`} data-testid="insights-link" className="flex items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium">{m.INSIGHTS_UI.dashboardLinkTitle}</p>
+              <p className="truncate text-xs text-muted-foreground">{m.INSIGHTS_UI.dashboardLinkSubtitle}</p>
+            </div>
+            <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          </Link>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

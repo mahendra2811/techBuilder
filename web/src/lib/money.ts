@@ -18,3 +18,8 @@ export function formatPaise(paise: Paise): string {
     maximumFractionDigits: 2,
   })}`;
 }
+
+/** Like formatPaise but puts the minus BEFORE the ₹: -25000 → "-₹250" (not "₹-250"). */
+export function formatSignedPaise(paise: Paise): string {
+  return paise < 0 ? `-${formatPaise(-paise)}` : formatPaise(paise);
+}

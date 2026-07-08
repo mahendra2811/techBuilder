@@ -17,6 +17,8 @@ import type {
   EmergencyContactKind,
   ErrorCode,
   ExpenseCategory,
+  IssueSeverity,
+  IssueStatus,
   LeaveType,
   Locale,
   OrgConfig,
@@ -100,6 +102,7 @@ export const en = {
     dashboard: "Dashboard",
     attendance: "Attendance",
     expense: "Expense",
+    progress: "Progress",
     records: "Records",
     vehicleFuel: "Vehicle / Fuel",
     requests: "Requests",
@@ -110,6 +113,8 @@ export const en = {
     sites: "Sites",
     fleet: "Fleet",
     vendors: "Shops",
+    ledger: "Khata",
+    insights: "Insights",
     settings: "Settings",
   },
 
@@ -871,6 +876,220 @@ export const en = {
     shopLabel: "Shop",
     selectShop: "Select shop",
     shopRequired: "Pick a shop.",
+  },
+
+  /** Progress report — WO-14: the "Progress" half of the split Records screen
+   *  (SM + TH). Morning/evening usage, multiple reports per site/day allowed;
+   *  filing one never blocks another. */
+  PROGRESS_UI: {
+    title: "Progress report",
+    subtitle: "What was done on site today — morning or evening, as many reports as you need.",
+    textLabel: "What was done today",
+    textPlaceholder: "Describe today's work…",
+    textRequired: "Write something, or attach a photo.",
+    sitePhotosLabel: "Site photos (optional, up to 20)",
+    billPhotosLabel: "Bill photos (optional)",
+    saving: "Saving…",
+    submit: "Save report",
+    saved: "Progress report saved.",
+    photoNotUploaded: "Saved, but some photos or the voice note could not be uploaded.",
+    unknownUser: "unknown user",
+    coveredBannerPrefix: "Today is covered — filed by",
+    todaysReportsTitle: "Today's reports",
+    todaysReportsEmpty: "No report filed yet today.",
+    historyTitle: "Last 7 days",
+    historyEmpty: "No progress reports in the last 7 days.",
+    attachmentsLabel: "attachment(s)",
+  },
+
+  /** Cash ledger — money khata (WO-9): the dashboard <KhataCard /> + the
+   *  Owner/SM/TH ledger screen (give/receive-back form, history, rollup). */
+  LEDGER_UI: {
+    // Dashboard khata card
+    cardTitle: "My khata",
+    balanceLabel: "Cash with me",
+    receivedLabel: "Received",
+    spentLabel: "Spent",
+    givenLabel: "Given",
+
+    // Ledger screen
+    title: "Money khata",
+    subtitle: "Cash given out, received back, and who holds what.",
+
+    // Give / receive-back form
+    formTitle: "Give / receive money",
+    formSubtitle: "Record cash you handed over or got back.",
+    personLabel: "Person",
+    selectPerson: "Select person",
+    personRequired: "Pick a person.",
+    noPeople: "No one under you to give cash to yet.",
+    kindLabel: "What happened?",
+    kindGive: "Gave money",
+    kindReturn: "Received back",
+    kindGiveHint: "You handed cash to this person.",
+    kindReturnHint: "This person returned cash to you.",
+    amountLabel: "Amount (₹)",
+    amountInvalid: "Enter an amount greater than 0.",
+    noteLabel: "Note (optional)",
+    submit: "Save entry",
+    submitting: "Saving…",
+    saved: "Entry saved.",
+
+    // Transfers history
+    historyTitle: "Cash entries",
+    historyEmpty: "No cash entries yet.",
+    kindChipGive: "Gave",
+    kindChipReturn: "Returned",
+
+    // Rollup (Owner + Site Manager only)
+    rollupTitle: "Who holds what",
+    rollupSubtitle: "Each person's cash position — where the money went.",
+    rollupEmpty: "No cash movement yet.",
+    rollupReceived: "Received",
+    rollupGiven: "Given onward",
+    rollupSpent: "Spent",
+  },
+
+  /**
+   * WO-11/WO-12: driver self-switch, damage lifecycle (report → resolve → close), and
+   * fleet/driver drill-downs (Owner + Site Manager).
+   */
+  VEHICLE_WAVE_UI: {
+    SEVERITY_LABELS: {
+      LOW: "Small",
+      MEDIUM: "Medium",
+      HIGH: "Big",
+    } satisfies Record<IssueSeverity, string>,
+    STATUS_LABELS: {
+      OPEN: "Open",
+      RESOLVED: "Resolved",
+    } satisfies Record<IssueStatus, string>,
+
+    // driver: switch section
+    switchTitle: "Switch vehicle",
+    switchSubtitle: "Move yourself onto another vehicle at your site.",
+    switchListEmpty: "No other vehicles at your site right now.",
+    currentVehicleBadge: "Current",
+    switchNow: "Switch now",
+    switchNowBusy: "Switching…",
+    switchNowDone: "You are now on this vehicle.",
+    needsApproval: "Needs approval",
+    requestSwitchLink: "Ask for this vehicle",
+
+    // driver: damage report form
+    reportDamageTitle: "Report damage",
+    reportDamageSubtitle: "Tell us what happened to the vehicle.",
+    severityLabel: "How bad?",
+    descriptionLabel: "What happened?",
+    descriptionRequired: "Describe what happened.",
+    reportSubmit: "Report damage",
+    reportSubmitting: "Saving…",
+    reportSaved: "Damage report sent.",
+
+    // damage timeline (shared: driver history + vehicle-detail tab)
+    damageHistoryTitle: "Damage reports",
+    damageHistoryEmpty: "No damage reports yet.",
+    timelineRaised: "Raised",
+    timelineResolved: "Resolved",
+    timelineClosed: "Closed by driver",
+
+    // driver: closing remark (on a RESOLVED issue they raised)
+    closeButton: "Add closing remark",
+    closeFormTitle: "Closing remark",
+    closeNoteLabel: "Note (optional)",
+    closeSubmit: "Close",
+    closeSubmitting: "Saving…",
+    closeSaved: "Closed.",
+
+    // SM / Owner: resolve form (on an OPEN issue)
+    resolveButton: "Mark resolved",
+    resolveFormTitle: "Resolve this damage report",
+    resolutionNoteLabel: "What was done?",
+    resolutionNoteRequired: "Describe what was repaired.",
+    resolveSubmit: "Mark resolved",
+    resolveSubmitting: "Saving…",
+    resolveSaved: "Marked resolved.",
+
+    // vehicle detail screen (Owner + SM)
+    vehicleDetailBack: "Back to fleet",
+    vehicleNotFound: "Vehicle not found.",
+    analyticsTitle: "Vehicle performance",
+    avgRunPerDay7: "Avg / day (7d)",
+    avgRunPerDay30: "Avg / day (30d)",
+    avgRunPerDay90: "Avg / day (90d)",
+    noData: "No data yet",
+    fuel30Title: "Fuel (30d)",
+    fuelLitresSuffix: "L",
+    monthlyCostTitle: "Cost this month",
+    totalCostTitle: "Total fuel cost (all-time)",
+    logsTitle: "Vehicle logs",
+    logsEmpty: "No logs yet.",
+    fuelTitle: "Fuel entries",
+    fuelEmpty: "No fuel entries yet.",
+    tripsTitle: "Trips",
+    tripsEmpty: "No trips yet.",
+    currentDriverLabel: "Current driver",
+    viewDriverLink: "View driver details",
+    noDriverAssigned: "No driver assigned",
+
+    // driver detail screen (Owner + SM)
+    driverDetailBack: "Back",
+    driverDetailTitle: "Driver details",
+    driverNotFound: "Driver not found.",
+    driverPhoneLabel: "Phone",
+    driverVehicleLabel: "Current vehicle",
+    driverNoVehicle: "No vehicle assigned",
+    driverExpensesTitle: "Expenses entered",
+    driverExpensesEmpty: "No expenses yet.",
+  },
+
+  /**
+   * WO-13 — date-wise "pick a day, see everything" insights (client plan S-1/T-1/O-1):
+   * the Owner/SM/TH insights screen + the per-person drill-down + the two dashboard embeds.
+   */
+  INSIGHTS_UI: {
+    title: "Day-wise insights",
+    subtitle: "Pick a day and see everything that happened.",
+    unknownUser: "unknown user",
+
+    // date presets
+    chipToday: "Today",
+    chipYesterday: "Yesterday",
+    chipDayBefore: "Day before",
+    chipLast7: "Last 7 days",
+    chipLast30: "Last 30 days",
+    customDateLabel: "Custom date",
+
+    // single-day view
+    noProgressBanner: "No progress filed on this day.",
+    progressTitle: "Progress",
+    progressEmpty: "No progress notes on this day.",
+    attachmentsSuffix: "attachment(s)",
+    expensesTitle: "Expenses",
+    expensesEmpty: "No expenses on this day.",
+    expenseTotalPrefix: "Total",
+    requestsTitle: "Requests",
+    requestsEmpty: "No requests on this day.",
+
+    // period view
+    periodTotalSpend: "Total spend",
+    periodProgressLabel: "Days with progress",
+    periodNoProgressLabel: "Days with no progress",
+    dayListTitle: "Day by day",
+    dayListNoteCount: "notes",
+    periodEmpty: "Nothing recorded in this period.",
+
+    // dashboard embeds
+    crewTodayStripTitle: "Crew — today",
+    crewTodayStripSubtitle: "See everything your crew filed today, or any other day.",
+    dashboardLinkTitle: "Day-wise insights",
+    dashboardLinkSubtitle: "Pick any day and see everything that happened.",
+
+    // person drill-down
+    personTitle: "Person insights",
+    personBack: "Back to people",
+    personTotalsTitle: "Totals",
+    personDaysTitle: "Day by day",
   },
 };
 

@@ -38,3 +38,13 @@ export function apiErrorMessage(m: Messages, code?: ErrorCode): string {
  * UI copy — the button label itself is localized (ENTRY_UI.nothingToReport).
  */
 export const NOTHING_TO_REPORT_TEXT = 'Nothing to report';
+
+/**
+ * Literal progress-note text submitted (WO-14 progress-screen) when the
+ * report has photos and/or a voice note attached but no typed text. The
+ * backend's CreateProgressNoteInput.text is validated with z.string().min(1)
+ * — it is never actually optional — so an empty text box can't be sent
+ * as-is. Locale-INDEPENDENT for the same reason as NOTHING_TO_REPORT_TEXT: a
+ * stored canonical marker, not UI copy.
+ */
+export const PHOTO_ONLY_NOTE_TEXT = 'Photos attached (no text note)';

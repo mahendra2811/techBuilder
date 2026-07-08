@@ -26,6 +26,7 @@ import {
   Store,
   Truck,
   Users,
+  Wallet,
 } from 'lucide-react';
 import { roleHome } from './roles';
 import type { Messages } from '@/lib/i18n/messages';
@@ -49,9 +50,11 @@ const NAV_DEFS: NavDef[] = [
   { action: 'view.all', labelKey: 'dashboard', path: '', icon: LayoutDashboard },
   // Phase-scoping 2026-07: attendance & wages are manual for now (see docs/techBuilder-Build-WorkOrders.md WO-1)
   // { action: 'attendance.mark', labelKey: 'attendance', path: '/attendance', icon: ClipboardCheck },
-  // WO-6: the Records split — Expense is its own section; Progress replaces `records` in WO-14.
+  // WO-6/WO-14: the Records split — Expense + Progress are separate sections now.
   { action: 'record.enter', labelKey: 'expense', path: '/expense', icon: IndianRupee, testId: 'nav-expense' },
-  { action: 'record.enter', labelKey: 'records', path: '/records', icon: NotebookPen },
+  { action: 'record.enter', labelKey: 'progress', path: '/progress', icon: NotebookPen, testId: 'nav-progress' },
+  // The old combined Records screen stays routable at /records but is out of the menu.
+  // { action: 'record.enter', labelKey: 'records', path: '/records', icon: NotebookPen },
   { action: 'vehicleLog.enter', labelKey: 'vehicleFuel', path: '/vehicle', icon: Fuel },
   { action: 'request.submit', labelKey: 'requests', path: '/requests', icon: Send },
   { action: 'request.decide', labelKey: 'approvals', path: '/approvals', icon: BadgeCheck },
@@ -61,6 +64,10 @@ const NAV_DEFS: NavDef[] = [
   // { action: 'wage.view', labelKey: 'wages', path: '/wages', icon: Wallet },
   { action: 'report.export', labelKey: 'reports', path: '/reports', icon: FileSpreadsheet },
   { action: 'config.manage', labelKey: 'settings', path: '/settings', icon: Settings },
+  // WO-13: date-wise insights — "pick a day, see everything" (S-1/T-1/O-1). Service-gated scopes.
+  { action: 'view.all', labelKey: 'insights', path: '/insights', icon: FileSpreadsheet, roles: ['OWNER', 'SITE_MANAGER', 'TEAM_HEAD'], testId: 'nav-insights' },
+  // WO-9: money ledger (khata) — give/receive-back cash + rollup. Service-gated; recorded by seniors.
+  { action: 'view.all', labelKey: 'ledger', path: '/ledger', icon: Wallet, roles: ['OWNER', 'SITE_MANAGER', 'TEAM_HEAD'], testId: 'nav-ledger' },
   // WO-10: shops / udhaar khata — SM manages his site's vendor list + payments (service-gated).
   { action: 'view.all', labelKey: 'vendors', path: '/vendors', icon: Store, roles: ['SITE_MANAGER'], testId: 'nav-vendors' },
   // WO-8: SM site settings (limits · categories · form fields · emergency contacts). The SM holds

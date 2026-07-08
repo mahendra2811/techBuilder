@@ -18,6 +18,7 @@ import { useMessages } from '@/lib/i18n/locale-context';
 import { roleHome } from '@/lib/roles';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ContactPanel } from '@/components/contact-panel';
+import { KhataCard } from '@/components/khata-card';
 import { LoadingState, EmptyState, ErrorState } from '@/components/entry/states';
 import { MyExpenseRequestsSummary } from '@/components/requests/my-requests';
 
@@ -67,6 +68,8 @@ export function WorkerDashboardScreen() {
       </Card>
 
       <MyExpenseRequestsSummary href={`${roleHome('WORKER')}/requests`} />
+
+      <KhataCard />
 
       <ContactPanel />
     </div>

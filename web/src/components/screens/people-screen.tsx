@@ -15,6 +15,7 @@
  * change on first login).
  */
 import { useState } from 'react';
+import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { uuidv7 } from 'uuidv7';
 import { PERSON_SKILLS } from '@techbuilder/contracts';
@@ -33,6 +34,7 @@ import { CREATABLE_ROLES, makeTempPassword } from '@/lib/cascade';
 import { apiErrorMessage } from '@/lib/i18n/messages';
 import { useMessages } from '@/lib/i18n/locale-context';
 import { rupeesToPaise } from '@/lib/money';
+import { roleHome } from '@/lib/roles';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -99,7 +101,10 @@ function UserList({
   });
 
   const creatable = CREATABLE_ROLES[role];
-  const canDeactivate = (u: User) => u.active && u.id !== myUserId && creatable.includes(u.role);
+  // Client-plan T-5: a Team Head creates people but never deactivates — SM-and-above only
+  // (server hard-blocks it too; hiding the button avoids a dead affordance).
+  const canDeactivate = (u: User) =>
+    role !== 'TEAM_HEAD' && u.active && u.id !== myUserId && creatable.includes(u.role);
 
   const serverError =
     deactivate.error instanceof ApiClientError ? apiErrorMessage(m, deactivate.error.code) : deactivate.error ? apiErrorMessage(m) : null;
@@ -122,12 +127,13 @@ function UserList({
               const busy = deactivate.isPending && deactivate.variables === u.id;
               return (
                 <li key={u.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0" data-testid={`user-row-${u.id}`}>
-                  <div className="min-w-0 flex-1">
+                  {/* WO-13: opens the day-wise insights drill-down for this person. */}
+                  <Link href={`${roleHome(role)}/people/${u.id}`} data-testid={`user-row-link-${u.id}`} className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{u.name}</p>
                     <p className="truncate text-xs text-muted-foreground">
                       {u.username} · {m.ROLE_LABELS[u.role]}
                     </p>
-                  </div>
+                  </Link>
                   <span
                     className={
                       u.active

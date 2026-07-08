@@ -1,12 +1,25 @@
 import { Injectable } from '@nestjs/common';
-import { and, desc, eq, isNull, sql, type SQL } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, isNull, ne, sql, type SQL } from 'drizzle-orm';
+import { uuidv7 } from 'uuidv7';
 import * as schema from '@techbuilder/contracts/db/schema';
-import type { CreateVehicleInput, Vehicle, VehicleSnapshot } from '@techbuilder/contracts';
+import type {
+  CreateVehicleInput,
+  FuelLog,
+  Issue,
+  Trip,
+  Vehicle,
+  VehicleAnalytics,
+  VehicleDetail,
+  VehicleLog,
+  VehicleSnapshot,
+} from '@techbuilder/contracts';
 import type { VehicleDoc } from '@techbuilder/contracts';
 import { DbService } from '../db/db.service';
 import { ApiException } from '../common/api-exception';
 import type { Principal } from '../common/current-user.decorator';
 import { forbidScope, inSet, loadScope } from '../common/scope.util';
+import { addDays, businessDateNow } from '../common/business-date';
+import { loadEodCutoff } from '../common/org-config.util';
 
 @Injectable()
 export class VehiclesService {
@@ -54,11 +67,14 @@ export class VehiclesService {
   async list(u: Principal): Promise<Vehicle[]> {
     return this.dbs.runInTenant(u.orgId, async (tx) => {
       const ctx = await loadScope(tx, u);
-      // WP-1: Owner sees all; SM their site's fleet; Driver their assigned vehicle(s);
-      // TH/Worker have no vehicle scope → empty list.
+      // WP-1: Owner sees all; SM their site's fleet; TH/Worker have no vehicle scope → empty list.
+      // WO-11: Driver scope widened from "own vehicle only" to their own SITE's fleet (still
+      // site-scoped, not org-wide — same shape as SITE_MANAGER) so the self-switch screen can
+      // list other vehicles at the site to switch onto. `ctx.siteIds` for a DRIVER is derived
+      // from their currently assigned vehicle(s) (loadScope) — a driver with none assigned sees
+      // an empty list here, same as they already do on the vehicle-log entry screens.
       let scope: SQL | undefined;
-      if (ctx.role === 'SITE_MANAGER') scope = inSet(schema.vehicles.assignedSiteId, ctx.siteIds);
-      else if (ctx.role === 'DRIVER') scope = inSet(schema.vehicles.id, ctx.vehicleIds);
+      if (ctx.role === 'SITE_MANAGER' || ctx.role === 'DRIVER') scope = inSet(schema.vehicles.assignedSiteId, ctx.siteIds);
       else if (ctx.role !== 'OWNER') scope = sql`false`;
       const rows = await tx
         .select()
@@ -125,6 +141,224 @@ export class VehiclesService {
       };
     });
   }
+
+  /**
+   * WO-11 — driver self-switch: a driver may move themselves onto another vehicle of the
+   * SAME org (RLS/tenant-scoped — no extra site-scope restriction, kept deliberately simple
+   * per the WO) as long as it is not under MAINTENANCE and its vehicle TYPE is one they are
+   * allowed to drive. "Allowed" is the UNION of `users.allowedVehicleTypeIds` and
+   * `driver_allowed_types` rows — both mechanisms coexist in this schema. Outside that list,
+   * the driver must fall back to the existing VEHICLE_SWITCH approval-request flow (message
+   * below points the web UI at it).
+   */
+  async selfSwitch(p: Principal, targetVehicleId: string): Promise<Vehicle> {
+    return this.dbs.runInTenant(p.orgId, async (tx) => {
+      const ctx = await loadScope(tx, p);
+      if (ctx.role !== 'DRIVER' || !ctx.personId) {
+        forbidScope('Only a driver with a linked person record may switch vehicles');
+      }
+      const personId = ctx.personId;
+
+      const [target] = await tx
+        .select()
+        .from(schema.vehicles)
+        .where(and(eq(schema.vehicles.id, targetVehicleId), isNull(schema.vehicles.deletedAt)));
+      if (!target) throw new ApiException('NOT_FOUND', 'Vehicle not found');
+      if (target.status === 'MAINTENANCE') {
+        throw new ApiException('VALIDATION_FAILED', 'Vehicle is under maintenance and cannot be switched into');
+      }
+
+      const [userRow] = await tx
+        .select({ allowedVehicleTypeIds: schema.users.allowedVehicleTypeIds })
+        .from(schema.users)
+        .where(eq(schema.users.id, p.userId));
+      const viaColumn = userRow?.allowedVehicleTypeIds ?? [];
+      const viaTable = await tx
+        .select({ vehicleTypeId: schema.driverAllowedTypes.vehicleTypeId })
+        .from(schema.driverAllowedTypes)
+        .where(eq(schema.driverAllowedTypes.userId, p.userId));
+      const allowed = new Set<string>([...viaColumn, ...viaTable.map((r) => r.vehicleTypeId)]);
+      if (!allowed.has(target.vehicleTypeId)) {
+        throw new ApiException(
+          'FORBIDDEN',
+          'Vehicle type not in your allowed list — submit a vehicle-change request',
+        );
+      }
+
+      // Clear the driver off any other vehicle(s) currently pointing at them, then assign the target.
+      const previous = await tx
+        .select({ id: schema.vehicles.id, regNo: schema.vehicles.regNo })
+        .from(schema.vehicles)
+        .where(
+          and(
+            eq(schema.vehicles.assignedDriverPersonId, personId),
+            isNull(schema.vehicles.deletedAt),
+            ne(schema.vehicles.id, target.id),
+          ),
+        );
+      if (previous.length) {
+        await tx
+          .update(schema.vehicles)
+          .set({
+            assignedDriverPersonId: null,
+            updatedBy: p.userId,
+            updatedAt: new Date(),
+            version: sql`${schema.vehicles.version} + 1`,
+          })
+          .where(
+            inArray(
+              schema.vehicles.id,
+              previous.map((v) => v.id),
+            ),
+          );
+      }
+
+      const [updated] = await tx
+        .update(schema.vehicles)
+        .set({
+          assignedDriverPersonId: personId,
+          updatedBy: p.userId,
+          updatedAt: new Date(),
+          version: sql`${schema.vehicles.version} + 1`,
+        })
+        .where(eq(schema.vehicles.id, target.id))
+        .returning();
+      if (!updated) throw new ApiException('CONFLICT', 'Could not switch vehicle');
+
+      // Best-effort: tell the target vehicle's site manager (no SM assigned → no notification).
+      if (updated.assignedSiteId) {
+        const [site] = await tx
+          .select({ sm: schema.sites.siteManagerId })
+          .from(schema.sites)
+          .where(and(eq(schema.sites.id, updated.assignedSiteId), isNull(schema.sites.deletedAt)));
+        if (site?.sm) {
+          await tx.insert(schema.notifications).values({
+            id: uuidv7(),
+            orgId: p.orgId,
+            userId: site.sm,
+            type: 'ASSIGNMENT_CHANGED',
+            payload: {
+              driverUserId: p.userId,
+              fromVehicleId: previous[0]?.id ?? null,
+              toVehicleId: updated.id,
+              fromRegNo: previous[0]?.regNo ?? null,
+              toRegNo: updated.regNo,
+            },
+          });
+        }
+      }
+
+      return mapVehicle(updated);
+    });
+  }
+
+  /**
+   * WO-12 — fleet drill-down: SM (own site) / OWNER (any). Analytics are computed here (no
+   * stored rollup table): per-day run = endReading−startReading over the last 90 days of
+   * vehicle_logs, averaged over the 7/30/90-day sub-windows; fuel litres/paise over the last
+   * 30 days; `totalExpensePaise` is ALL-TIME fuel spend (the `expenses` table has no
+   * vehicleId column in this schema — true all-cost totals are a v2 gap, `expenses: []` here).
+   */
+  async detail(p: Principal, vehicleId: string): Promise<VehicleDetail> {
+    return this.dbs.runInTenant(p.orgId, async (tx) => {
+      const ctx = await loadScope(tx, p);
+      if (ctx.role !== 'OWNER' && ctx.role !== 'SITE_MANAGER') {
+        forbidScope(`Role ${ctx.role} cannot view vehicle details`);
+      }
+      const [vehicleRow] = await tx
+        .select()
+        .from(schema.vehicles)
+        .where(and(eq(schema.vehicles.id, vehicleId), isNull(schema.vehicles.deletedAt)));
+      if (!vehicleRow) throw new ApiException('NOT_FOUND', 'Vehicle not found');
+      if (ctx.role === 'SITE_MANAGER') {
+        if (!vehicleRow.assignedSiteId || !ctx.siteIds.includes(vehicleRow.assignedSiteId)) {
+          forbidScope('Vehicle out of scope');
+        }
+      }
+
+      const today = businessDateNow(new Date(), await loadEodCutoff(tx));
+      const from90 = addDays(today, -89);
+      const from30 = addDays(today, -29);
+      const from7 = addDays(today, -6);
+
+      const logs = await tx
+        .select()
+        .from(schema.vehicleLogs)
+        .where(
+          and(
+            eq(schema.vehicleLogs.vehicleId, vehicleId),
+            isNull(schema.vehicleLogs.deletedAt),
+            gte(schema.vehicleLogs.businessDate, from90),
+          ),
+        )
+        .orderBy(desc(schema.vehicleLogs.businessDate));
+
+      const fuel = await tx
+        .select()
+        .from(schema.fuelLogs)
+        .where(
+          and(
+            eq(schema.fuelLogs.vehicleId, vehicleId),
+            isNull(schema.fuelLogs.deletedAt),
+            gte(schema.fuelLogs.businessDate, from90),
+          ),
+        )
+        .orderBy(desc(schema.fuelLogs.businessDate));
+
+      const trips = await tx
+        .select()
+        .from(schema.trips)
+        .where(
+          and(eq(schema.trips.vehicleId, vehicleId), isNull(schema.trips.deletedAt), gte(schema.trips.businessDate, from90)),
+        )
+        .orderBy(desc(schema.trips.businessDate));
+
+      const damages = await tx
+        .select()
+        .from(schema.issues)
+        .where(and(eq(schema.issues.vehicleId, vehicleId), isNull(schema.issues.deletedAt)))
+        .orderBy(desc(schema.issues.createdAt));
+
+      // All-time fuel spend (unbounded by the 90-day window above) → totalExpensePaise.
+      const allFuel = await tx
+        .select({ amountPaise: schema.fuelLogs.amountPaise })
+        .from(schema.fuelLogs)
+        .where(and(eq(schema.fuelLogs.vehicleId, vehicleId), isNull(schema.fuelLogs.deletedAt)));
+      const totalExpensePaise = allFuel.reduce((sum, r) => sum + (r.amountPaise ?? 0), 0);
+
+      const avgRunPerDay = (fromDate: string): number | null => {
+        const runs = logs
+          .filter((l) => l.businessDate >= fromDate && l.endReading != null)
+          .map((l) => (l.endReading as number) - l.startReading);
+        if (!runs.length) return null;
+        return runs.reduce((a, b) => a + b, 0) / runs.length;
+      };
+      const fuel30 = fuel.filter((f) => f.businessDate >= from30);
+      const fuelLitres30 = fuel30.reduce((sum, f) => sum + f.litres, 0);
+      const fuelPaise30 = fuel30.reduce((sum, f) => sum + (f.amountPaise ?? 0), 0);
+
+      const analytics: VehicleAnalytics = {
+        vehicleId,
+        avgRunPerDay7: avgRunPerDay(from7),
+        avgRunPerDay30: avgRunPerDay(from30),
+        avgRunPerDay90: avgRunPerDay(from90),
+        fuelLitres30,
+        fuelPaise30,
+        monthlyCostPaise: fuelPaise30,
+        totalExpensePaise,
+      };
+
+      return {
+        vehicle: mapVehicle(vehicleRow),
+        analytics,
+        logs: logs.map(mapVehicleLog),
+        fuel: fuel.map(mapFuelLog),
+        expenses: [], // NOT LINKED: expenses has no vehicleId column in this schema (v1 gap — see report)
+        trips: trips.map(mapTrip),
+        damages: damages.map(mapIssue),
+      };
+    });
+  }
 }
 
 function mapVehicle(r: typeof schema.vehicles.$inferSelect): Vehicle {
@@ -139,6 +373,90 @@ function mapVehicle(r: typeof schema.vehicles.$inferSelect): Vehicle {
     assignedDriverPersonId: r.assignedDriverPersonId ?? null,
     status: r.status,
     docs: (r.docs as VehicleDoc[]) ?? [],
+    createdAt: r.createdAt.toISOString(),
+    updatedAt: r.updatedAt.toISOString(),
+    createdBy: r.createdBy ?? r.id,
+    updatedBy: r.updatedBy ?? r.id,
+    deletedAt: r.deletedAt ? r.deletedAt.toISOString() : null,
+    version: r.version,
+  };
+}
+
+// ---- WO-12 drill-down mappers (mirror the local mapXxx in records.service.ts) ----
+
+function mapVehicleLog(r: typeof schema.vehicleLogs.$inferSelect): VehicleLog {
+  return {
+    id: r.id,
+    orgId: r.orgId,
+    vehicleId: r.vehicleId,
+    driverPersonId: r.driverPersonId,
+    startReading: r.startReading,
+    endReading: r.endReading ?? null,
+    hoursWorked: r.hoursWorked ?? null,
+    loadsCount: r.loadsCount ?? null,
+    note: r.note ?? null,
+    businessDate: r.businessDate,
+    createdAt: r.createdAt.toISOString(),
+    updatedAt: r.updatedAt.toISOString(),
+    createdBy: r.createdBy ?? r.id,
+    updatedBy: r.updatedBy ?? r.id,
+    deletedAt: r.deletedAt ? r.deletedAt.toISOString() : null,
+    version: r.version,
+  };
+}
+
+function mapFuelLog(r: typeof schema.fuelLogs.$inferSelect): FuelLog {
+  return {
+    id: r.id,
+    orgId: r.orgId,
+    vehicleId: r.vehicleId,
+    amountPaise: r.amountPaise ?? 0,
+    litres: r.litres,
+    reading: r.reading,
+    receiptMediaId: r.receiptMediaId ?? null,
+    businessDate: r.businessDate,
+    createdAt: r.createdAt.toISOString(),
+    updatedAt: r.updatedAt.toISOString(),
+    createdBy: r.createdBy ?? r.id,
+    updatedBy: r.updatedBy ?? r.id,
+    deletedAt: r.deletedAt ? r.deletedAt.toISOString() : null,
+    version: r.version,
+  };
+}
+
+function mapTrip(r: typeof schema.trips.$inferSelect): Trip {
+  return {
+    id: r.id,
+    orgId: r.orgId,
+    vehicleId: r.vehicleId,
+    fromText: r.fromText,
+    toText: r.toText,
+    purpose: r.purpose ?? null,
+    materialTxnId: r.materialTxnId ?? null,
+    businessDate: r.businessDate,
+    createdAt: r.createdAt.toISOString(),
+    updatedAt: r.updatedAt.toISOString(),
+    createdBy: r.createdBy ?? r.id,
+    updatedBy: r.updatedBy ?? r.id,
+    deletedAt: r.deletedAt ? r.deletedAt.toISOString() : null,
+    version: r.version,
+  };
+}
+
+function mapIssue(r: typeof schema.issues.$inferSelect): Issue {
+  return {
+    id: r.id,
+    orgId: r.orgId,
+    siteId: r.siteId ?? null,
+    vehicleId: r.vehicleId ?? null,
+    severity: r.severity,
+    description: r.description,
+    status: r.status,
+    resolvedBy: r.resolvedBy ?? null,
+    resolutionNote: r.resolutionNote ?? null,
+    closingNote: r.closingNote ?? null,
+    businessDate: r.businessDate,
+    mediaIds: r.mediaIds ?? [],
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),
     createdBy: r.createdBy ?? r.id,
