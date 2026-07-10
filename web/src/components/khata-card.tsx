@@ -7,34 +7,79 @@
  * expenses, negative rendered red with a leading minus) over a small
  * received / spent / given breakdown, sized for a construction worker's phone.
  *
+ * WO-1 (wave 2): banking-app style — hidden by default, no network call until
+ * the eye is tapped (a "second priority" fetch that never competes with a
+ * dashboard's base queries). Once revealed, a small refresh icon re-fetches
+ * without hiding the current figures (loader only on the icon).
+ *
  * A khata card must never break a dashboard: any query error renders nothing.
  */
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { Eye, EyeOff, RefreshCw } from 'lucide-react';
 import type { MyBalance } from '@techbuilder/contracts';
 import { api } from '@/lib/api-client';
 import { useMessages } from '@/lib/i18n/locale-context';
 import { formatPaise, formatSignedPaise } from '@/lib/money';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { LoadingState } from '@/components/entry/states';
 
 export function KhataCard() {
   const m = useMessages();
+  const [revealed, setRevealed] = useState(false);
   const balanceQ = useQuery({
     queryKey: ['me', 'balance'],
     queryFn: () => api<MyBalance>('GET', '/me/balance'),
+    enabled: revealed,
   });
 
-  if (balanceQ.error) return null;
+  if (revealed && balanceQ.error) return null;
 
   const b = balanceQ.data;
+  const masked = m.LEDGER_UI.hiddenPlaceholder;
+
   return (
     <Card data-testid="khata-card">
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
         <CardTitle>{m.LEDGER_UI.cardTitle}</CardTitle>
+        <div className="flex items-center gap-1">
+          {revealed && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              data-testid="khata-refresh"
+              aria-label={m.LEDGER_UI.refreshAmounts}
+              disabled={balanceQ.isFetching}
+              onClick={() => void balanceQ.refetch()}
+            >
+              <RefreshCw className={cn('size-4', balanceQ.isFetching && 'animate-spin')} aria-hidden="true" />
+            </Button>
+          )}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            data-testid="khata-toggle-reveal"
+            aria-label={revealed ? m.LEDGER_UI.hideAmounts : m.LEDGER_UI.showAmounts}
+            onClick={() => setRevealed((r) => !r)}
+          >
+            {revealed ? <EyeOff className="size-4" aria-hidden="true" /> : <Eye className="size-4" aria-hidden="true" />}
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="grid min-h-16 content-start gap-3">
-        {!b ? (
+        {!revealed ? (
+          <div>
+            <p className="text-xs text-muted-foreground">{m.LEDGER_UI.balanceLabel}</p>
+            <p className="text-2xl font-semibold tabular-nums text-muted-foreground" data-testid="khata-balance-masked">
+              {masked}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">{m.LEDGER_UI.tapToShow}</p>
+          </div>
+        ) : !b ? (
           <LoadingState />
         ) : (
           <>

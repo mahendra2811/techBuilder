@@ -2,7 +2,7 @@
 
 > **Purpose:** let any session (human or AI) find the right file WITHOUT exploring/grepping the tree.
 > Regenerate hint: file headers carry doc-comments — this index is distilled from them.
-> Last regenerated: 2026-07-09 (Excel Export v2 pass — `backend/src/exports/`, section-picker Reports screen, ExcelJS). If you add/move files, update the matching section only.
+> Last regenerated: 2026-07-11 (Dashboard UX wave-2 pass — khata/digest lazy-loading, approvals-pending callouts, contacts panel for TH/SM, approvals site-tabs + accordion, user activate + admin password reset [contracts `frozen.7`], person-profile day compaction, shared `ui/show-more.tsx`). Prior: 2026-07-09 (Excel Export v2 — `backend/src/exports/`, section-picker Reports screen, ExcelJS). If you add/move files, update the matching section only.
 
 ---
 
@@ -66,7 +66,7 @@ Every resource module = `<name>.service.ts` + `<name>.controller.ts` + `<name>.m
 
 | Path | What it does |
 |---|---|
-| `auth/auth.service.ts` | login (SECURITY-DEFINER `auth_lookup`), refresh rotation, change-password, `/me`, `/me/contacts`. |
+| `auth/auth.service.ts` | login (SECURITY-DEFINER `auth_lookup`), refresh rotation, change-password, `/me`, `/me/contacts` (wave 2: SITE_MANAGER gets the `loadScope`-derived union of emergency contacts across every site they manage, deduped by phone; nobody is ever surfaced as their own siteManager/teamHead). |
 | `auth/auth.controller.ts` | `/auth/*` + `MeController` (`/me`, `/me/contacts`). |
 | `auth/jwt.strategy.ts` + `jwt-auth.guard.ts` | Stateless JWT → `Principal` (NO DB hit per request). |
 | `auth/password.ts` | scrypt hash/verify (documented deviation from argon2id). |
@@ -75,7 +75,7 @@ Every resource module = `<name>.service.ts` + `<name>.controller.ts` + `<name>.m
 
 | Module | Owns |
 |---|---|
-| `users/` | User CRUD + creation cascade (Owner→SM→TH), forced password change. |
+| `users/` | User CRUD + creation cascade (Owner→SM→TH), forced password change, deactivate. Wave 2: `activate` (Owner only) + `resetPassword` (Owner any / SM own-created roles, never self, revokes the target's refresh tokens) — `ENDPOINTS.usersActivate`/`usersResetPassword`, contracts `frozen.7`. |
 | `sites/` | Sites + **`PATCH /sites/:id/config`** (per-site settings). THE pattern module — copy it. |
 | `people/` | Workers/people registry (person-scoped, crew membership). |
 | `vehicle-types/`, `vehicles/` | Fleet registry + driver assignment + vehicle switch. |
@@ -150,11 +150,11 @@ Each role area has a `layout.tsx` = `requireRole(ROLE)` + `<RoleShell>`.
 
 | File | Screen |
 |---|---|
-| `owner-dashboard-screen.tsx` | Owner+SM dashboard: KPI grid, completeness strip, cost rollup, khata card, WhatsApp digest. Fires ~6 queries + per-site attendance. |
-| `team-head-dashboard-screen.tsx` | TH dashboard from TH-scoped queries. |
+| `owner-dashboard-screen.tsx` | Owner+SM dashboard: KPI grid, completeness strip, cost rollup, khata card, approvals-pending callout (wave 2, zero extra calls — reuses the KPI), WhatsApp digest (wave 2 — collapsed by default, `todayDashQ` only fires once opened), SM-only contacts panel. |
+| `team-head-dashboard-screen.tsx` | TH dashboard from TH-scoped queries; wave 2 adds an approvals-pending callout (client-side count) and the contacts panel. |
 | `driver-dashboard-screen.tsx` | Driver day (WO-7): vehicle, fuel, trips, damage. |
 | `worker-dashboard-screen.tsx` | Only worker screen; read-only + contacts. |
-| `approvals-screen.tsx` | Approvals inbox (Owner/SM/TH) + decide actions. |
+| `approvals-screen.tsx` | Approvals inbox (Owner/SM/TH) + decide actions. Wave 2: Owner-only per-site tabs (client-derived from `payload.siteId`/requester's site — no contracts change) + accordion rows (collapsed name/type/one-liner/status; a PENDING row expands to the full payload + decide form, a decided row never expands). |
 | `requests-screen.tsx` | Raise request (SM/TH/Driver). |
 | `expense-request-screen.tsx` | Worker/Driver EXPENSE_ADD request form (WO-5). |
 | `expense-screen.tsx` | Direct expense entry (SM/TH). |
@@ -164,7 +164,7 @@ Each role area has a `layout.tsx` = `requireRole(ROLE)` + `<RoleShell>`.
 | `vehicle-switch-screen.tsx` | WO-11 driver self-switch vehicle. |
 | `ledger-screen.tsx` | Cash khata (Owner/SM/TH). |
 | `vendors-screen.tsx` | Vendor udhaar khata (SM). |
-| `people-screen.tsx` / `person-insights-screen.tsx` | People mgmt + WO-13 per-person drill-down. |
+| `people-screen.tsx` / `person-insights-screen.tsx` | People mgmt + WO-13 per-person drill-down. Wave 2: Owner can reactivate a deactivated login; Owner/SM get an admin password-reset action (`people/reset-password-action.tsx`, both places); the person profile's day list collapses to header rows (date + counts), expands per day on tap, and only renders the first 7 days until "show more" (`ui/show-more.tsx`). |
 | `insights-screen.tsx` | WO-13 day-wise insights (Owner/SM/TH). |
 | `owner-sites-screen.tsx` / `site-detail-screen.tsx` | Site list + owner-only drill-in. |
 | `reports-screen.tsx` | Excel export v2 (Owner/SM) — window picker (Today/7d/30d/90d/custom) + checkbox section picker (default: Expenses + Cash khata; money/vendor/attendance/progress/site-summary/materials/fleet/issues/people), each section's queries `enabled` only when checked. Download in-browser, or email delivery when the backend reports `emailEnabled` (`GET /exports/config`). |
@@ -183,9 +183,11 @@ Each role area has a `layout.tsx` = `requireRole(ROLE)` + `<RoleShell>`.
 | `entry/*` | Form building blocks: `date-field`, `site-picker`, `photo-field`, `photo-multi-field`, `voice-field`, `recent-entries`, `states` (**LoadingState/EmptyState/ErrorState/Notice — the loading-UX primitives**). |
 | `insights/*` | WO-13 shared: `date-presets`, `period-summary`, `record-lists`. |
 | `owner/*` | `completeness` (badge+dots), `window-toggle` (today/7d/30d), `audit-chip` (version>1 = corrected). |
-| `requests/*` | `my-requests` (own EXPENSE_ADD list), `request-bits` (status badge etc.). |
+| `dashboard/*` | `quick-actions` (shortcut grid), `approvals-pending-card` (wave 2 — dashboard callout, renders nothing when count is 0). |
+| `people/reset-password-action.tsx` | Wave 2 — shared admin password-reset button (confirm → generate temp password → reveal once), used by `people-screen.tsx` row actions and `person-insights-screen.tsx`'s header. |
+| `requests/*` | `my-requests` (own EXPENSE_ADD list), `request-bits` (status badge, `payloadOneLiner` — accordion one-line summary). |
 | `vehicle/damage-timeline.tsx` | Damage lifecycle timeline (raised→resolved→closed). |
-| `ui/*` | shadcn-style primitives: button, card, checkbox (`@base-ui/react/checkbox`, used by the export section picker), field, input, label, native-select, separator, textarea. |
+| `ui/*` | shadcn-style primitives: button, card, checkbox (`@base-ui/react/checkbox`, used by the export section picker), field, input, label, native-select, separator, textarea, **`show-more`** (wave 2 — generic client-side "render first N, reveal rest on tap"; owns its own `ul`/`div` wrapper so the button never lands as an invalid direct child of a `<ul>`). |
 
 ### 4.5 `lib/`
 
@@ -227,6 +229,7 @@ Each role area has a `layout.tsx` = `requireRole(ROLE)` + `<RoleShell>`.
 | Loading/error UX | `components/entry/states.tsx` + per-screen skeletons + `app/providers.tsx` query defaults. |
 | Auth/session/cookies | `web/src/proxy.ts`, `lib/server/{backend,cookies,require-session}.ts`, `app/api/auth/*`, `backend/src/auth/*`. |
 | Per-site settings | `sm-settings-screen.tsx` ↔ `PATCH /sites/:id/config` (`sites.service.ts`) ↔ `common/org-config.util.ts`. |
+| Long list → render fewer at once | Wrap in `ui/show-more.tsx` (client-side, data already fetched). Only `cash-transfers` is capped server-side today — reach for real pagination only when a list is genuinely unbounded from the server, not just long client-side. |
 | Add an export section | `web/lib/export-excel.ts` (new sheet builder) + `reports-screen.tsx` (checkbox + `enabled` query) + `backend/src/exports/export-sheets.ts` (mirror sheet, bilingual labels) — same section key string in both places. |
 
 Full playbook: `docs/techBuilder-Developer-Guide.md` §10.

@@ -50,4 +50,4 @@ Since the actual bug is "DB in the wrong region," check whether **Neon itself of
 
 ## Next step (when ready to proceed)
 
-Write the actual step-by-step provisioning (AWS Console steps or a CLI/Terraform script) for Phase 1 (RDS-only). Not done yet — pending the user's decision to proceed.
+✅ **Written:** [`techBuilder-AWS-Onboarding-Steps.md`](techBuilder-AWS-Onboarding-Steps.md) — the exact console steps + commands for Phase 1 (RDS-only), grounded in this repo's actual `db:migrate`/`db:rls`/`seed` scripts and role setup. Not yet executed — pending the user actually running through it.

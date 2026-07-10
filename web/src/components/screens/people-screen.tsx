@@ -41,6 +41,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
+import { ShowMore } from '@/components/ui/show-more';
+import { ResetPasswordAction } from '@/components/people/reset-password-action';
 
 type PeopleRole = 'OWNER' | 'SITE_MANAGER' | 'TEAM_HEAD';
 
@@ -91,6 +93,8 @@ function UserList({
   const m = useMessages();
   const queryClient = useQueryClient();
   const [confirmingId, setConfirmingId] = useState<UUID | null>(null);
+  const [confirmingActivateId, setConfirmingActivateId] = useState<UUID | null>(null);
+  const [showResetFor, setShowResetFor] = useState<UUID | null>(null);
 
   const deactivate = useMutation({
     mutationFn: (id: UUID) => api<{ ok: true }>('POST', `/users/${id}/deactivate`),
@@ -100,14 +104,28 @@ function UserList({
     },
   });
 
+  // WO-8 (wave 2): Owner only — reactivating is a trust decision, unlike deactivate.
+  const activate = useMutation({
+    mutationFn: (id: UUID) => api<{ ok: true }>('POST', `/users/${id}/activate`),
+    onSuccess: () => {
+      setConfirmingActivateId(null);
+      void queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+  });
+
   const creatable = CREATABLE_ROLES[role];
   // Client-plan T-5: a Team Head creates people but never deactivates — SM-and-above only
   // (server hard-blocks it too; hiding the button avoids a dead affordance).
   const canDeactivate = (u: User) =>
     role !== 'TEAM_HEAD' && u.active && u.id !== myUserId && creatable.includes(u.role);
+  const canActivate = (u: User) => role === 'OWNER' && !u.active && u.id !== myUserId;
+  // Mirrors backend resetPassword scope: Owner any, SM only roles they may create
+  // (the users list is already scope-filtered server-side, so presence ⟺ in-scope).
+  const canResetPassword = (u: User) => role !== 'TEAM_HEAD' && u.id !== myUserId && (role === 'OWNER' || creatable.includes(u.role));
 
-  const serverError =
-    deactivate.error instanceof ApiClientError ? apiErrorMessage(m, deactivate.error.code) : deactivate.error ? apiErrorMessage(m) : null;
+  const errorMessage = (err: unknown): string | null =>
+    err instanceof ApiClientError ? apiErrorMessage(m, err.code) : err ? apiErrorMessage(m) : null;
+  const serverError = errorMessage(deactivate.error) ?? errorMessage(activate.error);
 
   return (
     <Card data-testid="user-list">
@@ -122,46 +140,89 @@ function UserList({
         ) : !usersQ.data || usersQ.data.length === 0 ? (
           <EmptyState label={m.PEOPLE_UI.usersEmpty} />
         ) : (
-          <ul className="divide-y">
-            {usersQ.data.map((u) => {
+          <ShowMore
+            items={usersQ.data}
+            initial={10}
+            as="ul"
+            className="divide-y"
+            testIdPrefix="user-list"
+            renderItem={(u) => {
               const busy = deactivate.isPending && deactivate.variables === u.id;
+              const activating = activate.isPending && activate.variables === u.id;
               return (
-                <li key={u.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0" data-testid={`user-row-${u.id}`}>
-                  {/* WO-13: opens the day-wise insights drill-down for this person. */}
-                  <Link href={`${roleHome(role)}/people/${u.id}`} data-testid={`user-row-link-${u.id}`} className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{u.name}</p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {u.username} · {m.ROLE_LABELS[u.role]}
-                    </p>
-                  </Link>
-                  <span
-                    className={
-                      u.active
-                        ? 'shrink-0 rounded bg-emerald-500/15 px-1.5 py-0.5 text-[11px] text-emerald-700 dark:text-emerald-400'
-                        : 'shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground'
-                    }
-                  >
-                    {u.active ? m.PEOPLE_UI.activeYes : m.PEOPLE_UI.activeNo}
-                  </span>
-                  {canDeactivate(u) && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={confirmingId === u.id ? 'destructive' : 'outline'}
-                      data-testid={`user-deactivate-${u.id}`}
-                      disabled={busy}
-                      onClick={() => {
-                        if (confirmingId === u.id) deactivate.mutate(u.id);
-                        else setConfirmingId(u.id);
-                      }}
+                <li key={u.id} className="grid gap-2 py-3 first:pt-0 last:pb-0" data-testid={`user-row-${u.id}`}>
+                  <div className="flex items-center gap-3">
+                    {/* WO-13: opens the day-wise insights drill-down for this person. */}
+                    <Link href={`${roleHome(role)}/people/${u.id}`} data-testid={`user-row-link-${u.id}`} className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{u.name}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {u.username} · {m.ROLE_LABELS[u.role]}
+                      </p>
+                    </Link>
+                    <span
+                      className={
+                        u.active
+                          ? 'shrink-0 rounded bg-emerald-500/15 px-1.5 py-0.5 text-[11px] text-emerald-700 dark:text-emerald-400'
+                          : 'shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground'
+                      }
                     >
-                      {busy ? m.PEOPLE_UI.deactivating : confirmingId === u.id ? m.PEOPLE_UI.deactivateConfirm : m.PEOPLE_UI.deactivate}
-                    </Button>
+                      {u.active ? m.PEOPLE_UI.activeYes : m.PEOPLE_UI.activeNo}
+                    </span>
+                  </div>
+                  {(canDeactivate(u) || canActivate(u) || canResetPassword(u)) && (
+                    <div className="flex flex-wrap gap-2">
+                      {canDeactivate(u) && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={confirmingId === u.id ? 'destructive' : 'outline'}
+                          data-testid={`user-deactivate-${u.id}`}
+                          disabled={busy}
+                          onClick={() => {
+                            if (confirmingId === u.id) deactivate.mutate(u.id);
+                            else setConfirmingId(u.id);
+                          }}
+                        >
+                          {busy ? m.PEOPLE_UI.deactivating : confirmingId === u.id ? m.PEOPLE_UI.deactivateConfirm : m.PEOPLE_UI.deactivate}
+                        </Button>
+                      )}
+                      {canActivate(u) && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={confirmingActivateId === u.id ? 'default' : 'outline'}
+                          data-testid={`user-activate-${u.id}`}
+                          disabled={activating}
+                          onClick={() => {
+                            if (confirmingActivateId === u.id) activate.mutate(u.id);
+                            else setConfirmingActivateId(u.id);
+                          }}
+                        >
+                          {activating
+                            ? m.PEOPLE_UI.activating
+                            : confirmingActivateId === u.id
+                              ? m.PEOPLE_UI.activateConfirm
+                              : m.PEOPLE_UI.activate}
+                        </Button>
+                      )}
+                      {canResetPassword(u) && showResetFor !== u.id && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          data-testid={`user-reset-password-toggle-${u.id}`}
+                          onClick={() => setShowResetFor(u.id)}
+                        >
+                          {m.PEOPLE_UI.resetPassword}
+                        </Button>
+                      )}
+                    </div>
                   )}
+                  {showResetFor === u.id && <ResetPasswordAction userId={u.id} testIdPrefix={`user-reset-password-${u.id}`} />}
                 </li>
               );
-            })}
-          </ul>
+            }}
+          />
         )}
         {serverError && (
           <Notice tone="error" testId="user-deactivate-error">

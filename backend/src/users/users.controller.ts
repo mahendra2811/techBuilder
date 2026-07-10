@@ -21,6 +21,8 @@ const CreateUserSchema = z.object({
   tempPassword: z.string().min(8),
 });
 
+const ResetPasswordSchema = z.object({ newPassword: z.string().min(8) });
+
 @UseGuards(JwtAuthGuard, RbacGuard)
 @Controller('users')
 export class UsersController {
@@ -42,6 +44,26 @@ export class UsersController {
   @Post(':id/deactivate')
   async deactivate(@CurrentUser() u: Principal, @Param('id') id: string): Promise<{ ok: true }> {
     await this.users.deactivate(u, id);
+    return { ok: true };
+  }
+
+  // ENDPOINTS.usersActivate — WO-8: Owner only (service-enforced).
+  @RequireAction('user.create')
+  @Post(':id/activate')
+  async activate(@CurrentUser() u: Principal, @Param('id') id: string): Promise<{ ok: true }> {
+    await this.users.activate(u, id);
+    return { ok: true };
+  }
+
+  // ENDPOINTS.usersResetPassword — WO-9: Owner/SM scope mirrors deactivate (service-enforced).
+  @RequireAction('user.create')
+  @Post(':id/reset-password')
+  async resetPassword(
+    @CurrentUser() u: Principal,
+    @Param('id') id: string,
+    @Body(new ZodBody(ResetPasswordSchema)) body: z.infer<typeof ResetPasswordSchema>,
+  ): Promise<{ ok: true }> {
+    await this.users.resetPassword(u, id, body.newPassword);
     return { ok: true };
   }
 

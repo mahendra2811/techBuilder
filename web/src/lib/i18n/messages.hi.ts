@@ -222,6 +222,7 @@ export const hi: Messages = {
     recentEmpty: "पिछले 7 दिनों में कोई एंट्री नहीं।",
     noSites: "आपके लिए कोई साइट नहीं मिली।",
     corrected: "सुधारा गया",
+    showMore: "और देखें",
 
     // attendance
     attendanceTitle: "हाज़िरी",
@@ -313,6 +314,8 @@ export const hi: Messages = {
     kpiVehiclesActive: "आज चली गाड़ियाँ",
     kpiOpenIssues: "खुले मुद्दे",
     kpiPendingApprovals: "मंज़ूरी बाकी",
+    approvalsPendingTitle: "मंज़ूरी बाकी है",
+    approvalsPendingSuffix: "आपकी मंज़ूरी का इंतज़ार कर रहे हैं",
     completenessTitle: "रोज़ का रिकॉर्ड — हर साइट का",
     completenessSubtitle: "आज का हाल और पिछले 7 दिन।",
     completenessNoData: "कुछ नहीं",
@@ -328,6 +331,7 @@ export const hi: Messages = {
     // WhatsApp digest
     digestTitle: "आज का सार",
     digestSubtitle: "आपके WhatsApp ग्रुप के लिए एक मैसेज।",
+    digestShowSummary: "आज का सार देखें",
     digestShare: "WhatsApp पर भेजें",
     digestCopy: "कॉपी करें",
     digestCopied: "कॉपी हो गया।",
@@ -609,6 +613,11 @@ export const hi: Messages = {
     unknownRequester: "अनजान यूज़र",
     finalCategoryLabel: "फ़ाइनल कैटेगरी",
     rejectReasonRequired: "रिजेक्ट करने के लिए वजह लिखें",
+    siteFilterLabel: "साइट",
+    siteFilterAll: "सभी साइटें",
+    siteOther: "अन्य",
+    expandAria: "पूरी जानकारी देखें",
+    collapseAria: "जानकारी छुपाएँ",
   },
 
   REQUESTS_UI: {
@@ -663,6 +672,12 @@ export const hi: Messages = {
     deactivate: "बंद करें",
     deactivateConfirm: "पक्का?",
     deactivating: "बंद हो रहा है…",
+    activate: "चालू करें",
+    activateConfirm: "पक्का?",
+    activating: "चालू हो रहा है…",
+    resetPassword: "पासवर्ड रीसेट करें",
+    resetPasswordConfirm: "पक्का?",
+    resettingPassword: "रीसेट हो रहा है…",
     activeYes: "चालू",
     activeNo: "बंद",
     crewPrefillNote: "यह लॉगिन आपकी टीम में जुड़ेगा।",
@@ -971,6 +986,11 @@ export const hi: Messages = {
     receivedLabel: "मिले",
     spentLabel: "खर्च हुए",
     givenLabel: "दिए",
+    hiddenPlaceholder: "•••••",
+    showAmounts: "रकम दिखाएँ",
+    hideAmounts: "रकम छुपाएँ",
+    tapToShow: "बैलेंस देखने के लिए आँख दबाएँ",
+    refreshAmounts: "रीफ्रेश करें",
 
     title: "पैसों का खाता",
     subtitle: "किसे कितने पैसे दिए, कितने वापस मिले, और किसके पास कितना है।",
@@ -1142,5 +1162,11 @@ export const hi: Messages = {
     personBack: "लोगों की सूची पर वापस",
     personTotalsTitle: "कुल जानकारी",
     personDaysTitle: "दिन के हिसाब से",
+    dayExpandAria: "इस दिन की जानकारी देखें",
+    dayCollapseAria: "इस दिन की जानकारी छुपाएँ",
+    daySummaryProgress: "प्रोग्रेस",
+    daySummaryExpense: "खर्च",
+    daySummaryRequest: "अनुरोध",
+    daySummaryNone: "कुछ भी दर्ज नहीं",
   },
 };

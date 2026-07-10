@@ -21,7 +21,7 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useQueries, useQuery } from '@tanstack/react-query';
-import { ChevronRight, Copy, FileSpreadsheet, Fuel, MessageCircle } from 'lucide-react';
+import { ChevronRight, Copy, FileSpreadsheet, Fuel, MessageCircle, RefreshCw } from 'lucide-react';
 import type { Attendance, Completeness, OwnerDashboard, Site, UUID, Vehicle } from '@techbuilder/contracts';
 import { api, me } from '@/lib/api-client';
 import { addDays, formatBusinessDate, todayKolkata } from '@/lib/business-date';
@@ -34,6 +34,8 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { CompletenessBadge, CompletenessDots } from '@/components/owner/completeness';
 import { KhataCard } from '@/components/khata-card';
+import { ApprovalsPendingCard } from '@/components/dashboard/approvals-pending-card';
+import { ContactPanel } from '@/components/contact-panel';
 import { WindowToggle } from '@/components/owner/window-toggle';
 import { QuickActions } from '@/components/dashboard/quick-actions';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
@@ -55,6 +57,7 @@ export function OwnerDashboardScreen({ variant = 'OWNER' }: { variant?: 'OWNER' 
   const isOwner = variant === 'OWNER';
   const today = useMemo(() => todayKolkata(), []);
   const [win, setWin] = useState<DashWindow>('7d');
+  const [digestOpen, setDigestOpen] = useState(false);
   const from = addDays(today, -WINDOW_DAYS_BACK[win]);
   const dotsFrom = addDays(today, -6);
 
@@ -64,14 +67,15 @@ export function OwnerDashboardScreen({ variant = 'OWNER' }: { variant?: 'OWNER' 
     queryKey: ['owner-dashboard', from, today],
     queryFn: () => api<OwnerDashboard>('GET', dashboardPath(from)),
   });
-  // Digest is always about TODAY (dedupes with dashQ when the Today window is
-  // active). Deferred until the above-fold dashboard query settles — the two
-  // aggregate queries otherwise compete on the backend and delay first content
-  // (the digest card sits below the fold anyway).
+  // WO-2 (wave 2): digest is always about TODAY (dedupes with dashQ when the Today
+  // window is active), but this second aggregate call never fires on page load —
+  // only once the user taps "show today's summary" (digestOpen), so a card most
+  // people never open costs nothing by default. A header refresh re-fires it
+  // without hiding the currently-shown digest text.
   const todayDashQ = useQuery({
     queryKey: ['owner-dashboard', today, today],
     queryFn: () => api<OwnerDashboard>('GET', dashboardPath(today)),
-    enabled: !dashQ.isPending,
+    enabled: digestOpen,
   });
   const comp7Q = useQuery({
     queryKey: ['completeness', dotsFrom, today],
@@ -137,6 +141,9 @@ export function OwnerDashboardScreen({ variant = 'OWNER' }: { variant?: 'OWNER' 
       {/* My cash khata (WO-9) — one mount covers BOTH the owner home and the
           SM home (/site-manager renders this screen with variant="SITE_MANAGER"). */}
       <KhataCard />
+
+      {/* WO-3 (wave 2): reuses the KPI already fetched by dashQ — zero extra calls. */}
+      <ApprovalsPendingCard count={kpis?.pendingApprovals ?? 0} href={`${roleHome(variant)}/approvals`} />
 
       {/* WO-13: day-wise insights link — role-aware href via the same variant this
           screen already uses for the owner/SM split (roleHome() from the shared
@@ -241,6 +248,9 @@ export function OwnerDashboardScreen({ variant = 'OWNER' }: { variant?: 'OWNER' 
         vehicles={vehiclesQ.data}
         todayDash={todayDashQ.data}
         markedToday={markedToday}
+        open={digestOpen}
+        onOpen={() => setDigestOpen(true)}
+        isFetching={todayDashQ.isFetching}
         ready={
           !!meQ.data &&
           !!todayDashQ.data &&
@@ -256,6 +266,9 @@ export function OwnerDashboardScreen({ variant = 'OWNER' }: { variant?: 'OWNER' 
           attQs.forEach((q) => void q.refetch());
         }}
       />
+
+      {/* WO-4 (wave 2): SM-only — owner has no site of their own to show emergency contacts for. */}
+      {!isOwner && <ContactPanel />}
     </div>
   );
 }
@@ -343,6 +356,9 @@ function DigestCard({
   vehicles,
   todayDash,
   markedToday,
+  open,
+  onOpen,
+  isFetching,
   ready,
   error,
   onRetry,
@@ -353,6 +369,9 @@ function DigestCard({
   vehicles: Vehicle[] | undefined;
   todayDash: OwnerDashboard | undefined;
   markedToday: Map<UUID, number>;
+  open: boolean;
+  onOpen: () => void;
+  isFetching: boolean;
   ready: boolean;
   error: unknown;
   onRetry: () => void;
@@ -361,7 +380,7 @@ function DigestCard({
   const [copied, setCopied] = useState<'ok' | 'fail' | null>(null);
 
   const digest =
-    ready && orgName && todayDash && vehicles
+    open && ready && orgName && todayDash && vehicles
       ? buildTodayDigest(
           {
           orgName,
@@ -398,12 +417,33 @@ function DigestCard({
 
   return (
     <Card data-testid="digest-card">
-      <CardHeader>
-        <CardTitle>{m.OWNER_UI.digestTitle}</CardTitle>
-        <CardDescription>{m.OWNER_UI.digestSubtitle}</CardDescription>
+      <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0">
+        <div>
+          <CardTitle>{m.OWNER_UI.digestTitle}</CardTitle>
+          <CardDescription>{m.OWNER_UI.digestSubtitle}</CardDescription>
+        </div>
+        {open && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            data-testid="digest-refresh"
+            aria-label={m.LEDGER_UI.refreshAmounts}
+            disabled={isFetching}
+            onClick={onRetry}
+          >
+            <RefreshCw className={cn('size-4', isFetching && 'animate-spin')} aria-hidden="true" />
+          </Button>
+        )}
       </CardHeader>
       <CardContent className="grid min-h-56 content-start gap-3">
-        {error ? (
+        {!open ? (
+          <div className="flex h-full flex-col items-start justify-center gap-3 py-6">
+            <Button type="button" data-testid="digest-open" onClick={onOpen}>
+              {m.OWNER_UI.digestShowSummary}
+            </Button>
+          </div>
+        ) : error ? (
           <ErrorState error={error} onRetry={onRetry} />
         ) : !digest ? (
           <LoadingState />

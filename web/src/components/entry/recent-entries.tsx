@@ -3,6 +3,7 @@
 /** Read-only "last 7 days" context list rendered under each entry form. */
 import { useMessages } from '@/lib/i18n/locale-context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ShowMore } from '@/components/ui/show-more';
 import { LoadingState, EmptyState, ErrorState } from './states';
 
 export interface RecentRow {
@@ -42,8 +43,13 @@ export function RecentEntries({
         ) : !rows || rows.length === 0 ? (
           <EmptyState label={m.ENTRY_UI.recentEmpty} />
         ) : (
-          <ul className="divide-y">
-            {rows.map((r) => (
+          <ShowMore
+            items={rows}
+            initial={5}
+            as="ul"
+            className="divide-y"
+            testIdPrefix={`${testId}-recent`}
+            renderItem={(r) => (
               <li key={r.id} className="flex items-baseline justify-between gap-3 py-2 first:pt-0 last:pb-0">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">{r.primary}</p>
@@ -51,8 +57,8 @@ export function RecentEntries({
                 </div>
                 {r.secondary && <span className="shrink-0 text-sm tabular-nums">{r.secondary}</span>}
               </li>
-            ))}
-          </ul>
+            )}
+          />
         )}
       </CardContent>
     </Card>

@@ -136,6 +136,56 @@ export class UsersService {
     });
   }
 
+  /** WO-8 (wave 2) — the mirror of deactivate(): Owner only (reactivating is a trust decision
+   * a Site Manager should not make unilaterally, unlike deactivate which any creator-role may do). */
+  async activate(p: Principal, id: string): Promise<void> {
+    await this.dbs.runInTenant(p.orgId, async (tx) => {
+      const ctx = await loadScope(tx, p);
+      if (ctx.role !== 'OWNER') forbidScope('Only the Owner may reactivate a user');
+      const [target] = await tx.select().from(schema.users).where(eq(schema.users.id, id));
+      if (!target || target.deletedAt) throw new ApiException('NOT_FOUND', 'User not found');
+      await tx
+        .update(schema.users)
+        .set({ active: true, updatedBy: p.userId, updatedAt: new Date() })
+        .where(eq(schema.users.id, id));
+    });
+  }
+
+  /**
+   * WO-9 (wave 2) — admin password reset. Scope mirrors deactivate() (Owner: anyone;
+   * Site Manager: only roles they may create, inside their own site scope; Team Head:
+   * forbidden), plus never yourself (use POST /auth/change-password for that). Forces
+   * `mustChangePassword` and revokes every refresh token the target holds — old sessions
+   * on other devices die immediately, matching the intent of a forced credential reset.
+   */
+  async resetPassword(p: Principal, id: string, newPassword: string): Promise<void> {
+    await this.dbs.runInTenant(p.orgId, async (tx) => {
+      if (id === p.userId) forbidScope('Use /auth/change-password to change your own password');
+      const ctx = await loadScope(tx, p);
+      if (ctx.role === 'TEAM_HEAD') forbidScope('Team heads cannot reset passwords — ask your Site Manager');
+      const [target] = await tx.select().from(schema.users).where(eq(schema.users.id, id));
+      if (!target || target.deletedAt) throw new ApiException('NOT_FOUND', 'User not found');
+      if (ctx.role !== 'OWNER') {
+        if (!CAN_CREATE[ctx.role].includes(target.role)) {
+          forbidScope(`${ctx.role} cannot reset the password of role ${target.role}`);
+        }
+        const inScope =
+          ctx.role === 'SITE_MANAGER' && !!target.assignedSiteId && ctx.siteIds.includes(target.assignedSiteId);
+        if (!inScope) forbidScope('User is outside your scope');
+      }
+      await tx
+        .update(schema.users)
+        .set({
+          passwordHash: await hashPassword(newPassword),
+          mustChangePassword: true,
+          updatedBy: p.userId,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.users.id, id));
+      await tx.update(schema.refreshTokens).set({ revokedAt: new Date() }).where(eq(schema.refreshTokens.userId, id));
+    });
+  }
+
   /**
    * WO-12 — driver drill-down (SM own-site / OWNER any, mirrors VehiclesService.detail).
    * A driver has no `assignedSiteId` of their own — site membership for an SM's scope check is

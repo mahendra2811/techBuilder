@@ -193,7 +193,11 @@ export function ReportsScreen() {
       enabled: needsAttendance,
     })),
   });
-  const attendanceReady = !needsAttendance || (sitesQ.data !== undefined && attQs.every((q) => q.data !== undefined));
+  // `!isFetching` matters here: WO-6's keepPreviousData keeps the PREVIOUS window's
+  // data visible during a refetch, so `.data !== undefined` alone would flag a
+  // section "ready" with stale-window rows while the current window is still loading.
+  const attendanceReady =
+    !needsAttendance || (sitesQ.data !== undefined && attQs.every((q) => q.data !== undefined && !q.isFetching));
   const attendance: Attendance[] = attendanceReady ? attQs.flatMap((q) => q.data ?? []) : [];
 
   const cashTransfersQ = useQuery({
@@ -202,7 +206,8 @@ export function ReportsScreen() {
     enabled: checked.has('money'),
   });
   const ledgerRollupQ = useQuery({
-    queryKey: ['ledger', 'rollup'],
+    // Same key as ledger-screen.tsx's identical /ledger/rollup fetch — shares cache.
+    queryKey: ['ledger-rollup'],
     queryFn: () => api<LedgerRollupRow[]>('GET', '/ledger/rollup'),
     enabled: checked.has('money'),
   });
@@ -263,16 +268,22 @@ export function ReportsScreen() {
   const configQ = useQuery({ queryKey: ['exports-config'], queryFn: () => api<ExportConfig>('GET', '/exports/config') });
 
   // ---- per-section readiness + row-count preview ----
+  // `settled(q)` = has data AND isn't mid-refetch — required because WO-6's
+  // keepPreviousData means `.data` can be the PREVIOUS window's rows while the
+  // current window is still loading (see attendanceReady above).
+  const settled = <T,>(q: { data: T | undefined; isFetching: boolean }) => q.data !== undefined && !q.isFetching;
   const SECTION_READY: Record<SectionKey, boolean> = {
-    expense: !checked.has('expense') || !!expensesQ.data,
-    money: !checked.has('money') || (!!cashTransfersQ.data && !!ledgerRollupQ.data),
+    expense: !checked.has('expense') || settled(expensesQ),
+    money: !checked.has('money') || (settled(cashTransfersQ) && settled(ledgerRollupQ)),
     vendor: !checked.has('vendor') || (vendorsQ.data !== undefined && vendorLedgersReady),
     attendance: !checked.has('attendance') || attendanceReady,
-    progress: !checked.has('progress') || !!progressQ.data,
-    siteSummary: !checked.has('siteSummary') || (attendanceReady && !!expensesQ.data && !!progressQ.data && !!issueQ.data && !!fuelQ.data),
-    material: !checked.has('material') || !!materialQ.data,
-    fleet: !checked.has('fleet') || (!!fuelQ.data && !!vehicleLogQ.data && !!tripQ.data),
-    issue: !checked.has('issue') || !!issueQ.data,
+    progress: !checked.has('progress') || settled(progressQ),
+    siteSummary:
+      !checked.has('siteSummary') ||
+      (attendanceReady && settled(expensesQ) && settled(progressQ) && settled(issueQ) && settled(fuelQ)),
+    material: !checked.has('material') || settled(materialQ),
+    fleet: !checked.has('fleet') || (settled(fuelQ) && settled(vehicleLogQ) && settled(tripQ)),
+    issue: !checked.has('issue') || settled(issueQ),
     people: !checked.has('people') || (!!peopleQ.data && !!usersQ.data),
   };
   const SECTION_ROWS: Partial<Record<SectionKey, number>> = {

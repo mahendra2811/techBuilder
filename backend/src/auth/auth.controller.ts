@@ -58,6 +58,6 @@ export class MeController {
   @UseGuards(JwtAuthGuard)
   @Get('me/contacts')
   contacts(@CurrentUser() u: Principal): Promise<ContactPanel> {
-    return this.auth.contacts(u.orgId, u.userId);
+    return this.auth.contacts(u);
   }
 }

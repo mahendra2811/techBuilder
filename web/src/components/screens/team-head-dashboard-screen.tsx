@@ -14,12 +14,14 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronRight } from 'lucide-react';
-import type { Attendance, Person, ProgressNote, Site, UUID } from '@techbuilder/contracts';
-import { api } from '@/lib/api-client';
+import type { ApprovalRequest, Attendance, Person, ProgressNote, Site, UUID } from '@techbuilder/contracts';
+import { api, me } from '@/lib/api-client';
 import { todayKolkata } from '@/lib/business-date';
 import { useMessages } from '@/lib/i18n/locale-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { KhataCard } from '@/components/khata-card';
+import { ApprovalsPendingCard } from '@/components/dashboard/approvals-pending-card';
+import { ContactPanel } from '@/components/contact-panel';
 import { SitePicker } from '@/components/entry/site-picker';
 import { LoadingState, ErrorState, Notice } from '@/components/entry/states';
 
@@ -28,8 +30,19 @@ export function TeamHeadDashboardScreen() {
   const today = useMemo(() => todayKolkata(), []);
   const [pickedSiteId, setPickedSiteId] = useState<UUID | ''>('');
 
+  const meQ = useQuery({ queryKey: ['me'], queryFn: me });
   const sitesQ = useQuery({ queryKey: ['sites'], queryFn: () => api<Site[]>('GET', '/sites') });
   const peopleQ = useQuery({ queryKey: ['people'], queryFn: () => api<Person[]>('GET', '/people') });
+  // WO-3 (wave 2): TH has no dashboard KPI feed, so this counts client-side —
+  // mirrors approvals-screen's canDecide rule (VEHICLE_SWITCH/EXPENSE_ADD, never own).
+  const pendingRequestsQ = useQuery({
+    queryKey: ['requests', 'PENDING'],
+    queryFn: () => api<ApprovalRequest[]>('GET', '/requests?status=PENDING'),
+  });
+  const myUserId = meQ.data?.user.id;
+  const decidablePending = (pendingRequestsQ.data ?? []).filter(
+    (r) => (r.type === 'VEHICLE_SWITCH' || r.type === 'EXPENSE_ADD') && r.requestedBy !== myUserId,
+  ).length;
 
   // A TH normally has exactly one site — default to the first scoped one (derived, no effect).
   const sites = sitesQ.data;
@@ -65,6 +78,8 @@ export function TeamHeadDashboardScreen() {
   return (
     <div className="grid gap-4" data-testid="th-dashboard">
       <KhataCard />
+
+      <ApprovalsPendingCard count={decidablePending} href="/team-head/approvals" />
 
       <SitePicker
         sites={sites}
@@ -150,6 +165,9 @@ export function TeamHeadDashboardScreen() {
           </Link>
         </CardContent>
       </Card>
+
+      {/* WO-4 (wave 2): same emergency/contacts footer already used by worker + driver. */}
+      <ContactPanel />
     </div>
   );
 }

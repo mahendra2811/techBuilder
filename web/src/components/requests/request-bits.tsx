@@ -101,6 +101,14 @@ function PaidViaChip({ paidVia, m }: { paidVia: PaymentMode; m: Messages }) {
   );
 }
 
+/** WO-7 (wave 2): the collapsed accordion row's one-line summary — just the
+ * first meaningful field (amount / vehicle / person / material), not the
+ * full payload. Falls back to the type label alone when nothing resolves. */
+export function payloadOneLiner(m: Messages, type: ApprovalType, payload: Record<string, unknown>): string {
+  const lines = linesFor(m, type, payload);
+  return lines[0]?.value ?? '';
+}
+
 export function PayloadSummary({ type, payload }: { type: ApprovalType; payload: Record<string, unknown> }) {
   const m = useMessages();
   const lines = linesFor(m, type, payload);

@@ -20,6 +20,8 @@ export const ENDPOINTS = {
   usersList: { method: 'GET', path: '/users' },
   usersCreate: { method: 'POST', path: '/users' },
   usersDeactivate: { method: 'POST', path: '/users/:id/deactivate' },
+  usersActivate: { method: 'POST', path: '/users/:id/activate' },
+  usersResetPassword: { method: 'POST', path: '/users/:id/reset-password' },
   peopleList: { method: 'GET', path: '/people' },
   peopleCreate: { method: 'POST', path: '/people' },
   sitesList: { method: 'GET', path: '/sites' },

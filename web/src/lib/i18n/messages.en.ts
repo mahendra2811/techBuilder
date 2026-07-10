@@ -262,6 +262,7 @@ export const en = {
     recentEmpty: "No entries in the last 7 days.",
     noSites: "No sites available for your account.",
     corrected: "corrected",
+    showMore: "Show more",
 
     // attendance
     attendanceTitle: "Attendance",
@@ -356,6 +357,8 @@ export const en = {
     kpiVehiclesActive: "Vehicles active today",
     kpiOpenIssues: "Open issues",
     kpiPendingApprovals: "Pending approvals",
+    approvalsPendingTitle: "Approvals pending",
+    approvalsPendingSuffix: "waiting for your decision",
     completenessTitle: "Daily records — site by site",
     completenessSubtitle: "Today’s state and the last 7 days.",
     completenessNoData: "No data",
@@ -371,6 +374,7 @@ export const en = {
     // WhatsApp digest
     digestTitle: "Today’s summary",
     digestSubtitle: "One message for your WhatsApp group.",
+    digestShowSummary: "Show today's summary",
     digestShare: "Share on WhatsApp",
     digestCopy: "Copy",
     digestCopied: "Copied.",
@@ -671,6 +675,11 @@ export const en = {
     unknownRequester: "Unknown user",
     finalCategoryLabel: "Final category",
     rejectReasonRequired: "A reason is required to reject",
+    siteFilterLabel: "Site",
+    siteFilterAll: "All sites",
+    siteOther: "Other",
+    expandAria: "Show full details",
+    collapseAria: "Hide details",
   },
 
   /** Raise-request screen (SM / TH / Driver). */
@@ -727,6 +736,12 @@ export const en = {
     deactivate: "Deactivate",
     deactivateConfirm: "Confirm?",
     deactivating: "Deactivating…",
+    activate: "Activate",
+    activateConfirm: "Confirm?",
+    activating: "Activating…",
+    resetPassword: "Reset password",
+    resetPasswordConfirm: "Confirm?",
+    resettingPassword: "Resetting…",
     activeYes: "Active",
     activeNo: "Inactive",
     crewPrefillNote: "This login joins your crew.",
@@ -1052,6 +1067,11 @@ export const en = {
     receivedLabel: "Received",
     spentLabel: "Spent",
     givenLabel: "Given",
+    hiddenPlaceholder: "•••••",
+    showAmounts: "Show amount",
+    hideAmounts: "Hide amount",
+    tapToShow: "Tap the eye to see your balance",
+    refreshAmounts: "Refresh",
 
     // Ledger screen
     title: "Money khata",
@@ -1231,6 +1251,12 @@ export const en = {
     personBack: "Back to people",
     personTotalsTitle: "Totals",
     personDaysTitle: "Day by day",
+    dayExpandAria: "Show this day's details",
+    dayCollapseAria: "Hide this day's details",
+    daySummaryProgress: "progress",
+    daySummaryExpense: "expense",
+    daySummaryRequest: "request",
+    daySummaryNone: "Nothing recorded",
   },
 };
 

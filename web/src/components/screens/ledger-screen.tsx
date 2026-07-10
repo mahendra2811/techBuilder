@@ -40,6 +40,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
+import { ShowMore } from '@/components/ui/show-more';
 import { DateField } from '@/components/entry/date-field';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
 
@@ -307,8 +308,13 @@ function TransfersHistory({ usersQ }: { usersQ: ReturnType<typeof useQuery<User[
         ) : !transfersQ.data || transfersQ.data.length === 0 ? (
           <EmptyState label={m.LEDGER_UI.historyEmpty} />
         ) : (
-          <ul className="divide-y">
-            {transfersQ.data.map((t) => (
+          <ShowMore
+            items={transfersQ.data}
+            initial={10}
+            as="ul"
+            className="divide-y"
+            testIdPrefix="cash-transfers-history"
+            renderItem={(t) => (
               <li key={t.id} className="grid gap-1 py-3 first:pt-0 last:pb-0" data-testid={`transfer-row-${t.id}`}>
                 <div className="flex items-baseline justify-between gap-3">
                   <p className="min-w-0 truncate text-sm font-medium">
@@ -322,8 +328,8 @@ function TransfersHistory({ usersQ }: { usersQ: ReturnType<typeof useQuery<User[
                   {t.note && <span className="min-w-0 truncate">· {t.note}</span>}
                 </p>
               </li>
-            ))}
-          </ul>
+            )}
+          />
         )}
       </CardContent>
     </Card>

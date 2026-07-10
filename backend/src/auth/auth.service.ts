@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { createHash, randomBytes } from 'node:crypto';
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { uuidv7 } from 'uuidv7';
 import * as schema from '@techbuilder/contracts/db/schema';
 import {
@@ -18,6 +18,8 @@ import {
 import { DbService, type Tx } from '../db/db.service';
 import { ApiException } from '../common/api-exception';
 import { loadEnv } from '../config/env';
+import { loadScope } from '../common/scope.util';
+import type { Principal } from '../common/current-user.decorator';
 import { hashPassword, verifyPassword } from './password';
 
 type Row = Record<string, unknown>;
@@ -97,13 +99,19 @@ export class AuthService {
   }
 
   /**
-   * WO-4: resolved tap-to-call panel for the calling user (worker/driver
-   * dashboards). Best-effort by design — a broken link (missing site/crew/SM/TH
-   * row) yields null members / an empty list, NEVER an error: a contacts footer
-   * must not break a dashboard.
+   * WO-4 (wave 2): resolved tap-to-call panel for the calling user — now mounted on
+   * ALL FIVE role dashboards (was worker/driver only). Best-effort by design — a
+   * broken link (missing site/crew/SM/TH row) yields null members / an empty list,
+   * NEVER an error: a contacts footer must not break a dashboard.
+   *
+   * SITE_MANAGER gets the UNION of emergency contacts across every site in their
+   * scope (`loadScope` — assigned + managed), deduped by phone; siteManager/teamHead
+   * stay null for them (an SM is never their own contact). Everyone else never sees
+   * themselves surfaced as their own siteManager/teamHead (self-filtered by id).
    */
-  async contacts(orgId: string, userId: string): Promise<ContactPanel> {
-    return this.dbs.runInTenant(orgId, async (tx) => {
+  async contacts(p: Principal): Promise<ContactPanel> {
+    return this.dbs.runInTenant(p.orgId, async (tx) => {
+      const ctx = await loadScope(tx, p);
       const loadUser = async (id: string) => {
         const [u] = await tx
           .select()
@@ -114,7 +122,22 @@ export class AuthService {
       const toPerson = (u: { name: string; phone: string | null } | undefined): ContactPerson | null =>
         u ? { name: u.name, phone: u.phone } : null;
 
-      const me = await loadUser(userId);
+      if (ctx.role === 'SITE_MANAGER') {
+        const sites = ctx.siteIds.length
+          ? await tx
+              .select()
+              .from(schema.sites)
+              .where(and(inArray(schema.sites.id, ctx.siteIds), isNull(schema.sites.deletedAt)))
+          : [];
+        const byPhone = new Map<string, EmergencyContact>();
+        for (const site of sites) {
+          const list = (site.emergencyContacts as EmergencyContact[] | null) ?? [];
+          for (const c of list) if (!byPhone.has(c.phone)) byPhone.set(c.phone, c);
+        }
+        return { siteManager: null, teamHead: null, emergency: [...byPhone.values()] };
+      }
+
+      const me = await loadUser(p.userId);
       if (!me) return { siteManager: null, teamHead: null, emergency: [] };
 
       let siteManager: ContactPerson | null = null;
@@ -126,7 +149,9 @@ export class AuthService {
           .where(and(eq(schema.sites.id, me.assignedSiteId), isNull(schema.sites.deletedAt)));
         if (site) {
           emergency = (site.emergencyContacts as EmergencyContact[] | null) ?? [];
-          if (site.siteManagerId) siteManager = toPerson(await loadUser(site.siteManagerId));
+          if (site.siteManagerId && site.siteManagerId !== p.userId) {
+            siteManager = toPerson(await loadUser(site.siteManagerId));
+          }
         }
       }
 
@@ -136,7 +161,7 @@ export class AuthService {
           .select()
           .from(schema.crews)
           .where(and(eq(schema.crews.id, me.crewId), isNull(schema.crews.deletedAt)));
-        if (crew) teamHead = toPerson(await loadUser(crew.teamHeadUserId));
+        if (crew && crew.teamHeadUserId !== p.userId) teamHead = toPerson(await loadUser(crew.teamHeadUserId));
       }
 
       return { siteManager, teamHead, emergency };

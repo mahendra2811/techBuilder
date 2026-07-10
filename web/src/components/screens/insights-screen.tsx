@@ -20,6 +20,7 @@ import { formatBusinessDateShort, todayKolkata } from '@/lib/business-date';
 import { useMessages } from '@/lib/i18n/locale-context';
 import { formatPaise } from '@/lib/money';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ShowMore } from '@/components/ui/show-more';
 import { SitePicker } from '@/components/entry/site-picker';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
 import { DatePresets, type DateRange } from '@/components/insights/date-presets';
@@ -200,8 +201,13 @@ function PeriodSection({
           {data.days.length === 0 ? (
             <EmptyState label={i.periodEmpty} />
           ) : (
-            <ul className="divide-y" data-testid="insights-day-list">
-              {data.days.map((d) => (
+            <ShowMore
+              items={data.days}
+              initial={10}
+              as="ul"
+              className="divide-y"
+              testIdPrefix="insights-day-list"
+              renderItem={(d) => (
                 <li key={d.businessDate}>
                   <button
                     type="button"
@@ -223,8 +229,8 @@ function PeriodSection({
                     <span className="shrink-0 font-medium tabular-nums">{formatPaise(d.totalExpensePaise)}</span>
                   </button>
                 </li>
-              ))}
-            </ul>
+              )}
+            />
           )}
         </CardContent>
       </Card>

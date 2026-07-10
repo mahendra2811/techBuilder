@@ -31,6 +31,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { ShowMore } from '@/components/ui/show-more';
 import { DateField } from '@/components/entry/date-field';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
 
@@ -268,8 +269,13 @@ function VendorDetail({ vendorId, vendorName, onBack }: { vendorId: UUID; vendor
                 {ledgerQ.data.months.length === 0 ? (
                   <EmptyState label={m.VENDOR_UI.monthsEmpty} />
                 ) : (
-                  <ul className="divide-y" data-testid="vendor-ledger-months">
-                    {ledgerQ.data.months.map((row) => (
+                  <ShowMore
+                    items={ledgerQ.data.months}
+                    initial={6}
+                    as="ul"
+                    className="divide-y"
+                    testIdPrefix="vendor-ledger-months"
+                    renderItem={(row) => (
                       <li key={row.month} className="flex items-center justify-between gap-3 py-2 text-sm first:pt-0 last:pb-0">
                         <span className="font-medium">{row.month}</span>
                         <span className="text-xs text-muted-foreground">
@@ -277,8 +283,8 @@ function VendorDetail({ vendorId, vendorName, onBack }: { vendorId: UUID; vendor
                           {formatPaise(row.paidPaise)}
                         </span>
                       </li>
-                    ))}
-                  </ul>
+                    )}
+                  />
                 )}
               </div>
             </>

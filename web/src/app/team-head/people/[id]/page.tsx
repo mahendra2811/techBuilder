@@ -2,5 +2,5 @@ import { PersonInsightsScreen } from '@/components/screens/person-insights-scree
 
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  return <PersonInsightsScreen userId={id} backHref="/team-head/people" />;
+  return <PersonInsightsScreen userId={id} backHref="/team-head/people" role="TEAM_HEAD" />;
 }
