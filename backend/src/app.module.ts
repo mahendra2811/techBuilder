@@ -21,6 +21,7 @@ import { VendorsModule } from './vendors/vendors.module';
 import { InsightsModule } from './insights/insights.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { MediaModule } from './media/media.module';
+import { ExportsModule } from './exports/exports.module';
 import { AllExceptionsFilter } from './common/all-exceptions.filter';
 import { TransformInterceptor } from './common/transform.interceptor';
 import { HealthController } from './health.controller';
@@ -49,6 +50,7 @@ import { HealthController } from './health.controller';
     DashboardsModule,
     ReconciliationModule,
     SyncModule,
+    ExportsModule,
   ],
   providers: [
     Reflector,

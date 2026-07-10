@@ -21,6 +21,8 @@ import type {
   IssueStatus,
   LeaveType,
   Locale,
+  MaterialTxnStatus,
+  MaterialTxnType,
   OrgConfig,
   PersonSkill,
   RecordType,
@@ -408,11 +410,9 @@ export const en = {
 
     // reports / Excel export
     reportsTitle: "Reports",
-    reportsSubtitle: "Download attendance and expenses as an Excel file.",
+    reportsSubtitle: "Pick a period and the sections you need, then download or email an Excel file.",
     reportsDownload: "Download Excel",
     reportsPreparing: "Fetching records…",
-    reportsPreviewAttendance: "Attendance rows",
-    reportsPreviewExpenses: "Expense rows",
     reportsFileLabel: "File",
     reportsDone: "Excel file downloaded.",
     sheetAttendance: "Attendance",
@@ -430,6 +430,141 @@ export const en = {
     colEnteredBy: "Entered by",
     colVoided: "Voided",
     exportYes: "YES",
+  },
+
+  /** Excel export v2 (/owner/reports, /site-manager/reports) — section picker,
+   *  the sheets not already covered by OWNER_UI's original two, and email delivery. */
+  EXPORT_UI: {
+    // window
+    windowToday: "Today",
+    window90d: "90 days",
+    windowCustom: "Custom",
+    customFrom: "From",
+    customTo: "To",
+
+    // section picker
+    sectionsTitle: "What to include",
+    sectionsHint: "Pick the sections you need — the file only includes what you tick.",
+    selectAll: "Select all",
+    clearAll: "Clear all",
+    groupMoney: "Money",
+    groupSite: "Site",
+    groupVehicles: "Vehicles",
+    groupOther: "Other",
+    sectionExpense: "Expenses",
+    sectionMoney: "Cash khata",
+    sectionVendor: "Vendors / udhaar",
+    sectionAttendance: "Attendance",
+    sectionProgress: "Progress notes",
+    sectionSiteSummary: "Site-wise summary",
+    sectionMaterial: "Materials",
+    sectionFleet: "Fleet (fuel, vehicle logs, trips)",
+    sectionIssue: "Issues / damage",
+    sectionPeople: "People directory",
+    rowsCountSuffix: "rows",
+
+    // summary sheet
+    sheetSummary: "Summary",
+    summaryOrg: "Organisation",
+    summaryPeriod: "Period",
+    summaryGeneratedAt: "Generated at",
+    summaryRequestedBy: "Requested by",
+    summaryColField: "Field",
+    summaryColValue: "Value",
+    summaryColRows: "Rows",
+    summaryColAmount: "Amount ₹",
+    totalsLabel: "Total",
+
+    // expense sheet — extra columns
+    colPaidVia: "Paid via",
+    colShop: "Shop",
+    colRemark: "Remark",
+
+    // cash khata
+    sheetCashTransfers: "Cash Transfers",
+    sheetBalanceSummary: "Balance Summary",
+    colFrom: "From",
+    colTo: "To",
+    colKind: "Type",
+    colNote: "Note",
+    colRole: "Role",
+    colBalance: "Balance ₹",
+
+    // vendors
+    sheetVendors: "Vendors",
+    sheetVendorMonths: "Vendor Months",
+    colVendorName: "Vendor",
+    colPhone: "Phone",
+    colMonth: "Month",
+
+    // progress
+    sheetProgress: "Progress",
+    colReportText: "Report",
+    colPhotoCount: "Photos",
+
+    // materials
+    sheetMaterial: "Materials",
+    colTxnType: "Transaction type",
+    colQty: "Qty",
+    colUom: "Unit",
+    colCounterpartSite: "Counterpart site",
+    materialTxnTypeLabels: {
+      IN: "Received (in)",
+      CONSUME: "Consumed",
+      DISPATCH: "Dispatched",
+      RECEIVE: "Received (transfer)",
+    } satisfies Record<MaterialTxnType, string>,
+    materialTxnStatusLabels: {
+      PENDING: "Pending",
+      CONFIRMED: "Confirmed",
+      MISMATCH: "Mismatch",
+    } satisfies Record<MaterialTxnStatus, string>,
+
+    // fleet
+    sheetFuel: "Fuel",
+    sheetVehicleLogs: "Vehicle Logs",
+    sheetTrips: "Trips",
+    colVehicle: "Vehicle",
+    colLitres: "Litres",
+    colReading: "Reading",
+    colDriver: "Driver",
+    colStartReading: "Start reading",
+    colEndReading: "End reading",
+    colHoursWorked: "Hours worked",
+    colLoads: "Loads",
+    colTripFrom: "From",
+    colTripTo: "To",
+    colPurpose: "Purpose",
+
+    // issues
+    sheetIssues: "Issues",
+    colSeverity: "Severity",
+    colDescription: "Description",
+
+    // site-wise summary
+    sheetSiteSummary: "Site Summary",
+    colHeadcount: "Marked",
+    colFuelAmount: "Fuel ₹",
+    colProgressNotes: "Progress notes",
+    colOpenIssues: "Open issues",
+
+    // people directory
+    sheetPeople: "People",
+    colName: "Name",
+    colSkill: "Skill",
+    colActive: "Active",
+
+    // delivery + email
+    deliveryTitle: "How should we send it?",
+    deliveryDownload: "Download now",
+    deliveryEmail: "Send to email",
+    emailLabel: "Email address",
+    emailInvalid: "Enter a valid email address.",
+    emailHintLongWindow: "This is a lot of data — sending it by email avoids waiting in the browser.",
+    emailSend: "Send",
+    emailSending: "Sending…",
+    emailAccepted: "Building your file — it will land in your email shortly.",
+    emailNotAvailable: "Email delivery isn't set up yet — download the file instead.",
   },
 
   /** Role dashboards (SM / TH / Driver / Worker homes). */

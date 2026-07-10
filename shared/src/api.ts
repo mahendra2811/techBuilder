@@ -101,6 +101,10 @@ export const ENDPOINTS = {
   insightsDay: { method: 'GET', path: '/insights/day' },
   insightsPeriod: { method: 'GET', path: '/insights/period' },
   insightsPerson: { method: 'GET', path: '/insights/person/:id' },
+
+  // Excel export v2 (frozen.6): section-picker download + server-built email delivery
+  exportConfig: { method: 'GET', path: '/exports/config' },
+  exportEmail: { method: 'POST', path: '/exports/email' },
 } as const satisfies Record<string, { method: 'GET' | 'POST' | 'PATCH' | 'DELETE'; path: string }>;
 
 export type EndpointKey = keyof typeof ENDPOINTS;

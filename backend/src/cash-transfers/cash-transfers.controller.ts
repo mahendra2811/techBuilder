@@ -34,8 +34,13 @@ export class CashTransfersController {
 
   // ENDPOINTS.cashTransfersList
   @Get()
-  list(@CurrentUser() u: Principal, @Query('limit') limit?: string) {
-    return this.cash.list(u, limit);
+  list(
+    @CurrentUser() u: Principal,
+    @Query('limit') limit?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.cash.list(u, { limit, from, to });
   }
 }
 

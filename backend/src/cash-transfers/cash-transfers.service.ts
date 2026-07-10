@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { and, desc, eq, inArray, isNull, or, sql, type SQL } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, isNull, lte, or, sql, type SQL } from 'drizzle-orm';
 import * as schema from '@techbuilder/contracts/db/schema';
 import type {
   CashTransfer,
@@ -126,10 +126,16 @@ export class CashTransfersService {
     });
   }
 
-  /** Transfers the caller may see: own (from/to) + (SM) any transfer touching a user at their site + (OWNER) all. */
-  async list(p: Principal, limitParam?: string): Promise<CashTransfer[]> {
-    // Bounded by default — this was the app's one truly unbounded lifetime-history read.
-    const limit = Math.min(Math.max(parseInt(limitParam ?? '', 10) || 100, 1), 200);
+  /**
+   * Transfers the caller may see: own (from/to) + (SM) any transfer touching a user at their
+   * site + (OWNER) all. Bounded by default — this was the app's one truly unbounded
+   * lifetime-history read. When `from`/`to` (businessDate range) are given — the Reports/export
+   * use case — the cap raises to cover a full export window instead of just recent activity.
+   */
+  async list(p: Principal, opts: { limit?: string; from?: string; to?: string } = {}): Promise<CashTransfer[]> {
+    const hasRange = !!opts.from && !!opts.to;
+    const maxCap = hasRange ? 5000 : 200;
+    const limit = Math.min(Math.max(parseInt(opts.limit ?? '', 10) || 100, 1), maxCap);
     return this.dbs.runInTenant(p.orgId, async (tx) => {
       const ctx = await loadScope(tx, p);
       let filter: SQL | undefined;
@@ -154,10 +160,13 @@ export class CashTransfersService {
           filter = own; // TH / DRIVER / WORKER see only their own transfers
         }
       }
+      const dateFilter = hasRange
+        ? and(gte(schema.cashTransfers.businessDate, opts.from as string), lte(schema.cashTransfers.businessDate, opts.to as string))
+        : undefined;
       const rows = await tx
         .select()
         .from(schema.cashTransfers)
-        .where(and(isNull(schema.cashTransfers.deletedAt), filter))
+        .where(and(isNull(schema.cashTransfers.deletedAt), filter, dateFilter))
         .orderBy(desc(schema.cashTransfers.createdAt))
         .limit(limit);
       return rows.map(mapCashTransfer);
