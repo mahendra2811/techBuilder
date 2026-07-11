@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.techbuilder.app",
+      "sha256_cert_fingerprints": [
+        "2B:95:D6:9D:DB:A3:77:8C:48:42:0E:E3:53:54:52:DF:BC:20:1A:38:80:42:6A:C9:BE:DE:0C:83:48:33:9B:26"
+      ]
+    }
+  }
+]
