@@ -1,5 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "buildCommand": "cd .. && npm run build --workspace=shared && cd web && next build"
+  "buildCommand": "cd .. && npm run build --workspace=shared && cd web && next build",
+  "regions": ["bom1"]
 }

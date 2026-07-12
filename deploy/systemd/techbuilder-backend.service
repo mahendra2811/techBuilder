@@ -1,0 +1,33 @@
+[Unit]
+Description=techBuilder NestJS backend
+After=network.target
+# If RDS is also reachable only after cloud-init/networking settles, this ordering is sufficient —
+# the app fails fast on an unreachable DB (Zod-validated env + Nest's own boot-time DB connection
+# attempt) and systemd's Restart=on-failure below retries automatically.
+
+[Service]
+Type=simple
+User=techbuilder
+Group=techbuilder
+WorkingDirectory=/opt/techbuilder/backend/current
+EnvironmentFile=/opt/techbuilder/backend/.env
+ExecStart=/usr/bin/node dist/main.js
+Restart=on-failure
+RestartSec=5
+# Phase 1: t4g.micro is 1GB total RAM, running only this one Node process + Caddy + OS — cap
+# leaves ~350-400MB for OS/Caddy so a runaway backend gets OOM-killed-and-restarted by systemd
+# instead of taking the whole box down via swap thrashing.
+# Phase 2 (resized to t4g.small, 2GB, two Node processes): raise this to ~768M.
+MemoryMax=650M
+# Give in-flight requests (e.g. an export workbook build) time to finish before SIGKILL.
+TimeoutStopSec=90
+
+# Hardening (safe defaults for a Node HTTP service — none of these restrict anything this app needs)
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/techbuilder/backend
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

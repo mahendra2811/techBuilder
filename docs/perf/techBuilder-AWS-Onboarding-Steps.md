@@ -1,3 +1,11 @@
+> **⚠️ SUPERSEDED (2026-07-11):** this doc's RDS setup (Part B) uses **public RDS access** and
+> bootstraps roles via a manually-exported `DATABASE_URL` swap — a deliberate dev-only shortcut.
+> For the actual production-track setup (RDS never public, EC2 from day one, the role/grant
+> sequence cleaned up and now matching a permanent `drizzle.config.ts` fix), use
+> `docs/deployment/AWS_SETUP_GUIDE.md` + `docs/deployment/DATABASE_MIGRATION.md` instead. This doc
+> is kept for reference (its SQL role-bootstrap block is still accurate) but do not follow Part B's
+> "Public access: Yes" step for anything beyond a quick local-only experiment.
+
 # AWS Onboarding — Step-by-Step (Phase 1: RDS in Mumbai)
 
 > Executes the plan in [`techBuilder-AWS-Testing-Setup-Plan.md`](techBuilder-AWS-Testing-Setup-Plan.md). Read that doc first for the *why* and the cost model. This doc is the *how* — exact console clicks + exact commands, grounded in this repo's actual scripts (`backend/package.json`, `shared/src/db/rls.sql`, `backend/sql/auth.sql`).

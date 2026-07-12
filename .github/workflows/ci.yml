@@ -1,0 +1,51 @@
+name: CI (lint, typecheck, test, build)
+
+# Runs on every push/PR. Does NOT deploy anything and does NOT need any secrets — safe to enable
+# immediately. Integration tests (which need a live Postgres with the `techbuilder_app`/`postgres`
+# role split) are intentionally excluded here; run `npm run test:integration` from `backend/`
+# manually against a real DB per docs/deployment/DATABASE_MIGRATION.md instead of wiring DB
+# credentials into this generic workflow.
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [main]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: 'npm'
+
+      - name: Install (workspace root)
+        run: npm ci --legacy-peer-deps
+
+      - name: Build shared contracts
+        run: npm run build --workspace=shared
+
+      - name: Typecheck shared
+        run: npm run typecheck --workspace=shared
+
+      - name: Typecheck backend
+        run: npm run typecheck --workspace=backend
+
+      - name: Unit tests (backend)
+        run: npm run test --workspace=backend
+
+      - name: Build backend
+        run: npm run build --workspace=backend
+
+      - name: Lint web
+        run: npm run lint --workspace=web
+
+      - name: Typecheck web
+        run: npm run typecheck --workspace=web
+
+      - name: Build web
+        run: npm run build --workspace=web

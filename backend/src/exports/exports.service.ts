@@ -157,6 +157,10 @@ export class ExportsService {
       port: env.SMTP_PORT ?? 587,
       secure: env.SMTP_PORT === 465,
       auth: { user: env.SMTP_USER, pass: env.SMTP_PASS },
+      // A hung SMTP connection would otherwise block this background job indefinitely.
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 20_000,
     });
     await transporter.sendMail({
       from: env.SMTP_FROM,

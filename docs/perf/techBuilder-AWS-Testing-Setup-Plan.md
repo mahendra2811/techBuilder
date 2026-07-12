@@ -1,3 +1,10 @@
+> **⚠️ SUPERSEDED (2026-07-11) for anything beyond a cheap RDS-only dev test:** see
+> `docs/deployment/ARCHITECTURE.md` for the full production-track plan (RDS never public, EC2 from
+> day one, proper role bootstrap order). This doc's RDS-only start/stop cost model is still valid
+> and referenced from `docs/deployment/COST_AND_SHUTDOWN_CHECKLIST.md` as a cheaper pre-EC2 option —
+> but its "Public access: Yes" RDS step is **not** what the production docs do; don't follow that
+> step if you're going straight to the full plan.
+
 # AWS Free-Tier Testing Setup — Plan (not yet built)
 
 > **Status: PLANNING ONLY.** Nothing in this doc has been provisioned. Written 2026-07-09 after the [Performance Report](techBuilder-Performance-Report.md) traced the app's slowness to Neon Postgres being in `us-east-1` while the user + backend are in India. This doc captures the AWS option the user is considering for **dev/testing use, before any merchant is onboarded** — budget matters now, won't matter once a merchant is paying.

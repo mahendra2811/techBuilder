@@ -1,0 +1,68 @@
+# techBuilder production reverse proxy — Caddy (automatic HTTPS via Let's Encrypt).
+# Copy to /etc/caddy/Caddyfile on the EC2 box. Replace the two domain placeholders.
+#
+# Phase 1: only the api.example.com block is live (frontend is on Vercel).
+# Phase 2: uncomment the app.example.com block once Next.js is deployed to this same box
+#          (see docs/deployment/PRODUCTION_DEPLOYMENT.md "Phase 2").
+
+api.example.com {
+	# Reasonable upload limit for JSON bodies + future media uploads once R2/S3 is wired.
+	request_body {
+		max_size 10MB
+	}
+
+	# Timeouts suited to a REST API, not a static site — long enough for the exports
+	# workbook-build path (backend/src/exports/), short enough to fail fast on a hung backend.
+	reverse_proxy localhost:4000 {
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+		transport http {
+			read_timeout 30s
+			write_timeout 30s
+			dial_timeout 5s
+		}
+	}
+
+	encode gzip zstd
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		# Never cache authenticated API responses at any intermediate layer.
+		Cache-Control "no-store"
+	}
+
+	log {
+		output file /var/log/caddy/api-access.log {
+			roll_size 50mb
+			roll_keep 7
+		}
+	}
+}
+
+# --- Phase 2: uncomment once the Next.js standalone server is deployed to this box ---
+# app.example.com {
+# 	reverse_proxy localhost:3000 {
+# 		header_up X-Real-IP {remote_host}
+# 		header_up X-Forwarded-For {remote_host}
+# 		header_up X-Forwarded-Proto {scheme}
+# 	}
+#
+# 	encode gzip zstd
+#
+# 	header {
+# 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+# 		X-Content-Type-Options "nosniff"
+# 		Referrer-Policy "strict-origin-when-cross-origin"
+# 	}
+#
+# 	log {
+# 		output file /var/log/caddy/app-access.log {
+# 			roll_size 50mb
+# 			roll_keep 7
+# 		}
+# 	}
+# }

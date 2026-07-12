@@ -1,0 +1,30 @@
+# Phase 2 only — enable once the Next.js frontend moves off Vercel onto this same EC2 box.
+# See docs/deployment/PRODUCTION_DEPLOYMENT.md "Phase 2".
+[Unit]
+Description=techBuilder Next.js web (standalone output)
+After=network.target techbuilder-backend.service
+
+[Service]
+Type=simple
+User=techbuilder
+Group=techbuilder
+WorkingDirectory=/opt/techbuilder/web/current
+EnvironmentFile=/opt/techbuilder/web/.env
+Environment=PORT=3000
+Environment=HOSTNAME=127.0.0.1
+# NOT "next start" — output:'standalone' explicitly requires the generated server.js entry point
+# (Next.js itself warns "next start" does not work with standalone output).
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=5
+MemoryMax=768M
+TimeoutStopSec=30
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/techbuilder/web
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,76 @@
+name: Deploy to EC2 (manual)
+
+# DISABLED BY DEFAULT in effect: this only runs when someone explicitly clicks "Run workflow" in
+# the Actions tab (workflow_dispatch) — it never triggers on push, and per the brief's own
+# instruction ("support manual deployment first, don't force CI/CD"), that's deliberate. It also
+# requires 4 repo secrets to be set (below) — with none set, `Run workflow` simply fails at the
+# SSH step rather than doing anything partial/unsafe.
+#
+# Required repo secrets (Settings -> Secrets and variables -> Actions):
+#   DEPLOY_SSH_HOST          e.g. ubuntu@203.0.113.10 or ubuntu@api.example.com
+#   DEPLOY_SSH_PRIVATE_KEY   the private key matching an authorized_keys entry on the EC2 box
+#   DEPLOY_API_ORIGIN        e.g. https://api.example.com   (origin only, no path)
+#   DEPLOY_WEB_ORIGIN        e.g. https://app.example.com   (origin only, no path — Phase 2 only)
+#
+# Only runs from `main` (branch protection should also require this, independent of the check below).
+
+on:
+  workflow_dispatch:
+    inputs:
+      app:
+        description: 'Which workspace to deploy'
+        required: true
+        type: choice
+        options: [backend, web]
+        default: backend
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: 'npm'
+
+      - name: Install
+        run: npm ci --legacy-peer-deps
+
+      - name: Set up SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          HOST_ONLY="${SSH_HOST#*@}"
+          ssh-keyscan -H "$HOST_ONLY" >> ~/.ssh/known_hosts 2>/dev/null
+          {
+            echo "Host deploy-target"
+            echo "  HostName $HOST_ONLY"
+            echo "  User ${SSH_HOST%@*}"
+            echo "  IdentityFile ~/.ssh/deploy_key"
+          } >> ~/.ssh/config
+
+      - name: Deploy
+        env:
+          APP_INPUT: ${{ inputs.app }}
+        run: ./scripts/deploy-backend.sh --app "$APP_INPUT" --host deploy-target
+
+      - name: Post-deploy verification
+        env:
+          API_ORIGIN: ${{ secrets.DEPLOY_API_ORIGIN }}
+          WEB_ORIGIN: ${{ secrets.DEPLOY_WEB_ORIGIN }}
+          APP_INPUT: ${{ inputs.app }}
+        run: |
+          if [ "$APP_INPUT" = "backend" ] && [ -n "${API_ORIGIN:-}" ]; then
+            ./scripts/verify-production.sh --api "$API_ORIGIN"
+          elif [ "$APP_INPUT" = "web" ] && [ -n "${WEB_ORIGIN:-}" ]; then
+            ./scripts/verify-production.sh --web "$WEB_ORIGIN"
+          else
+            echo "No matching origin secret set for '$APP_INPUT' — skipping (deploy script's own health check already ran)."
+          fi

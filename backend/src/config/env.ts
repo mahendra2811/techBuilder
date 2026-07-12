@@ -10,6 +10,10 @@ const EnvSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(16),
   ACCESS_TTL_SEC: z.coerce.number().default(900), // 15 min
   REFRESH_TTL_SEC: z.coerce.number().default(2_592_000), // 30 days
+  /** Comma-separated allowlist, e.g. "https://app.example.com,https://staging.example.com".
+   * Unset in production = block all cross-origin (fail closed). Unset outside production =
+   * default to localhost:3000 (the web dev server) so local dev needs no extra config. */
+  CORS_ORIGINS: z.string().optional(),
   // Cloudflare R2 (presigned uploads)
   R2_ACCOUNT_ID: z.string().optional(),
   R2_ACCESS_KEY_ID: z.string().optional(),
