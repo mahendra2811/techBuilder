@@ -1,16 +1,17 @@
 import { Injectable } from '@nestjs/common';
-import { and, desc, eq, inArray, isNull, or, type SQL } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, or, sql, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 import { uuidv7 } from 'uuidv7';
 import * as schema from '@techbuilder/contracts/db/schema';
 import { EXPENSE_CATEGORIES, PAYMENT_MODES } from '@techbuilder/contracts';
-import type { ApprovalRequest, SubmitRequestInput, DecideRequestInput, ApprovalStatus } from '@techbuilder/contracts';
+import type { ApprovalRequest, SubmitRequestInput, DecideRequestInput, ApprovalStatus, VerifyInput } from '@techbuilder/contracts';
 import { DbService, type Tx } from '../db/db.service';
 import { ApiException } from '../common/api-exception';
 import type { Principal } from '../common/current-user.decorator';
 import { forbidScope, inSet, loadScope, type ScopeContext } from '../common/scope.util';
 import { businessDateNow, daysBetween } from '../common/business-date';
 import { loadExpenseLimits, loadOrgConfig } from '../common/org-config.util';
+import { assertCanVerify, assertNotVerified, notifyMoneyFlagged, verificationSet } from '../common/verification.util';
 
 @Injectable()
 export class ApprovalsService {
@@ -79,8 +80,8 @@ export class ApprovalsService {
       if (existing.requestedBy === p.userId) {
         forbidScope('You cannot decide your own request');
       }
-      // WP-1/WP-2 scope: SM decides requests from users at their sites; TH only vehicle-switch
-      // requests from their own crew's users; Owner decides anything (org scope).
+      // Round 2 decider map: Owner anything · ACCOUNTANT money (own sites) · SM site (approval
+      // still awaits the accountant's tick) · SUPERVISOR nothing.
       await assertDecideScope(tx, ctx, existing.requestedBy, existing.type);
 
       const newStatus: ApprovalStatus = input.approve ? 'APPROVED' : 'REJECTED';
@@ -88,6 +89,11 @@ export class ApprovalsService {
       if (!input.approve && existing.type === 'EXPENSE_ADD' && !input.comment?.trim()) {
         throw new ApiException('VALIDATION_FAILED', 'A reason is required when rejecting', { comment: 'required' });
       }
+      // Round 2 two-tick: when the ACCOUNTANT (or the Owner, as override) approves, the approval
+      // and the verify tick land in one act — recorded distinctly. An SM approval stays unverified.
+      const decidesAndVerifies =
+        input.approve && existing.type === 'EXPENSE_ADD' && (ctx.role === 'ACCOUNTANT' || ctx.role === 'OWNER');
+      const verifyStamp = decidesAndVerifies ? { verifiedBy: p.userId, verifiedAt: new Date() } : {};
       const [updated] = await tx
         .update(schema.approvalRequests)
         .set({
@@ -96,6 +102,7 @@ export class ApprovalsService {
           decidedAt: new Date(),
           comment: input.comment ?? null,
           updatedBy: p.userId,
+          ...verifyStamp,
         })
         .where(eq(schema.approvalRequests.id, id))
         .returning();
@@ -104,7 +111,7 @@ export class ApprovalsService {
       // Client-plan v1: approving an EXPENSE_ADD materializes the booked expense (same tx —
       // request state and money never diverge). The decider's category choice wins.
       if (newStatus === 'APPROVED' && existing.type === 'EXPENSE_ADD') {
-        await materializeExpense(tx, existing, input.categoryOverride, p.userId);
+        await materializeExpense(tx, existing, input.categoryOverride, p.userId, verifyStamp);
       }
       // Tell the requester what happened (dashboard "my requests" + notifications list).
       await tx.insert(schema.notifications).values({
@@ -130,12 +137,70 @@ export class ApprovalsService {
       return rows.map(mapApprovalRequest);
     });
   }
+
+  /**
+   * Round 2 two-tick: the accountant's verdict on an APPROVED money request. ok=true stamps the
+   * verify tick on the request AND its materialized expense (same tx) — both become permanent.
+   * ok=false red-flags both (🚩 MONEY_FLAGGED → site SM + Owners; the Owner resolves).
+   */
+  async verifyRequest(p: Principal, id: string, input: VerifyInput): Promise<ApprovalRequest> {
+    return this.dbs.runInTenant(p.orgId, async (tx) => {
+      const ctx = await loadScope(tx, p);
+      const [existing] = await tx
+        .select()
+        .from(schema.approvalRequests)
+        .where(eq(schema.approvalRequests.id, id));
+      assertNotVerified(existing, 'Approval request');
+      const req = existing!;
+      if (req.type !== 'EXPENSE_ADD') {
+        throw new ApiException('VALIDATION_FAILED', 'Only money requests carry the verify tick');
+      }
+      if (req.status !== 'APPROVED') {
+        throw new ApiException('CONFLICT', 'Only an approved request can be verified — nothing moved yet');
+      }
+      const siteId = typeof (req.payload as Record<string, unknown>).siteId === 'string'
+        ? ((req.payload as Record<string, unknown>).siteId as string)
+        : null;
+      assertCanVerify(ctx, siteId);
+
+      const set = verificationSet(ctx, input);
+      const [updated] = await tx
+        .update(schema.approvalRequests)
+        .set(set)
+        .where(eq(schema.approvalRequests.id, id))
+        .returning();
+      if (!updated) throw new ApiException('NOT_FOUND', 'Approval request not found');
+      // Mirror the verdict onto the booked expense (expense.id = request.id).
+      await tx.update(schema.expenses).set(set).where(eq(schema.expenses.id, id));
+
+      if (!input.ok) {
+        await notifyMoneyFlagged(tx, req.orgId, siteId, {
+          kind: 'request',
+          requestId: req.id,
+          flagNote: input.flagNote,
+          requestedBy: req.requestedBy,
+        });
+      }
+      return mapApprovalRequest(updated);
+    });
+  }
 }
 
 /** Requests visible to the caller: own requests + requests from users inside their scope. */
 function listScopeFilter(tx: Tx, ctx: ScopeContext): SQL | undefined {
   if (ctx.role === 'OWNER') return undefined;
   const own = eq(schema.approvalRequests.requestedBy, ctx.userId) as SQL;
+  if (ctx.role === 'ACCOUNTANT') {
+    // Round 2: the money desk sees his sites' EXPENSE_ADD requests (payload.siteId is
+    // server-derived at submit) — his own requests too, though he can never self-decide.
+    return or(
+      own,
+      and(
+        eq(schema.approvalRequests.type, 'EXPENSE_ADD'),
+        inArray(sql`(${schema.approvalRequests.payload} ->> 'siteId')`, ctx.siteIds.length ? ctx.siteIds : ['-']),
+      ),
+    ) as SQL;
+  }
   if (ctx.role === 'SITE_MANAGER') {
     const siteUsers = tx
       .select({ id: schema.users.id })
@@ -143,7 +208,7 @@ function listScopeFilter(tx: Tx, ctx: ScopeContext): SQL | undefined {
       .where(and(isNull(schema.users.deletedAt), inSet(schema.users.assignedSiteId, ctx.siteIds)));
     return or(own, inArray(schema.approvalRequests.requestedBy, siteUsers)) as SQL;
   }
-  if (ctx.role === 'TEAM_HEAD') {
+  if (ctx.role === 'SUPERVISOR') {
     const crewUsers = tx
       .select({ id: schema.users.id })
       .from(schema.users)
@@ -153,40 +218,47 @@ function listScopeFilter(tx: Tx, ctx: ScopeContext): SQL | undefined {
   return own; // DRIVER / WORKER see only their own requests
 }
 
+/**
+ * Round 2 decider map. OWNER: anything. SUPERVISOR: NOTHING — zero deciding authority (client
+ * explicit; vehicle-switch requests now go to the SM). Money (EXPENSE_ADD): the site's
+ * ACCOUNTANT is the routine decider; the SM may also approve (site scope) but his approval
+ * still awaits the accountant's verify tick. Non-money types: SM only, site scope.
+ */
 async function assertDecideScope(tx: Tx, ctx: ScopeContext, requestedBy: string, type: string): Promise<void> {
   if (ctx.role === 'OWNER') return;
+  if (ctx.role === 'SUPERVISOR') forbidScope('Supervisors do not decide requests');
+  if (ctx.role === 'ACCOUNTANT' && type !== 'EXPENSE_ADD') {
+    forbidScope('The accountant decides money requests only');
+  }
+  if (ctx.role !== 'SITE_MANAGER' && ctx.role !== 'ACCOUNTANT') {
+    forbidScope(`Role ${ctx.role} cannot decide requests`);
+  }
+  // SM / ACCOUNTANT: the requester must belong to one of the caller's sites.
+  const requesterSites = await requesterSiteIds(tx, requestedBy);
+  if (!requesterSites.some((s) => ctx.siteIds.includes(s))) {
+    forbidScope('Request is outside your site scope');
+  }
+}
+
+/** The sites a requester belongs to: assignedSiteId, or (drivers) their vehicles' sites. */
+async function requesterSiteIds(tx: Tx, userId: string): Promise<string[]> {
   const [requester] = await tx
     .select({
       assignedSiteId: schema.users.assignedSiteId,
-      crewId: schema.users.crewId,
       personId: schema.users.personId,
     })
     .from(schema.users)
-    .where(eq(schema.users.id, requestedBy));
+    .where(eq(schema.users.id, userId));
   if (!requester) forbidScope('Requester not found in your scope');
-
-  if (ctx.role === 'SITE_MANAGER') {
-    if (requester.assignedSiteId && ctx.siteIds.includes(requester.assignedSiteId)) return;
-    // Drivers usually carry no assignedSiteId — their site comes from their vehicle assignment.
-    if (requester.personId) {
-      const vehicleSites = await tx
-        .select({ siteId: schema.vehicles.assignedSiteId })
-        .from(schema.vehicles)
-        .where(and(isNull(schema.vehicles.deletedAt), eq(schema.vehicles.assignedDriverPersonId, requester.personId)));
-      if (vehicleSites.some((v) => v.siteId && ctx.siteIds.includes(v.siteId))) return;
-    }
-    forbidScope('Request is outside your site scope');
+  const sites: string[] = requester.assignedSiteId ? [requester.assignedSiteId] : [];
+  if (requester.personId) {
+    const vehicleSites = await tx
+      .select({ siteId: schema.vehicles.assignedSiteId })
+      .from(schema.vehicles)
+      .where(and(isNull(schema.vehicles.deletedAt), eq(schema.vehicles.assignedDriverPersonId, requester.personId)));
+    vehicleSites.forEach((v) => v.siteId && sites.push(v.siteId));
   }
-  if (ctx.role === 'TEAM_HEAD') {
-    // Client-plan v1: TH decides vehicle-switch AND expense requests, crew-scoped. Drivers are
-    // site-level (no crewId) so their requests naturally route past the TH to the SM.
-    if (type !== 'VEHICLE_SWITCH' && type !== 'EXPENSE_ADD') {
-      forbidScope('Team heads may only decide vehicle-switch and expense requests');
-    }
-    if (requester.crewId && ctx.crewIds.includes(requester.crewId)) return;
-    forbidScope('Request is outside your crew scope');
-  }
-  forbidScope(`Role ${ctx.role} cannot decide requests`);
+  return [...new Set(sites)];
 }
 
 // ---- EXPENSE_ADD (client-plan v1): payload validation · materialization · notifications ----
@@ -249,7 +321,7 @@ async function validateExpenseAddPayload(
     if (pl.amountPaise > limits.requestCapPaise) {
       throw new ApiException(
         'VALIDATION_FAILED',
-        'Amount is over your request limit — ask your Team Head / Site Manager',
+        'Amount is over your request limit — ask your Supervisor / Site Manager',
         { amountPaise: 'OVER_REQUEST_CAP' },
       );
     }
@@ -258,12 +330,14 @@ async function validateExpenseAddPayload(
 }
 
 /** APPROVED EXPENSE_ADD → booked `expenses` row. expense.id = request.id (1:1, idempotent,
- *  traceable); enteredBy = the requester (the spender — the ledger debits HIS khata). */
+ *  traceable); enteredBy = the requester (the spender — the ledger debits HIS khata).
+ *  Round 2: carries the decider's verify stamp when the accountant/Owner decided (two-tick). */
 async function materializeExpense(
   tx: Tx,
   req: typeof schema.approvalRequests.$inferSelect,
   categoryOverride: DecideRequestInput['categoryOverride'],
   deciderId: string,
+  verifyStamp: { verifiedBy?: string; verifiedAt?: Date } = {},
 ): Promise<void> {
   const parsed = ExpenseAddPayloadSchema.extend({ siteId: z.string().uuid() }).safeParse(req.payload);
   if (!parsed.success) {
@@ -288,11 +362,14 @@ async function materializeExpense(
       void: false,
       createdBy: deciderId,
       updatedBy: deciderId,
+      ...verifyStamp,
     })
     .onConflictDoNothing();
 }
 
-/** Best-effort submit notifications: the site's SM + (for workers) the crew's TH. */
+/** Round 2 submit notifications: the site's ACCOUNTANT (routine decider) + the site's SM
+ *  (visibility) + the requester's crew SUPERVISOR (visibility). No accountant on the site →
+ *  every Owner is told instead (the Owner can always decide). */
 async function notifyExpenseRequested(
   tx: Tx,
   orgId: string,
@@ -302,21 +379,33 @@ async function notifyExpenseRequested(
 ): Promise<void> {
   const siteId = typeof payload.siteId === 'string' ? payload.siteId : null;
   const targets = new Set<string>();
+  let accountant: string | null = null;
   if (siteId) {
     const [site] = await tx
-      .select({ sm: schema.sites.siteManagerId })
+      .select({ sm: schema.sites.siteManagerId, acc: schema.sites.accountantId })
       .from(schema.sites)
       .where(and(eq(schema.sites.id, siteId), isNull(schema.sites.deletedAt)));
     if (site?.sm && site.sm !== ctx.userId) targets.add(site.sm);
+    if (site?.acc && site.acc !== ctx.userId) {
+      accountant = site.acc;
+      targets.add(site.acc);
+    }
   }
-  if (ctx.role === 'WORKER') {
+  if (!accountant) {
+    const owners = await tx
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .where(and(isNull(schema.users.deletedAt), eq(schema.users.role, 'OWNER'), eq(schema.users.active, true)));
+    owners.forEach((o) => o.id !== ctx.userId && targets.add(o.id));
+  }
+  if (ctx.role === 'WORKER' || ctx.role === 'DRIVER') {
     const [u] = await tx.select({ crewId: schema.users.crewId }).from(schema.users).where(eq(schema.users.id, ctx.userId));
     if (u?.crewId) {
       const [crew] = await tx
-        .select({ th: schema.crews.teamHeadUserId })
+        .select({ sup: schema.crews.supervisorUserId })
         .from(schema.crews)
         .where(and(eq(schema.crews.id, u.crewId), isNull(schema.crews.deletedAt)));
-      if (crew?.th && crew.th !== ctx.userId) targets.add(crew.th);
+      if (crew?.sup && crew.sup !== ctx.userId) targets.add(crew.sup);
     }
   }
   if (!targets.size) return;
@@ -348,5 +437,10 @@ function mapApprovalRequest(r: typeof schema.approvalRequests.$inferSelect): App
     updatedBy: r.updatedBy ?? r.id,
     deletedAt: r.deletedAt ? r.deletedAt.toISOString() : null,
     version: r.version,
+    // Round-2 two-tick rule: the accountant's verify tick (verifyRequest / decide-by-accountant).
+    verifiedBy: r.verifiedBy ?? null,
+    verifiedAt: r.verifiedAt ? r.verifiedAt.toISOString() : null,
+    flagged: r.flagged,
+    flagNote: r.flagNote ?? null,
   };
 }

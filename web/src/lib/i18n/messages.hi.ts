@@ -69,9 +69,10 @@ export const hi: Messages = {
   ROLE_LABELS: {
     OWNER: "मालिक",
     SITE_MANAGER: "साइट मैनेजर",
-    TEAM_HEAD: "टीम हेड",
+    SUPERVISOR: "सुपरवाइज़र",
     DRIVER: "ड्राइवर",
     WORKER: "मज़दूर",
+    ACCOUNTANT: "अकाउंटेंट",
   },
 
   NAV_LABELS: {
@@ -92,6 +93,10 @@ export const hi: Messages = {
     ledger: "खाता",
     insights: "दिन का हिसाब",
     settings: "सेटिंग",
+    // Round 2 (frozen.8):
+    materials: "सामग्री",
+    diesel: "डीज़ल",
+    complaints: "शिकायत",
   },
 
   ATTENDANCE_STATUS_LABELS: {
@@ -520,7 +525,7 @@ export const hi: Messages = {
     smTitle: "साइट डैशबोर्ड",
     smSubtitle: "आपकी साइटों का हाल एक नज़र में।",
 
-    // Team-head dashboard
+    // Supervisor dashboard
     thCrewTitle: "आज की हाज़िरी",
     thCrewSubtitle: "आपकी टीम का आज का हाल।",
     thOnSiteLabel: "आज साइट पर (हाज़िर + आधा दिन)",
@@ -540,7 +545,7 @@ export const hi: Messages = {
     workerAttTitle: "मेरी हाज़िरी",
     workerAttSubtitle: "इस महीने की, दिन-ब-दिन।",
     workerAttEmpty: "इस महीने अभी कोई हाज़िरी नहीं लगी।",
-    workerViewOnly: "सिर्फ़ देखने के लिए — हाज़िरी आपके टीम हेड लगाते हैं।",
+    workerViewOnly: "सिर्फ़ देखने के लिए — हाज़िरी आपके सुपरवाइज़र लगाते हैं।",
   },
 
   DRIVER_DAY_UI: {
@@ -581,7 +586,7 @@ export const hi: Messages = {
     people: "लोग",
     emergency: "इमरजेंसी",
     siteManager: "साइट मैनेजर",
-    teamHead: "टीम हेड",
+    supervisor: "सुपरवाइज़र",
     KIND_LABELS: {
       POLICE: "पुलिस",
       AMBULANCE: "एम्बुलेंस",
@@ -682,7 +687,7 @@ export const hi: Messages = {
     activeNo: "बंद",
     crewPrefillNote: "यह लॉगिन आपकी टीम में जुड़ेगा।",
     noCrewNote:
-      "टीम हेड की टीम अलग से बनती है — यहाँ आप सिर्फ़ उनकी साइट चुनें।",
+      "सुपरवाइज़र की टीम अलग से बनती है — यहाँ आप सिर्फ़ उनकी साइट चुनें।",
     noCrewWarning:
       "आपके खाते में कोई टीम नहीं जुड़ी है, इसलिए आप अभी लॉगिन नहीं बना सकते।",
     createPersonTitle: "मज़दूर जोड़ें (मज़दूर लिस्ट)",
@@ -807,12 +812,12 @@ export const hi: Messages = {
 
   EXPENSE_REQUEST_UI: {
     title: "नया खर्च रिक्वेस्ट",
-    subtitle: "अपने टीम हेड / साइट मैनेजर से खर्च जोड़ने के लिए कहें।",
+    subtitle: "अपने सुपरवाइज़र / साइट मैनेजर से खर्च जोड़ने के लिए कहें।",
     noSite: "आपके अकाउंट पर अभी कोई साइट सेट नहीं है।",
     amountLabel: "राशि (₹)",
     amountInvalid: "0 से ज़्यादा राशि डालें।",
     amountOverCapPrefix: "यह आपकी लिमिट",
-    amountOverCapSuffix: "से ज़्यादा है — अपने टीम हेड / साइट मैनेजर से सीधे एंट्री करने के लिए कहें।",
+    amountOverCapSuffix: "से ज़्यादा है — अपने सुपरवाइज़र / साइट मैनेजर से सीधे एंट्री करने के लिए कहें।",
     dateLabel: "तारीख",
     dateToday: "आज",
     dateYesterday: "कल",
@@ -840,9 +845,9 @@ export const hi: Messages = {
     noSite: "अभी आपके अकाउंट पर कोई साइट सेट नहीं है।",
 
     limitsTitle: "लिमिट",
-    limitsSubtitle: "वो रकम जो आपके वर्कर/ड्राइवर और टीम हेड सीधे डाल सकते हैं।",
+    limitsSubtitle: "वो रकम जो आपके वर्कर/ड्राइवर और सुपरवाइज़र सीधे डाल सकते हैं।",
     requestCapLabel: "वर्कर / ड्राइवर रिक्वेस्ट लिमिट (₹)",
-    thLimitLabel: "टीम हेड की पर-एंट्री लिमिट (₹)",
+    thLimitLabel: "सुपरवाइज़र की पर-एंट्री लिमिट (₹)",
     smLimitLabel: "आपकी (साइट मैनेजर) पर-एंट्री लिमिट (₹)",
     smLimitReadOnlyNote: "यह मालिक तय करते हैं — आप इसे नहीं बदल सकते।",
     effectivePrefix: "अभी:",

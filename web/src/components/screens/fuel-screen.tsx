@@ -16,12 +16,12 @@ import { Truck } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { uuidv7 } from 'uuidv7';
-import type { BusinessDate, CreateFuelLogInput, FuelLog, UUID, Vehicle } from '@techbuilder/contracts';
+import type { BusinessDate, CreateFuelLogInput, FuelLog, MaterialTxnStatus, UUID, Vehicle } from '@techbuilder/contracts';
 import { ApiClientError, api } from '@/lib/api-client';
 import { addDays, minEntryDate, todayKolkata } from '@/lib/business-date';
 import { uploadPhoto } from '@/lib/media-upload';
 import { apiErrorMessage, type Messages } from '@/lib/i18n/messages';
-import { useMessages } from '@/lib/i18n/locale-context';
+import { useLocale, useMessages } from '@/lib/i18n/locale-context';
 import { formatPaise, rupeesToPaise } from '@/lib/money';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,8 +31,46 @@ import { NativeSelect } from '@/components/ui/native-select';
 import { Separator } from '@/components/ui/separator';
 import { DateField } from '@/components/entry/date-field';
 import { PhotoField } from '@/components/entry/photo-field';
-import { RecentEntries } from '@/components/entry/recent-entries';
+import { RecentEntries, type RecentRow } from '@/components/entry/recent-entries';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
+
+/**
+ * CW-5 (Round 2): the driver's fuel entry IS the received side of the diesel
+ * double-check (the supervisor's issuance is the other side — see
+ * diesel-screen.tsx). DRIVER only gets the "received" framing + a match-status
+ * badge on the recent list; SITE_MANAGER copy/behaviour is untouched (still
+ * the shared ENTRY_UI catalog strings) since an SM logging their own vehicle's
+ * fuel isn't part of this double-check.
+ */
+const DRIVER_FUEL_UI = {
+  en: {
+    title: 'How much diesel did you receive today?',
+    subtitle: "Enter what the vehicle actually got — we'll match it against the supervisor's issue.",
+    statusPending: 'awaiting match',
+    statusConfirmed: 'confirmed',
+    statusMismatch: 'mismatch',
+  },
+  hi: {
+    title: 'आज कितना डीज़ल मिला?',
+    subtitle: 'गाड़ी को असल में जो डीज़ल मिला वह दर्ज करें — हम इसे सुपरवाइज़र की एंट्री से मिलाएँगे।',
+    statusPending: 'मिलान बाकी',
+    statusConfirmed: 'मिलान हो गया',
+    statusMismatch: 'बेमेल',
+  },
+} as const;
+
+// Widened to plain `string` per key — `DRIVER_FUEL_UI[locale]` is a union of the
+// `en`/`hi` literal-string objects, and only the widened form is assignable from both.
+type DriverFuelUi = Record<keyof (typeof DRIVER_FUEL_UI)['en'], string>;
+
+function fuelStatusBadge(
+  status: MaterialTxnStatus,
+  ui: DriverFuelUi,
+): { label: string; tone: 'success' | 'warning' | 'error' } {
+  if (status === 'CONFIRMED') return { label: `✓ ${ui.statusConfirmed}`, tone: 'success' };
+  if (status === 'MISMATCH') return { label: `🚩 ${ui.statusMismatch}`, tone: 'error' };
+  return { label: ui.statusPending, tone: 'warning' };
+}
 
 // Local FORM schema only (UX); the DTO comes from the frozen contracts.
 // Built per-locale (messages).
@@ -55,6 +93,8 @@ type FuelForm = z.infer<ReturnType<typeof makeFuelFormSchema>>;
 
 export function FuelScreen({ role = 'DRIVER' }: { role?: 'DRIVER' | 'SITE_MANAGER' }) {
   const m = useMessages();
+  const locale = useLocale();
+  const driverUi = DRIVER_FUEL_UI[locale];
   const queryClient = useQueryClient();
   const today = useMemo(() => todayKolkata(), []);
   const [date, setDate] = useState<BusinessDate>(today);
@@ -135,8 +175,8 @@ export function FuelScreen({ role = 'DRIVER' }: { role?: 'DRIVER' | 'SITE_MANAGE
     <div className="grid gap-4" data-testid="fuel-screen">
       <Card>
         <CardHeader>
-          <CardTitle>{m.ENTRY_UI.fuelTitle}</CardTitle>
-          <CardDescription>{m.ENTRY_UI.fuelSubtitle}</CardDescription>
+          <CardTitle>{role === 'DRIVER' ? driverUi.title : m.ENTRY_UI.fuelTitle}</CardTitle>
+          <CardDescription>{role === 'DRIVER' ? driverUi.subtitle : m.ENTRY_UI.fuelSubtitle}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
           <div className="grid gap-2">
@@ -275,12 +315,15 @@ export function FuelScreen({ role = 'DRIVER' }: { role?: 'DRIVER' | 'SITE_MANAGE
             isLoading={recentQ.isPending}
             error={recentQ.error}
             onRetry={() => void recentQ.refetch()}
-            rows={recentQ.data?.map((f) => ({
-              id: f.id,
-              primary: regNoOf(f.vehicleId) || `${f.litres} L`,
-              secondary: formatPaise(f.amountPaise),
-              tertiary: `${f.businessDate} · ${f.litres} L · ${f.reading}`,
-            }))}
+            rows={recentQ.data?.map(
+              (f): RecentRow => ({
+                id: f.id,
+                primary: regNoOf(f.vehicleId) || `${f.litres} L`,
+                secondary: formatPaise(f.amountPaise),
+                tertiary: `${f.businessDate} · ${f.litres} L · ${f.reading}`,
+                badge: role === 'DRIVER' ? fuelStatusBadge(f.status, driverUi) : undefined,
+              }),
+            )}
           />
         </CardContent>
       </Card>

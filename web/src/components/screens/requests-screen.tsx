@@ -38,13 +38,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
 import { PayloadSummary, RequestStatusBadge } from '@/components/requests/request-bits';
 
-type SubmitRole = 'SITE_MANAGER' | 'TEAM_HEAD' | 'DRIVER';
+type SubmitRole = 'SITE_MANAGER' | 'SUPERVISOR' | 'DRIVER';
 
 const TYPES_FOR: Record<SubmitRole, ApprovalType[]> = {
   DRIVER: ['VEHICLE_SWITCH'],
   // Phase-scoping 2026-07: LEAVE & MATERIAL are manual for now (see docs/techBuilder-Build-WorkOrders.md WO-1)
   SITE_MANAGER: ['VEHICLE_SWITCH'], // ['LEAVE', 'MATERIAL', 'VEHICLE_SWITCH'],
-  TEAM_HEAD: ['VEHICLE_SWITCH'], // ['LEAVE', 'MATERIAL', 'VEHICLE_SWITCH'],
+  SUPERVISOR: ['VEHICLE_SWITCH'], // ['LEAVE', 'MATERIAL', 'VEHICLE_SWITCH'],
 };
 
 export function RequestsScreen({ role }: { role: SubmitRole }) {

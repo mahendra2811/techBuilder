@@ -3,14 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>techBuilder — App Plan for Your Company</title>
+<title>techBuilder — App Plan v2 · Supervisor + Accountant</title>
 <style>
   :root{
     --bg:#F8F6F1; --card:#FFFFFF; --soft:#F0EDE5; --ink:#25282C; --muted:#6C6F75; --line:#E3E0D7;
     --accent:#C05E1A;
     --worker:#0E8A7B;  --worker-bg:#E3F2EF;
     --driver:#A66F14;  --driver-bg:#F6EEDC;
-    --th:#7457C0;      --th-bg:#EDE8F9;
+    --sup:#7457C0;     --sup-bg:#EDE8F9;
+    --acct:#1F7A3D;    --acct-bg:#E4F1E8;
     --sm:#2563B0;      --sm-bg:#E5EEF9;
     --owner:#B0355A;   --owner-bg:#F8E7ED;
     --ok:#2E7D46; --ok-bg:#E4F1E8; --no:#B93A3A; --no-bg:#F8E8E8;
@@ -22,7 +23,8 @@
       --accent:#E08A45;
       --worker:#3FBFAE; --worker-bg:#15302C;
       --driver:#D9A544; --driver-bg:#332A10;
-      --th:#A88FE8; --th-bg:#292139;
+      --sup:#A88FE8; --sup-bg:#292139;
+      --acct:#58B978; --acct-bg:#1E3226;
       --sm:#6FA3E0; --sm-bg:#19283A;
       --owner:#E0708F; --owner-bg:#371C25;
       --ok:#5FBE7F; --ok-bg:#1E3226; --no:#E07070; --no-bg:#3A2424;
@@ -31,13 +33,13 @@
   *{box-sizing:border-box}
   html{scroll-behavior:smooth}
   body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 system-ui,-apple-system,'Segoe UI',Roboto,'Noto Sans',sans-serif;-webkit-font-smoothing:antialiased}
-  .wrap{max-width:880px;margin:0 auto;padding:0 18px}
+  .wrap{max-width:920px;margin:0 auto;padding:0 18px}
   a{color:inherit}
 
   header{padding:36px 0 22px;border-bottom:3px solid var(--ink)}
   .eyebrow{font:700 11px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
   h1{font-size:clamp(26px,5vw,36px);line-height:1.12;margin:10px 0 10px;letter-spacing:-.01em;font-weight:800}
-  .lead{color:var(--muted);font-size:17px;max-width:62ch;margin:0}
+  .lead{color:var(--muted);font-size:17px;max-width:64ch;margin:0}
 
   .howbox{background:var(--card);border:2px solid var(--accent);border-radius:12px;padding:16px 18px;margin:22px 0}
   .howbox b{color:var(--accent)}
@@ -56,69 +58,77 @@
   h2.sec small{display:block;font-size:14px;font-weight:600;color:var(--muted);margin-top:2px}
   .secline{height:5px;border-radius:3px;margin:10px 0 20px;background:var(--line)}
   #worker .secline{background:var(--worker)} #driver .secline{background:var(--driver)}
-  #teamhead .secline{background:var(--th)} #sitemanager .secline{background:var(--sm)} #owner .secline{background:var(--owner)}
+  #supervisor .secline{background:var(--sup)} #accountant .secline{background:var(--acct)}
+  #sitemanager .secline{background:var(--sm)} #owner .secline{background:var(--owner)}
 
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin:0 0 16px}
   .card h3{margin:0 0 6px;font-size:18px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-  .card p{margin:6px 0;max-width:70ch}
+  .card p{margin:6px 0;max-width:74ch}
   .card p.dim{color:var(--muted)}
 
   .pt{display:inline-block;font:800 12px/1 var(--mono);letter-spacing:.05em;color:#fff;border-radius:7px;padding:6px 9px;background:var(--muted)}
-  .pt.w{background:var(--worker)} .pt.d{background:var(--driver)} .pt.t{background:var(--th)}
-  .pt.s{background:var(--sm)} .pt.o{background:var(--owner)} .pt.n{background:var(--no)} .pt.g{background:var(--ok)}
+  .pt.w{background:var(--worker)} .pt.d{background:var(--driver)} .pt.t{background:var(--sup)}
+  .pt.a{background:var(--acct)} .pt.s{background:var(--sm)} .pt.o{background:var(--owner)}
+  .pt.n{background:var(--no)} .pt.g{background:var(--ok)} .pt.q{background:var(--accent)}
+
+  .badge{display:inline-block;font:800 10.5px/1 var(--mono);letter-spacing:.08em;border-radius:6px;padding:5px 8px}
+  .badge.new{color:#fff;background:var(--accent)}
+  .badge.chg{color:var(--sm);background:var(--sm-bg);border:1.5px solid var(--sm)}
+  .badge.same{color:var(--muted);background:var(--soft)}
 
   /* role intro cards */
-  .roles{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin:14px 0}
+  .roles{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin:14px 0}
   .rolecard{border-radius:12px;padding:14px 16px;border:1px solid var(--line)}
-  .rolecard h4{margin:0 0 4px;font-size:16.5px}
+  .rolecard h4{margin:0 0 4px;font-size:16.5px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .rolecard p{margin:0;font-size:14px;color:var(--muted)}
   .rc-w{background:var(--worker-bg);border-left:5px solid var(--worker)}
   .rc-d{background:var(--driver-bg);border-left:5px solid var(--driver)}
-  .rc-t{background:var(--th-bg);border-left:5px solid var(--th)}
+  .rc-t{background:var(--sup-bg);border-left:5px solid var(--sup)}
+  .rc-a{background:var(--acct-bg);border-left:5px solid var(--acct)}
   .rc-s{background:var(--sm-bg);border-left:5px solid var(--sm)}
   .rc-o{background:var(--owner-bg);border-left:5px solid var(--owner)}
 
-  /* who-sees strip */
-  .who{display:flex;flex-wrap:wrap;gap:7px;margin:12px 0 2px;padding:12px;background:var(--soft);border-radius:10px}
-  .who .lbl{flex-basis:100%;font:700 10.5px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:2px}
-  .wc{font:700 12px/1.3 var(--mono);padding:7px 10px;border-radius:7px;color:#fff}
-  .wc small{display:block;font-weight:600;font-size:10px;opacity:.9;margin-top:2px}
-  .wc.w{background:var(--worker)} .wc.d{background:var(--driver)} .wc.t{background:var(--th)}
-  .wc.s{background:var(--sm)} .wc.o{background:var(--owner)}
-  .wc.off{background:transparent;color:var(--muted);border:1.5px dashed var(--line);opacity:.75}
-
-  /* form fields */
-  .form{margin:12px 0 4px;border:1.5px solid var(--line);border-radius:10px;overflow:hidden}
-  .form .fh{font:700 11px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;padding:10px 14px;background:var(--soft);color:var(--muted)}
-  .frow{display:flex;gap:12px;padding:11px 14px;border-top:1px solid var(--line);align-items:baseline}
-  .frow .n{font:800 12px/1.6 var(--mono);color:var(--muted);min-width:18px}
-  .frow .fx{flex:1}
-  .frow b{display:block;font-size:15px}
-  .frow span{display:block;font-size:13.5px;color:var(--muted);margin-top:1px}
-  .frow .must{color:var(--no);font-weight:700}
-  .frow .auto{color:var(--ok);font-weight:700}
-
-  /* flow boxes */
+  /* flow diagram boxes */
   .flow{display:flex;flex-direction:column;margin:14px 0}
   .fb{border:2px solid var(--line);background:var(--card);border-radius:10px;padding:12px 15px;font-size:15px}
   .fb b{font-weight:800}
   .fb small{display:block;color:var(--muted);margin-top:2px;font-size:13px}
   .fb.w{border-color:var(--worker);background:var(--worker-bg)}
   .fb.d{border-color:var(--driver);background:var(--driver-bg)}
-  .fb.t{border-color:var(--th);background:var(--th-bg)}
+  .fb.t{border-color:var(--sup);background:var(--sup-bg)}
+  .fb.a{border-color:var(--acct);background:var(--acct-bg)}
   .fb.s{border-color:var(--sm);background:var(--sm-bg)}
   .fb.o{border-color:var(--owner);background:var(--owner-bg)}
   .fb.ok{border-color:var(--ok);background:var(--ok-bg)}
   .fb.no{border-color:var(--no);background:var(--no-bg)}
+  .fb.dash{border-style:dashed;background:transparent;color:var(--muted)}
   .ar{text-align:center;color:var(--muted);font:700 12px/1.5 var(--mono);padding:5px 0}
   .ar::before{content:"↓";display:block;font-size:16px}
   .split{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  @media(max-width:620px){.split{grid-template-columns:1fr}}
+  .split3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+  @media(max-width:640px){.split,.split3{grid-template-columns:1fr}}
+
+  /* org tree */
+  .tree{display:grid;grid-template-columns:1fr 1.2fr;gap:12px;margin:14px 0}
+  .tree .full{grid-column:1/-1}
+  .tree .col{display:flex;flex-direction:column}
+  @media(max-width:640px){.tree{grid-template-columns:1fr}}
+
+  /* tables */
+  table.rt{width:100%;border-collapse:collapse;margin:12px 0 4px;font-size:14.5px}
+  .rt th{font:700 10.5px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);text-align:left;padding:8px 10px;border-bottom:2px solid var(--line)}
+  .rt td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  .rt tr:last-child td{border-bottom:none}
+  .rt td.c, .rt th.c{text-align:center}
+  .tbl-scroll{overflow-x:auto}
+  .tbl-scroll table{min-width:640px}
+
+  .tag-no{display:inline-block;font:700 11px/1 var(--mono);color:var(--no);background:var(--no-bg);padding:4px 8px;border-radius:6px;letter-spacing:.06em}
+  .tag-ok{display:inline-block;font:700 11px/1 var(--mono);color:var(--ok);background:var(--ok-bg);padding:4px 8px;border-radius:6px;letter-spacing:.06em}
+  .flag{display:inline-block;font:700 11px/1 var(--mono);color:#fff;background:var(--no);padding:4px 8px;border-radius:6px;letter-spacing:.06em}
 
   ul.pl{margin:8px 0;padding-left:22px}
   ul.pl li{margin:6px 0}
-  .tag-no{display:inline-block;font:700 11px/1 var(--mono);color:var(--no);background:var(--no-bg);padding:4px 8px;border-radius:6px;letter-spacing:.06em}
-  .tag-ok{display:inline-block;font:700 11px/1 var(--mono);color:var(--ok);background:var(--ok-bg);padding:4px 8px;border-radius:6px;letter-spacing:.06em}
 
   .legend{display:flex;flex-wrap:wrap;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:16px 0;font-size:13.5px;color:var(--muted)}
   .legend span b{color:var(--ink)}
@@ -130,12 +140,16 @@
 
 <header>
   <div class="wrap">
-    <div class="eyebrow">techBuilder · Daily Site Record App</div>
-    <h1>Your Company's App — who fills what, and who can see it</h1>
-    <p class="lead">This document explains the full plan of the app, role by role: every screen, every form, every rule — and most importantly, <b>when one person fills a form, who else can see that data</b>. Read it top to bottom, or jump using the index.</p>
+    <div class="eyebrow">techBuilder · Daily Site Record App · PLAN v2</div>
+    <h1>App Plan v2 — Supervisor &amp; Accountant update</h1>
+    <p class="lead">Updated after our meeting. Two big changes: <b>Team Head is now the Supervisor</b> (and he leads drivers too, not just workers), and there is a <b>new Accountant role — ALL money goes through him</b>. This document shows each role's powers in one diagram + one table, and the new money, diesel and material flows.</p>
+    <div class="howbox" style="border-color:var(--no)">
+      <b style="color:var(--no)">⚠️ Refined the same day — some rules on this page changed:</b> supervisor's request now has <b>NO cap</b> (SUP-5/Q-5) · the SM's ₹1L ladder is gone — SM books any amount and the <b>Accountant verifies EVERY money event</b> (two-tick rule, Q-2/Q-3) · vehicle switch to an allowed type needs <b>no approval at all</b> (Q-4) · <b>attendance is removed for every role</b> · new: personal SALARY/PERSONAL khata, diesel bulk stock, per-type material settings, complaint box.
+      <span class="ex">The up-to-date complete plan: <a href="client-plan/finalindex.html"><b>client-plan/finalindex.html</b></a> · hub: <a href="client-plan/index.html">client-plan/index.html</a></span>
+    </div>
     <div class="howbox">
-      <b>How to give your suggestions:</b> every point in this document has a code — like <b>W-3</b> (Worker point 3) or <b>S-7</b> (Site Manager point 7). Just tell us the code and your idea. No long explanation needed.
-      <span class="ex">Example: "W-3 — allow 5 photos, not 3."&nbsp;&nbsp;|&nbsp;&nbsp;"S-7 — default limit ₹5,000."&nbsp;&nbsp;|&nbsp;&nbsp;"SUG-1 — yes, I want this."</span>
+      <b>How to give your suggestions:</b> every point has a code — like <b>SUP-4</b> (Supervisor point 4) or <b>ACC-1</b> (Accountant point 1) or <b>Q-3</b> (a question waiting for your answer). Just tell us the code and your idea.
+      <span class="ex">Example: "SUP-5 — supervisor's limit should be ₹3,000."&nbsp;&nbsp;|&nbsp;&nbsp;"Q-1 — one accountant for the whole company."</span>
     </div>
   </div>
 </header>
@@ -145,575 +159,513 @@
 <nav class="toc">
   <h2>Index</h2>
   <ol>
-    <li><a href="#roles">The 5 roles — who is who</a></li>
-    <li><a href="#rule">The golden rule — who sees whose data</a></li>
-    <li><a href="#worker">Worker · मज़दूर (W-1 … W-4)</a></li>
-    <li><a href="#driver">Driver · ड्राइवर (D-1 … D-7)</a></li>
-    <li><a href="#teamhead">Team Head · मिस्त्री (T-1 … T-6)</a></li>
-    <li><a href="#sitemanager">Site Manager · साइट मैनेजर (S-1 … S-8)</a></li>
-    <li><a href="#owner">Owner · मालिक (O-1 … O-2)</a></li>
-    <li><a href="#money">The money flow — one picture</a></li>
-    <li><a href="#ledger">Money ledger — who holds how much (M-1 … M-4) ★ new</a></li>
-    <li><a href="#vendors">Shops &amp; vendor accounts (V-1 … V-3) ★ new</a></li>
-    <li><a href="#notnow">Not in this phase (N-1 … N-5)</a></li>
-    <li><a href="#suggest">Suggestions — with your decisions (SUG-1 … SUG-6)</a></li>
+    <li><a href="#roles">The 6 roles — who is who</a></li>
+    <li><a href="#structure">Company structure — one picture</a></li>
+    <li><a href="#money">Money — the new flow (MN) ★</a></li>
+    <li><a href="#fuel">Diesel double-check (F) ★ new</a></li>
+    <li><a href="#materials">Materials (MT) ★ new</a></li>
+    <li><a href="#worker">Worker · मज़दूर (W)</a></li>
+    <li><a href="#driver">Driver · ड्राइवर (D)</a></li>
+    <li><a href="#supervisor">Supervisor · सुपरवाइज़र (SUP) ★</a></li>
+    <li><a href="#accountant">Accountant · अकाउंटेंट (ACC) ★ new</a></li>
+    <li><a href="#sitemanager">Site Manager · साइट मैनेजर (S)</a></li>
+    <li><a href="#owner">Owner · मालिक (O)</a></li>
+    <li><a href="#matrix">Master table — who sees what</a></li>
+    <li><a href="#questions">Your decisions needed (Q-1 … Q-12)</a></li>
     <li><a href="#feedback">How to send feedback</a></li>
   </ol>
 </nav>
 
 <div class="legend">
-  <span><b>FILLS</b> = enters the data</span>
-  <span><b>APPROVES</b> = says yes/no to it</span>
-  <span><b>SEES</b> = can view it</span>
-  <span><b>SETS</b> = controls the setting</span>
-  <span><b>—</b> = cannot see it at all</span>
+  <span><b>★ NEW</b> = added in this update</span>
+  <span><b>CHANGED</b> = worked differently before</span>
+  <span><b>✓</b> = can do / can see</span>
+  <span><b>✗</b> = cannot</span>
+  <span><b>🚩</b> = red flag the app raises automatically</span>
 </div>
 
 <!-- ================= 1. ROLES ================= -->
 <section id="roles">
-  <h2 class="sec">1 · The 5 roles — who is who</h2>
+  <h2 class="sec">1 · The 6 roles — who is who</h2>
   <div class="secline"></div>
   <div class="roles">
-    <div class="rolecard rc-w"><h4>Worker · मज़दूर</h4><p>Works at the site. Can only see his own info, and can <b>request</b> an expense when he spends money for the site.</p></div>
-    <div class="rolecard rc-d"><h4>Driver · ड्राइवर</h4><p>Runs one vehicle at a time. Fills a morning and evening vehicle update every day, with photos.</p></div>
-    <div class="rolecard rc-t"><h4>Team Head · मिस्त्री</h4><p>Leads a team of workers. Enters the team's daily expenses and the site progress report.</p></div>
-    <div class="rolecard rc-s"><h4>Site Manager · साइट मैनेजर</h4><p>In charge of <b>one site</b>. Approves requests, manages people and vehicles, controls the settings.</p></div>
-    <div class="rolecard rc-o"><h4>Owner · मालिक</h4><p>You. See everything, from every site — every rupee, every photo, every approval.</p></div>
+    <div class="rolecard rc-w"><h4>Worker · मज़दूर</h4><p>Works at the site. Sees only his own info. Requests small expenses. His ID card now carries his <b>guardian's name &amp; number</b>.</p></div>
+    <div class="rolecard rc-d"><h4>Driver · ड्राइवर</h4><p>Runs one vehicle. Daily morning/evening updates. Now also confirms the <b>diesel he receives</b> — his entry is matched against the supervisor's.</p></div>
+    <div class="rolecard rc-t"><h4>Supervisor · सुपरवाइज़र <span class="badge chg">RENAMED — was Team Head</span></h4><p>Field boss of <b>workers AND drivers</b>. Owns attendance, progress, materials and diesel issuing. <b>Zero money powers.</b></p></div>
+    <div class="rolecard rc-a"><h4>Accountant · अकाउंटेंट <span class="badge new">★ NEW</span></h4><p>The money person. Approves <b>every money request, any amount</b>. Sees all finances — and only finances.</p></div>
+    <div class="rolecard rc-s"><h4>Site Manager · साइट मैनेजर</h4><p>Head of one site. Sees everything on his site. Spends directly up to his limit. Only he can edit worker ID-card details.</p></div>
+    <div class="rolecard rc-o"><h4>Owner · मालिक</h4><p>You. Everything the Site Manager sees + everything the Accountant sees — across all sites. Final word on anything.</p></div>
   </div>
 </section>
 
-<!-- ================= 2. GOLDEN RULE ================= -->
-<section id="rule">
-  <h2 class="sec">2 · The golden rule — who sees whose data</h2>
+<!-- ================= 2. STRUCTURE ================= -->
+<section id="structure">
+  <h2 class="sec">2 · Company structure — one picture</h2>
   <div class="secline"></div>
   <div class="card">
-    <p><b>Data always flows UP, never sideways.</b> Everyone fills only their own work; the people above them can see it.</p>
-    <div class="flow">
-      <div class="fb o"><b>Owner</b><small>sees everything, from all sites</small></div>
-      <div class="ar">sees everything below</div>
-      <div class="fb s"><b>Site Manager</b><small>sees everything on HIS site only — a Site Manager of Site A can never see even one line of Site B</small></div>
-      <div class="ar">sees everything below</div>
-      <div class="fb t"><b>Team Head</b><small>sees his own team of workers only</small></div>
-      <div class="ar">sees everything below</div>
-      <div class="fb"><span style="display:inline-block;margin-right:14px"><b style="color:var(--worker)">Worker</b></span><span><b style="color:var(--driver)">Driver</b></span><small>each sees ONLY his own data — nothing of anyone else</small></div>
+    <div class="tree">
+      <div class="full fb o"><b>Owner · मालिक</b><small>sees everything, everywhere · can decide anything</small></div>
+      <div class="full ar">two right hands</div>
+      <div class="col">
+        <div class="fb a"><b>Accountant</b> <span class="badge new">★ NEW</span><small>whole company · money ONLY</small></div>
+        <div class="ar">every money request lands here</div>
+        <div class="fb dash"><b>Requests come from:</b><small>worker · driver · supervisor · site manager (over his limit)</small></div>
+      </div>
+      <div class="col">
+        <div class="fb s"><b>Site Manager</b><small>one site = one sealed box</small></div>
+        <div class="ar">manages</div>
+        <div class="fb t"><b>Supervisor</b> <span class="badge chg">CHANGED</span><small>leads workers <b>and</b> drivers — every worker/driver has exactly ONE supervisor</small></div>
+        <div class="ar">leads</div>
+        <div class="split">
+          <div class="fb w"><b>Workers</b></div>
+          <div class="fb d"><b>Drivers</b></div>
+        </div>
+      </div>
     </div>
-    <p class="dim">Note: the Driver reports directly to the <b>Site Manager</b> (not to a Team Head).</p>
+    <table class="rt">
+      <tr><th>Rule</th><th>Meaning</th></tr>
+      <tr><td><b>Data flows UP</b></td><td>Everyone fills his own work; the people above can see it. Nobody sees sideways.</td></tr>
+      <tr><td><b>One-site sealed box</b></td><td>A Site Manager of Site A can never see even one line of Site B. Only you see all boxes.</td></tr>
+      <tr><td><b>Money flows through the Accountant</b></td><td>No money request is ever auto-approved. A human — the Accountant (or you) — decides every single one.</td></tr>
+      <tr><td><b>SM-visible ⇒ Owner-visible</b></td><td>Anything the Site Manager can see, you can see. Always.</td></tr>
+    </table>
   </div>
 </section>
 
-<!-- ================= 3. WORKER ================= -->
-<section id="worker">
-  <h2 class="sec">3 · Worker · मज़दूर <small>The simplest screen in the app — view + one form only</small></h2>
-  <div class="secline"></div>
-
-  <div class="card">
-    <h3><span class="pt w">W-1</span> His home screen</h3>
-    <p>When a worker opens the app he sees:</p>
-    <ul class="pl">
-      <li>His <b>ID card</b> — name, his site, his phone number.</li>
-      <li>His <b>expense requests</b> and their status: <span class="tag-ok">APPROVED</span> <span class="tag-no">REJECTED (with reason)</span> or waiting.</li>
-    </ul>
-  </div>
-
-  <div class="card">
-    <h3><span class="pt w">W-2</span> Emergency numbers — one tap to call</h3>
-    <p>At the bottom of his screen, always visible:</p>
-    <ul class="pl">
-      <li>His <b>Site Manager</b> and <b>Team Head</b> — added automatically.</li>
-      <li><b>Police · Ambulance · Hospital · Fire · Site office</b> — the Site Manager fills these numbers once for the site (see <b>S-7</b>).</li>
-    </ul>
-    <p class="dim">Tap a name → phone dials it. Useful in any emergency at the site.</p>
-  </div>
-
-  <div class="card">
-    <h3><span class="pt w">W-3</span> The Expense Request form — the only form he fills</h3>
-    <p>When a worker spends his own money for the site (buys something from a shop), he fills this. <b>It does not count as money spent yet</b> — it becomes an expense only after his Team Head or Site Manager approves it.</p>
-    <div class="form">
-      <div class="fh">Form fields &amp; rules</div>
-      <div class="frow"><span class="n">1</span><div class="fx"><b>Amount ₹ <span class="must">required</span></b><span>Numbers only. Must be within the limit you set (e.g. ₹2,000 — see S-7). Above the limit, the form stops and tells him: "ask your Team Head / Site Manager".</span></div></div>
-      <div class="frow"><span class="n">2</span><div class="fx"><b>Date <span class="auto">auto</span></b><span>Today's date fills automatically. He may pick today or up to <b>2 days back</b> (a 3-day window). Future dates are not allowed.</span></div></div>
-      <div class="frow"><span class="n">3</span><div class="fx"><b>Category <span class="must">required</span></b><span>Picks one from a list — Food, Material, Transport, Repair… You control which categories appear and their names (see S-7).</span></div></div>
-      <div class="frow"><span class="n">4</span><div class="fx"><b>Bill photo</b><span>Camera or gallery. The main proof. Strongly encouraged.</span></div></div>
-      <div class="frow"><span class="n">5</span><div class="fx"><b>More photos (optional)</b><span>Up to 2–3 extra photos.</span></div></div>
-      <div class="frow"><span class="n">6</span><div class="fx"><b>Remark (optional)</b><span>A short note in his words.</span></div></div>
-      <div class="frow"><span class="n">7</span><div class="fx"><b>Voice note (optional)</b><span>Press and speak — for those who don't like typing. The approver hears it before deciding.</span></div></div>
-    </div>
-    <div class="who">
-      <span class="lbl">Who does what with this form</span>
-      <span class="wc w">WORKER<small>fills it</small></span>
-      <span class="wc t">TEAM HEAD<small>approves / rejects</small></span>
-      <span class="wc s">SITE MANAGER<small>approves / rejects</small></span>
-      <span class="wc o">OWNER<small>sees it</small></span>
-      <span class="wc off">DRIVER — cannot see</span>
-    </div>
-    <p class="dim">After approval, the expense stays permanently visible to the Team Head and Site Manager in the site's expense history.</p>
-  </div>
-
-  <div class="card">
-    <h3><span class="pt n">W-4</span> What a worker can NOT do</h3>
-    <ul class="pl">
-      <li>Cannot see any other person's data or the site's total expenses.</li>
-      <li>Cannot add an expense directly — only request it.</li>
-      <li>No attendance in the app — attendance stays in your manual register for now.</li>
-    </ul>
-  </div>
-</section>
-
-<!-- ================= 4. DRIVER ================= -->
-<section id="driver">
-  <h2 class="sec">4 · Driver · ड्राइवर <small>His whole day lives in the app — morning to evening, with photo proof</small></h2>
-  <div class="secline"></div>
-
-  <div class="card">
-    <h3><span class="pt d">D-1</span> His home screen</h3>
-    <ul class="pl">
-      <li>His <b>vehicle card</b> — vehicle number, condition (fine / in repair), <b>today's meter reading and yesterday's</b>.</li>
-      <li>Status of his pending requests.</li>
-      <li>The same <b>emergency numbers</b> at the bottom (W-2).</li>
-    </ul>
-  </div>
-
-  <div class="card">
-    <h3><span class="pt d">D-2</span> Morning form — start of the day <span class="tag-no">COMPULSORY · EVERY DAY</span></h3>
-    <p>Must be filled every working day before the vehicle starts.</p>
-    <div class="form">
-      <div class="fh">Form fields &amp; rules</div>
-      <div class="frow"><span class="n">1</span><div class="fx"><b>Meter photo <span class="must">required</span></b><span>A camera photo of the odometer / hour-meter. This is the proof of the reading.</span></div></div>
-      <div class="frow"><span class="n">2</span><div class="fx"><b>Start reading <span class="must">required</span></b><span>Numbers only — km or hours, depending on the machine.</span></div></div>
-      <div class="frow"><span class="n">3</span><div class="fx"><b>Vehicle / site photos (optional)</b><span>Side view, condition of the vehicle, the site.</span></div></div>
-    </div>
-  </div>
-
-  <div class="card">
-    <h3><span class="pt d">D-3</span> Evening form — end of the day <span class="tag-ok">OPTIONAL — CAN BE SKIPPED</span></h3>
-    <p>Good to fill, but not forced. If skipped, the day simply closes with the next morning's reading.</p>
-    <div class="form">
-      <div class="fh">Form fields &amp; rules (required = required only when he fills this form)</div>
-      <div class="frow"><span class="n">1</span><div class="fx"><b>Meter photo <span class="must">required</span></b><span>End-of-day photo of the meter.</span></div></div>
-      <div class="frow"><span class="n">2</span><div class="fx"><b>Current reading <span class="must">required</span></b><span>The meter reading right now. Cannot be less than the morning reading — the app checks this.</span></div></div>
-      <div class="frow"><span class="n">3</span><div class="fx"><b>Hours worked</b><span>If he works two shifts (6 hours day + 6 hours night), both count into the same day's total.</span></div></div>
-      <div class="frow"><span class="n">4</span><div class="fx"><b>Trips / trucks filled</b><span>How many trips he made, how many trucks he loaded.</span></div></div>
-      <div class="frow"><span class="n">5</span><div class="fx"><b>Note (optional)</b><span>Anything that happened today.</span></div></div>
-    </div>
-    <p><b>Why this matters:</b> from D-2 + D-3 together, the Site Manager and you see — day by day — how many hours / km each vehicle ran, and its running cost (see the vehicle analytics in S-5).</p>
-    <p class="dim">This form can grow. Tell us what else the driver should report at day end — quote <b>D-3</b> with your idea.</p>
-    <div class="who">
-      <span class="lbl">Who sees the daily updates (D-2 + D-3)</span>
-      <span class="wc d">DRIVER<small>fills them</small></span>
-      <span class="wc t">TEAM HEAD<small>sees</small></span>
-      <span class="wc s">SITE MANAGER<small>sees</small></span>
-      <span class="wc o">OWNER<small>sees</small></span>
-      <span class="wc off">WORKER — cannot see</span>
-    </div>
-  </div>
-
-  <div class="card">
-    <h3><span class="pt d">D-4</span> Expense Request form</h3>
-    <p>Same form as the worker's (W-3), plus vehicle categories — <b>diesel, toll, repair, parts</b>. The categories are fully <b>customizable by the Site Manager for his own site</b>, and every box in this form is a simple <b>on/off switch</b> he controls (S-7) — so each site sees exactly the form it needs. His request goes to the <b>Site Manager</b> for approval.</p>
-    <div class="who">
-      <span class="lbl">Who does what</span>
-      <span class="wc d">DRIVER<small>fills it</small></span>
-      <span class="wc s">SITE MANAGER<small>approves / rejects</small></span>
-      <span class="wc o">OWNER<small>sees it</small></span>
-      <span class="wc off">TEAM HEAD — not involved</span>
-    </div>
-  </div>
-
-  <div class="card">
-    <h3><span class="pt d">D-5</span> Vehicle change</h3>
-    <p>A driver runs <b>one vehicle at a time</b>.</p>
-    <div class="split">
-      <div class="fb ok"><b>Allowed vehicle type</b><small>e.g. he is approved for 3 types — he switches himself, instantly. No approval needed.</small></div>
-      <div class="fb no"><b>Not-allowed type</b><small>the app sends a request to the Site Manager. He drives it only after approval.</small></div>
-    </div>
-    <p><b>Even for a self-switch</b> (no approval needed), the Site Manager automatically gets an information message — <i>"Driver X changed from vehicle A to vehicle B"</i> — so he is always in the know, without being a bottleneck.</p>
-  </div>
-
-  <div class="card">
-    <h3><span class="pt d">D-6</span> Damage report — the vehicle's permanent history</h3>
-    <div class="form">
-      <div class="fh">Form fields &amp; rules</div>
-      <div class="frow"><span class="n">1</span><div class="fx"><b>How big is the damage <span class="must">required</span></b><span>Small / Medium / Big.</span></div></div>
-      <div class="frow"><span class="n">2</span><div class="fx"><b>What happened <span class="must">required</span></b><span>Short description.</span></div></div>
-      <div class="frow"><span class="n">3</span><div class="fx"><b>Photos</b><span>Multiple photos of the damage.</span></div></div>
-      <div class="frow"><span class="n">4</span><div class="fx"><b>Voice note (optional)</b><span>Explain it in speech.</span></div></div>
-    </div>
-    <p><b>Nothing gets lost:</b> every damage stays saved with the vehicle forever. If a vehicle was damaged 3 months ago, the photos, voice note and remarks are still there on that vehicle's page (S-5).</p>
-    <p><b>And every damage has a full life-cycle:</b></p>
-    <div class="flow">
-      <div class="fb d"><b>1 · Driver raises the report</b><small>photos + voice + how big the damage is</small></div>
-      <div class="ar">repair happens</div>
-      <div class="fb s"><b>2 · Site Manager marks it RESOLVED</b><small>with his remark — what was repaired, by whom</small></div>
-      <div class="ar">optional</div>
-      <div class="fb ok"><b>3 · Driver adds a closing remark</b><small>confirms the vehicle is fine now</small></div>
-    </div>
-    <p class="dim">Have ideas to make this damage flow even better? Quote <b>D-6</b> and tell us.</p>
-    <div class="who">
-      <span class="lbl">Who does what</span>
-      <span class="wc d">DRIVER<small>fills it</small></span>
-      <span class="wc s">SITE MANAGER<small>sees + closes it</small></span>
-      <span class="wc o">OWNER<small>sees it</small></span>
-    </div>
-  </div>
-
-  <div class="card">
-    <h3><span class="pt n">D-7</span> What a driver can NOT do</h3>
-    <ul class="pl">
-      <li>Cannot see other vehicles or other people's data.</li>
-      <li>Cannot add an expense directly — only request it.</li>
-      <li>Cannot approve anything.</li>
-    </ul>
-  </div>
-</section>
-
-<!-- ================= 5. TEAM HEAD ================= -->
-<section id="teamhead">
-  <h2 class="sec">5 · Team Head · मिस्त्री <small>The team's money and the site's daily progress</small></h2>
-  <div class="secline"></div>
-
-  <div class="card">
-    <h3><span class="pt t">T-1</span> His home screen — team insights</h3>
-    <p>His team's list. <b>Tap any person → that person's full page</b>: on which day he logged which expense, which work — with totals for <b>Today / This week / This month</b>.</p>
-  </div>
-
-  <div class="card">
-    <h3><span class="pt t">T-2</span> Expense entry — direct, no approval needed</h3>
-    <p>Daily spends (groceries, small material, transport) — he enters them and they <b>count immediately</b>.</p>
-    <div class="form">
-      <div class="fh">Form fields &amp; rules</div>
-      <div class="frow"><span class="n">1</span><div class="fx"><b>Amount ₹ <span class="must">required</span></b><span>Up to <b>₹25,000 per entry</b> counts instantly (the Site Manager can change this number). Above it, the entry goes to the Site Manager as a request.</span></div></div>
-      <div class="frow"><span class="n">2</span><div class="fx"><b>Date <span class="auto">auto</span></b><span>Up to 7 days back allowed. <b>Older than 7 days?</b> Then it becomes a request and needs the Site Manager's approval.</span></div></div>
-      <div class="frow"><span class="n">3</span><div class="fx"><b>Category <span class="must">required</span></b><span>From the site's category list.</span></div></div>
-      <div class="frow"><span class="n">4</span><div class="fx"><b>Bill photo</b><span>By <b>camera OR from gallery</b> — both work.</span></div></div>
-      <div class="frow"><span class="n">5</span><div class="fx"><b>Remark + voice note (optional)</b><span>Voice is often easier — speak the detail.</span></div></div>
-    </div>
-    <div class="who">
-      <span class="lbl">Who does what</span>
-      <span class="wc t">TEAM HEAD<small>fills · counts instantly</small></span>
-      <span class="wc s">SITE MANAGER<small>sees</small></span>
-      <span class="wc o">OWNER<small>sees</small></span>
-      <span class="wc off">WORKER / DRIVER — cannot see</span>
-    </div>
-  </div>
-
-  <div class="card">
-    <h3><span class="pt t">T-3</span> Progress report — twice a day, with photos</h3>
-    <div class="form">
-      <div class="fh">Form fields &amp; rules</div>
-      <div class="frow"><span class="n">1</span><div class="fx"><b>Site photos</b><span>Many photos — up to about 20 per report. "What was done today."</span></div></div>
-      <div class="frow"><span class="n">2</span><div class="fx"><b>Voice note</b><span>Speak the day's progress.</span></div></div>
-      <div class="frow"><span class="n">3</span><div class="fx"><b>What happened (text)</b><span>Work done, quantities, notes.</span></div></div>
-      <div class="frow"><span class="n">4</span><div class="fx"><b>Bill photos (optional)</b><span>Any bills collected during the day.</span></div></div>
-    </div>
-    <ul class="pl">
-      <li>Morning + evening; 2–3 reports a day are fine.</li>
-      <li><b>If the Team Head files it, the Site Manager doesn't have to</b> (and the other way round). One report covers the day.</li>
-      <li>If <b>nobody</b> files → that day shows <span class="tag-no">NO PROGRESS TODAY</span> — you will see exactly which days went unreported.</li>
-    </ul>
-    <div class="who">
-      <span class="lbl">Who does what</span>
-      <span class="wc t">TEAM HEAD<small>fills</small></span>
-      <span class="wc s">SITE MANAGER<small>fills or sees</small></span>
-      <span class="wc o">OWNER<small>sees</small></span>
-    </div>
-  </div>
-
-  <div class="card">
-    <h3><span class="pt t">T-4</span> Approvals — his workers' expense requests</h3>
-    <p>Every request from his workers lands here with the amount, photos, voice note and remark — <b>he can decide without phoning anyone</b>. He can correct the category before approving. Rejecting requires a reason, which the worker sees.</p>
-  </div>
-
-  <div class="card">
-    <h3><span class="pt t">T-5</span> People</h3>
-    <ul class="pl">
-      <li>Sees his team's <b>active members</b>.</li>
-      <li>Can <b>add a new person</b> to his team and set his role.</li>
-      <li><span class="tag-no">CANNOT REMOVE</span> anyone — removing/deactivating a person is Site-Manager-only (S-6).</li>
-    </ul>
-  </div>
-
-  <div class="card">
-    <h3><span class="pt n">T-6</span> Not for the Team Head (this phase)</h3>
-    <ul class="pl">
-      <li>Attendance and wages — stay manual, outside the app.</li>
-      <li>Leave requests, material/stock tracking — later phase.</li>
-      <li>Driver matters — those go to the Site Manager, not him.</li>
-    </ul>
-  </div>
-</section>
-
-<!-- ================= 6. SITE MANAGER ================= -->
-<section id="sitemanager">
-  <h2 class="sec">6 · Site Manager · साइट मैनेजर <small>The site's command center — and its settings</small></h2>
-  <div class="secline"></div>
-
-  <div class="card">
-    <h3><span class="pt s">S-1</span> Day-wise dashboard — pick a date, see everything</h3>
-    <p>He picks <b>any date</b> and sees that day's full picture of his site, each in its own block:</p>
-    <ul class="pl">
-      <li>All <b>progress reports</b> of that day (photos + voice, right there).</li>
-      <li>All <b>expenses</b> of that day — and who entered each one.</li>
-      <li>All <b>requests</b> of that day — who raised it, who approved it, what happened.</li>
-      <li>Totals for <b>Today / This week / This month</b>.</li>
-      <li>Quick views: <b>Yesterday · day before · any day of the last 7 days · last 30 days · or pick any date</b> from the calendar.</li>
-    </ul>
-    <p><b>Two levels:</b> the dashboard shows the quick summary; a separate, full <b>Insights page</b> goes deeper — choose a day and everything of that day opens up: every worker's entries, the complete expense history, every request and its outcome.</p>
-  </div>
-
-  <div class="card">
-    <h3><span class="pt s">S-2</span> Expense entry — counts instantly, with one guard-rail</h3>
-    <p>Same form as T-2, with no date restriction. Entries are booked immediately — and <b>you (Owner) see every one</b>.</p>
-    <div class="split">
-      <div class="fb ok"><b>Up to ₹1,00,000 per entry</b><small>booked instantly — no approval (three bills of ₹50,000 in one day are fine)</small></div>
-      <div class="fb no"><b>Above ₹1,00,000 in one entry</b><small>goes to YOU (Owner) as a request — counted only after your approval</small></div>
-    </div>
-    <p class="dim">You (Owner) can change the Site Manager's limit anytime.</p>
-  </div>
-
-  <div class="card">
-    <h3><span class="pt s">S-3</span> Progress report</h3>
-    <p>The same form as the Team Head's (T-3). Either of them filing covers the day for the site.</p>
-  </div>
-
-  <div class="card">
-    <h3><span class="pt s">S-4</span> Approval center — everything comes to him</h3>
-    <ul class="pl">
-      <li><b>Expense requests</b> — from workers, drivers, and the Team Head's older-than-7-days entries. On approval he confirms or corrects the <b>category</b>, then the money is counted.</li>
-      <li><b>Vehicle change</b> requests from drivers.</li>
-      <li><b>Damage reports</b> — he reviews and closes them.</li>
-    </ul>
-    <p class="dim">A person can never approve his own request — the app blocks it.</p>
-  </div>
-
-  <div class="card">
-    <h3><span class="pt s">S-5</span> Vehicles page — tap anything, get its full story</h3>
-    <ul class="pl">
-      <li><b>Register a new vehicle</b> — number, type, name, and <b>1–2 photos of the vehicle</b> so every machine is recognizable at a glance.</li>
-      <li><b>Tap a vehicle</b> → its full history: meter readings, diesel taken (litres + ₹), total money spent on it, trips/loads, and every damage with photos and voice notes.</li>
-      <li><b>Tap a driver</b> → everything by that driver: daily updates, fuel, trips, expenses.</li>
-    </ul>
-    <p><b>Vehicle analytics</b> — because the driver logs readings daily (D-2/D-3), each vehicle's page shows simple numbers that tell its truth. Visible to the Site Manager and you:</p>
-    <ul class="pl">
-      <li>Average running per day — <b>last 7 / 30 / 90 days</b> (km or hours).</li>
-      <li>Diesel/petrol used, and the vehicle's <b>monthly running cost</b>.</li>
-      <li>No vehicle-vs-vehicle comparison for now (as you said) — deeper analytics can grow later.</li>
-    </ul>
-  </div>
-
-  <div class="card">
-    <h3><span class="pt s">S-6</span> People — full control</h3>
-    <ul class="pl">
-      <li>Adds Team Heads, Drivers, Workers to his site.</li>
-      <li><b>Only he can deactivate</b> (remove) a person.</li>
-    </ul>
-  </div>
-
-  <div class="card">
-    <h3><span class="pt s">S-7</span> Settings — the four controls that shape everyone's forms</h3>
-    <div class="form">
-      <div class="fh">Setting → who feels it</div>
-      <div class="frow"><span class="n">1</span><div class="fx"><b>Expense limits ₹</b><span>The worker's / driver's request limit (W-3, D-4) and the Team Head's per-entry limit (T-2). Above a limit, the form refuses or routes one level up. <b>Rule: every limit is changed by the person one level above</b> — the Owner changes the Site Manager's ₹1,00,000; the Site Manager changes everyone else's.</span></div></div>
-      <div class="frow"><span class="n">2</span><div class="fx"><b>Category list</b><span>Which expense categories are on, and their names — shown in every expense form (W-3, D-4, T-2, S-2).</span></div></div>
-      <div class="frow"><span class="n">3</span><div class="fx"><b>Expense form fields</b><span>Simple on/off switches for which boxes the worker/driver request form shows.</span></div></div>
-      <div class="frow"><span class="n">4</span><div class="fx"><b>Emergency numbers</b><span>Police, ambulance, hospital, fire, site office — shown to every worker and driver (W-2, D-1).</span></div></div>
-    </div>
-    <div class="who">
-      <span class="lbl">Who does what</span>
-      <span class="wc s">SITE MANAGER<small>sets all of this</small></span>
-      <span class="wc o">OWNER<small>sets company defaults</small></span>
-      <span class="wc w">WORKER<small>feels the effect</small></span>
-      <span class="wc d">DRIVER<small>feels the effect</small></span>
-    </div>
-  </div>
-
-  <div class="card">
-    <h3><span class="pt s">S-8</span> The one-site rule</h3>
-    <p>A Site Manager belongs to <b>exactly one site</b>. He can never see another site's people, money, vehicles or reports — not even their names. Each site is a sealed box; only you see all the boxes.</p>
-  </div>
-</section>
-
-<!-- ================= 7. OWNER ================= -->
-<section id="owner">
-  <h2 class="sec">7 · Owner · मालिक <small>You — the only one who sees across sites</small></h2>
-  <div class="secline"></div>
-  <div class="card">
-    <h3><span class="pt o">O-1</span> You see everything</h3>
-    <ul class="pl">
-      <li>Every <b>expense</b> from every site — including the ones Site Managers entered directly.</li>
-      <li>Every <b>progress report</b> with all photos and voice notes — day by day, site by site.</li>
-      <li>Every <b>vehicle and driver</b> — same drill-down pages the Site Manager has, but across all sites.</li>
-      <li>Every <b>request</b> with its full trail: who raised it → who approved it → what it became.</li>
-      <li>Day / week / month views — per site, per person, per vehicle.</li>
-    </ul>
-  </div>
-  <div class="card">
-    <h3><span class="pt o">O-2</span> Reports &amp; company defaults</h3>
-    <ul class="pl">
-      <li>Download <b>Excel reports</b> of the data.</li>
-      <li>Set <b>company-wide defaults</b> for the settings in S-7 — each site can then adjust its own.</li>
-    </ul>
-  </div>
-</section>
-
-<!-- ================= 8. MONEY FLOW ================= -->
+<!-- ================= 3. MONEY ================= -->
 <section id="money">
-  <h2 class="sec">8 · The money flow — one picture</h2>
+  <h2 class="sec">3 · Money — the new flow <small>★ CHANGED — one decider for all money requests: the Accountant</small></h2>
   <div class="secline"></div>
+
   <div class="card">
+    <h3><span class="pt g">MN-1</span> Every money request goes to the Accountant</h3>
     <div class="flow">
-      <div class="fb"><span style="margin-right:12px"><b style="color:var(--worker)">Worker</b></span><span><b style="color:var(--driver)">Driver</b></span> fills an expense <b>request</b><small>amount within limit · bill photo · voice note — it is NOT counted yet</small></div>
-      <div class="ar">goes for approval</div>
-      <div class="fb"><span style="margin-right:12px"><b style="color:var(--th)">Team Head</b> (worker requests)</span><span><b style="color:var(--sm)">Site Manager</b> (all requests)</span><small>sees the photos &amp; voice · can fix the category</small></div>
+      <div class="split3">
+        <div class="fb w"><b>Worker</b><small>request up to his limit (₹2,000 default)</small></div>
+        <div class="fb d"><b>Driver</b><small>request up to his limit</small></div>
+        <div class="fb t"><b>Supervisor</b><small>request up to the <b>worker's</b> limit — same as a worker</small></div>
+      </div>
+      <div class="ar">all requests go to ONE person</div>
+      <div class="fb a"><b>ACCOUNTANT decides — any amount</b><small>sees the bill photo, voice note, remark · can fix the category · rejecting needs a reason</small></div>
       <div class="ar">decision</div>
       <div class="split">
-        <div class="fb ok"><b>APPROVED</b><small>NOW it is counted in the site's expense</small></div>
+        <div class="fb ok"><b>APPROVED</b><small>NOW it counts in the site's expense &amp; cuts the spender's khata</small></div>
         <div class="fb no"><b>REJECTED</b><small>reason goes back to the person — nothing counted</small></div>
       </div>
       <div class="ar">every counted rupee reaches</div>
-      <div class="fb o"><b>Owner's dashboard</b><small>day / week / month · per site · per person · per vehicle</small></div>
+      <div class="fb o"><b>Owner's dashboard</b><small>you can also decide/override any request yourself, any time</small></div>
     </div>
-    <p class="dim"><b>Shortcut for seniors:</b> the Team Head (within 7 days, up to ₹25,000 per entry) and the Site Manager (up to ₹1,00,000 per entry) enter expenses <b>directly, without approval</b>. Bigger entries go one level up: Team Head → Site Manager, Site Manager → you. And every limit is set by the person one level above.</p>
+    <p class="dim"><b>What changed:</b> earlier the Team Head approved his workers' requests and the Site Manager approved the rest. Now <b>only the Accountant (and you)</b> approve money. The Supervisor approves nothing money-related.</p>
   </div>
-</section>
-
-<!-- ================= 9. MONEY LEDGER ================= -->
-<section id="ledger">
-  <h2 class="sec">9 · Money ledger — who holds how much <small>★ NEW — added from your feedback. This is how the advance money (petty cash) gets tracked.</small></h2>
-  <div class="secline"></div>
 
   <div class="card">
-    <h3><span class="pt g">M-1</span> Giving money is recorded in the app</h3>
-    <p>Whenever money is handed down, the giver records it in ten seconds: <b>amount · to whom · date · note</b>.</p>
+    <h3><span class="pt g">MN-2</span> Who can spend directly (without asking)</h3>
+    <table class="rt">
+      <tr><th>Role</th><th class="c">Direct spend</th><th>Above that</th></tr>
+      <tr><td><b style="color:var(--sm)">Site Manager</b></td><td class="c"><span class="tag-ok">✓ up to ₹1,00,000 / entry</span></td><td>becomes a request → Accountant (Q-3)</td></tr>
+      <tr><td><b style="color:var(--sup)">Supervisor</b></td><td class="c"><span class="tag-no">✗ ZERO — ₹0</span></td><td>everything becomes a request → Accountant (was ₹25,000 direct before — removed)</td></tr>
+      <tr><td><b style="color:var(--worker)">Worker</b> / <b style="color:var(--driver)">Driver</b></td><td class="c"><span class="tag-no">✗ request only</span></td><td>within limit → request; above limit the form stops him</td></tr>
+      <tr><td><b style="color:var(--acct)">Accountant</b></td><td class="c"><span class="tag-ok">✓ records money moves</span></td><td>gives/receives cash, pays vendors, records vendor money-in</td></tr>
+      <tr><td><b style="color:var(--owner)">Owner</b></td><td class="c"><span class="tag-ok">✓ anything</span></td><td>—</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3><span class="pt g">MN-3</span> Cash (khata) — who hands money to whom</h3>
     <div class="flow">
-      <div class="fb o"><b>Owner gives ₹1,00,000 to the Site Manager</b><small>recorded → the Site Manager's balance becomes ₹1,00,000</small></div>
-      <div class="ar">he distributes</div>
-      <div class="fb s"><b>Site Manager gives ₹5,000 to the Team Head · ₹500 to a worker…</b><small>each one recorded → their balances go up, his goes down</small></div>
+      <div class="fb o"><b>Owner</b><small>gives working cash down</small></div>
+      <div class="ar">GIVE</div>
+      <div class="fb a"><b>Accountant</b> — the cash desk<small>gives cash to the Site Manager, workers, drivers · takes returns back · every move recorded</small></div>
+      <div class="ar">GIVE / RETURN</div>
+      <div class="split">
+        <div class="fb s"><b>Site Manager</b><small>can also hand cash down (Q-7)</small></div>
+        <div class="fb"><span style="margin-right:10px"><b style="color:var(--worker)">Workers</b></span><span><b style="color:var(--driver)">Drivers</b></span><small>each sees his own khata: received · spent · left</small></div>
+      </div>
     </div>
-    <p><b>Money can come back UP too:</b> if someone is going on leave or the work ends, he returns his remaining balance — the return is recorded the same way, and both balances adjust automatically.</p>
+    <p><span class="tag-no">SUPERVISOR REMOVED FROM THE CASH CHAIN</span> — he holds no working cash and hands out nothing. If money is involved anywhere, the supervisor is not involved.</p>
   </div>
 
   <div class="card">
-    <h3><span class="pt g">M-2</span> Every approved expense cuts the spender's balance</h3>
-    <p>When a worker's ₹300 expense is approved, ₹300 is deducted from <b>his</b> balance automatically. When the Team Head enters today's kirana spend, it cuts <b>his</b> balance. Nothing to calculate by hand.</p>
-    <p class="dim">Balance = money received − approved expenses. That simple.</p>
+    <h3><span class="pt g">MN-4</span> Vendor can also GIVE money <span class="badge new">★ NEW</span></h3>
+    <p>A local vendor you trust can hand the site money — e.g. <b>₹50,000 from the hardware vendor</b>. The Accountant records it as <b>money-IN</b>; it shows in the vendor's khata and in your cash picture. Paying the vendor back is recorded the same way, so the vendor account always shows the true position: <b>purchased on credit · money he gave us · money we paid him</b>.</p>
   </div>
 
   <div class="card">
-    <h3><span class="pt g">M-3</span> Everyone sees his own khata</h3>
-    <p>Each person's screen shows three numbers: <b>received · spent · balance left</b> — so there is never an argument about "how much did I give you last week?"</p>
-  </div>
-
-  <div class="card">
-    <h3><span class="pt g">M-4</span> Your answer to "where did my one lakh go?"</h3>
-    <p>Your dashboard shows, for every rupee you sent down, <b>who used it and on what</b>. Example:</p>
-    <ul class="pl">
-      <li>₹50,000 — diesel &amp; vehicles</li>
-      <li>₹20,000 — workers' daily needs &amp; site maintenance</li>
-      <li>₹18,000 — material &amp; repairs</li>
-      <li>₹12,000 — still with the Site Manager (his balance)</li>
-    </ul>
-    <div class="who">
-      <span class="lbl">Who does what</span>
-      <span class="wc o">OWNER<small>gives money · sees all khatas</small></span>
-      <span class="wc s">SITE MANAGER<small>gives money · own khata</small></span>
-      <span class="wc t">TEAM HEAD<small>own khata</small></span>
-      <span class="wc w">WORKER<small>own khata</small></span>
-      <span class="wc d">DRIVER<small>own khata</small></span>
-    </div>
-    <p class="dim"><b>Two questions for you (quote M-4):</b> ① When money is handed over, should the receiver also tap "yes, received" in the app? ② If a worker's balance is ₹200, should the app stop a ₹500 request — or allow it and show minus?</p>
+    <h3><span class="pt g">MN-5</span> "My debits" — everyone sees his own withdrawals <span class="badge new">★ NEW</span></h3>
+    <p>Any staff member — worker, driver, supervisor, site manager — opens his money page and sees a <b>date-wise list of what he took from his earnings</b> (to send home / personal use):</p>
+    <div class="fb" style="max-width:420px"><b>My debits</b><small>10 Jul — ₹1,000 &nbsp;·&nbsp; 06 Jul — ₹5,000 &nbsp;·&nbsp; 28 Jun — ₹10,000</small></div>
+    <p class="dim">No more "how much did I take last month?" arguments — it is all there, for him and for you.</p>
   </div>
 </section>
 
-<!-- ================= 10. VENDORS ================= -->
-<section id="vendors">
-  <h2 class="sec">10 · Shops &amp; vendor accounts (udhaar khata) <small>★ NEW — promoted from SUG-3. You asked for a proper flow; here it is.</small></h2>
+<!-- ================= 4. DIESEL ================= -->
+<section id="fuel">
+  <h2 class="sec">4 · Diesel double-check <small>★ NEW — two people log the same diesel, the app matches them</small></h2>
   <div class="secline"></div>
 
   <div class="card">
-    <h3><span class="pt g">V-1</span> The site's shop list</h3>
-    <p>The Site Manager saves the regular shops once: <b>shop name · phone · what it sells</b> (hardware, kirana, diesel pump…). Most site purchases happen at these few shops. <b>Every site keeps its own local shop list.</b></p>
-  </div>
-
-  <div class="card">
-    <h3><span class="pt g">V-2</span> Buying on credit — no cash leaves anyone's pocket</h3>
-    <p>Anyone — worker, driver, Team Head, even the Site Manager — takes goods from a listed shop <b>without paying</b>. In the expense form he simply picks how it was paid:</p>
-    <div class="split">
-      <div class="fb"><b>Paid by cash</b><small>the amount is cut from HIS advance balance (M-2)</small></div>
-      <div class="fb ok"><b>On credit at [shop]</b><small>nothing cut from his balance — the amount goes on the SHOP's account</small></div>
-    </div>
-    <p>Approval works exactly the same (photos, voice, category, limits). Once approved, the amount counts in the site's expense <b>and</b> in that shop's outstanding.</p>
-  </div>
-
-  <div class="card">
-    <h3><span class="pt g">V-3</span> The shop's khata — settle with full history</h3>
-    <ul class="pl">
-      <li>Every shop's page shows: <b>total purchased · total paid · balance owed</b> — month by month.</li>
-      <li>When you or the Site Manager pay the shop, that payment is recorded → the balance comes down.</li>
-      <li>Month-end settlement happens from your records, not from the shopkeeper's diary.</li>
-    </ul>
-    <div class="who">
-      <span class="lbl">Who does what</span>
-      <span class="wc s">SITE MANAGER<small>manages shops · records payments</small></span>
-      <span class="wc o">OWNER<small>sees every shop's khata</small></span>
-      <span class="wc t">TEAM HEAD<small>buys on credit</small></span>
-      <span class="wc w">WORKER<small>buys on credit via request</small></span>
-      <span class="wc d">DRIVER<small>buys on credit via request</small></span>
+    <h3><span class="pt g">F-1</span> Both sides log the same event</h3>
+    <div class="flow">
+      <div class="split">
+        <div class="fb t"><b>Supervisor logs:</b><small>"Gave <b>40 L</b> diesel to <b>vehicle X</b> today"</small></div>
+        <div class="fb d"><b>Driver of vehicle X logs:</b><small>"Received <b>40 L</b> diesel today"</small></div>
+      </div>
+      <div class="ar">the app matches: same vehicle + same day + same litres</div>
+      <div class="split">
+        <div class="fb ok"><b>BOTH MATCH ✓</b><small>acknowledged — "haan, both sides say the same"</small></div>
+        <div class="fb no"><b>🚩 RED FLAG</b><small>litres differ, or one side never filled it by day end</small></div>
+      </div>
     </div>
   </div>
-</section>
 
-<!-- ================= 11. NOT NOW ================= -->
-<section id="notnow">
-  <h2 class="sec">11 · Not in this phase — kept aside on purpose</h2>
-  <div class="secline"></div>
   <div class="card">
-    <ul class="pl">
-      <li><span class="pt n">N-1</span>&nbsp; <b>Attendance</b> — stays in your manual register for now. Can come into the app in a later phase.</li>
-      <li><span class="pt n">N-2</span>&nbsp; <b>Wages</b> — calculated manually as you do today.</li>
-      <li><span class="pt n">N-3</span>&nbsp; <b>Leave requests</b> — later phase.</li>
-      <li><span class="pt n">N-4</span>&nbsp; <b>Material / stock tracking</b> (cement, sand, truck-loads in and out) — not built in this phase, but <b>the planning starts now, with you</b>. Tell us (quote N-4): how do you track material today, and what goes wrong most often? We will design this feature around your answers, so it is ready for the next phase.</li>
-      <li><span class="pt n">N-5</span>&nbsp; <b>Automatic reminders</b> to the driver (morning/evening "fill your update") — the forms exist now; the automatic reminder message comes in the next phase.</li>
-    </ul>
-    <p class="dim">This phase focuses on what matters most first: <b>money, daily progress, photos &amp; voice proof, and who-sees-what.</b></p>
+    <h3><span class="pt g">F-2</span> The three outcomes</h3>
+    <table class="rt">
+      <tr><th>Situation</th><th class="c">Result</th><th>Who is told</th></tr>
+      <tr><td>Supervisor says 40 L · Driver says 40 L</td><td class="c"><span class="tag-ok">✓ MATCHED</span></td><td>shows as confirmed, no noise</td></tr>
+      <tr><td>Supervisor says 40 L · Driver says 30 L</td><td class="c"><span class="flag">🚩 MISMATCH</span></td><td rowspan="2"><b style="color:var(--acct)">Accountant</b> + <b style="color:var(--sm)">Site Manager</b> + <b style="color:var(--owner)">Owner</b></td></tr>
+      <tr><td>Only one side filled by day end (8 pm)</td><td class="c"><span class="flag">🚩 ONE SIDE MISSING</span></td></tr>
+    </table>
+    <p class="dim">Q-6: should the match demand exact litres, or allow a small difference (±1–2 L)?</p>
   </div>
 </section>
 
-<!-- ================= 10. SUGGESTIONS ================= -->
-<section id="suggest">
-  <h2 class="sec">12 · Our suggestions — with your decisions so far</h2>
+<!-- ================= 5. MATERIALS ================= -->
+<section id="materials">
+  <h2 class="sec">5 · Materials <small>★ NEW — the Site Manager makes the list, the Supervisor runs the stock</small></h2>
   <div class="secline"></div>
   <div class="card">
-    <p>Your decisions are marked. <b>SUG-1 and SUG-2 still await your word</b> — just say the code.</p>
-    <ul class="pl">
-      <li><span class="pt g">SUG-1</span>&nbsp; <b>Evening WhatsApp summary to you</b> — every evening: today's total expense, number of progress photos, pending approvals — one message per site. <i>— awaiting your decision</i></li>
-      <li><span class="pt g">SUG-2</span>&nbsp; <b>Site budget with alert</b> — set a monthly budget per site; the app warns the Site Manager and you at 80%. <i>— awaiting your decision</i></li>
-      <li><span class="pt g">SUG-3</span>&nbsp; <b>Shop / vendor list</b> — <span class="tag-ok">ACCEPTED — now a full feature in the plan, see V-1 … V-3</span></li>
-      <li><span class="pt g">SUG-4</span>&nbsp; <b>Day's photo album</b> — all photos of a site for a day in one strip. <span class="tag-ok">ACCEPTED — PHASE 2</span></li>
-      <li><span class="pt g">SUG-5</span>&nbsp; <b>One-page daily PDF</b> — auto-made from the day's progress + expenses, shareable on WhatsApp. <span class="tag-ok">ACCEPTED — BUILT LATER</span></li>
-      <li><span class="pt g">SUG-6</span>&nbsp; <b>Vehicle paper alerts</b> — insurance / PUC / permit expiry reminders. Managed and seen by the Site Manager &amp; Owner only. <span class="tag-ok">ACCEPTED — PHASE 2</span></li>
-    </ul>
+    <div class="flow">
+      <div class="fb s"><b>MT-1 · Site Manager creates the material types</b><small>cement · sand · stone · bricks … 5–10 types, named once</small></div>
+      <div class="ar">that list appears in everyone's forms</div>
+      <div class="split">
+        <div class="fb t"><b>MT-2 · Supervisor logs material IN / USED</b><small>"10 bags cement came" · "6 bags used today" — he is the responsible person for all material movement</small></div>
+        <div class="fb d"><b>MT-3 · Driver picks the material on his trip</b><small>"carried sand, 2 trips" — chosen from the same list</small></div>
+      </div>
+      <div class="ar">rolls up</div>
+      <div class="fb"><b>Site material picture</b><small>what came, what was used, what should be left — visible to Site Manager &amp; Owner</small></div>
+    </div>
+    <table class="rt">
+      <tr><th>Role</th><th class="c">Material powers</th></tr>
+      <tr><td><b style="color:var(--sm)">Site Manager</b> / <b style="color:var(--owner)">Owner</b></td><td class="c">creates &amp; renames the types</td></tr>
+      <tr><td><b style="color:var(--sup)">Supervisor</b></td><td class="c"><b>responsible person</b> — logs everything in/out</td></tr>
+      <tr><td><b style="color:var(--driver)">Driver</b></td><td class="c">picks a type when logging a trip</td></tr>
+      <tr><td><b style="color:var(--worker)">Worker</b> / <b style="color:var(--acct)">Accountant</b></td><td class="c">—</td></tr>
+    </table>
   </div>
 </section>
 
-<!-- ================= 11. FEEDBACK ================= -->
+<!-- ================= 6. WORKER ================= -->
+<section id="worker">
+  <h2 class="sec">6 · Worker · मज़दूर <small>view + one small form — now with family details on the ID card</small></h2>
+  <div class="secline"></div>
+
+  <div class="card">
+    <h3><span class="pt w">W-1</span> His day in one picture</h3>
+    <div class="flow">
+      <div class="fb w"><b>Opens the app → his ID card</b><small>name · site · <b>his mobile</b> · <b>guardian name + guardian mobile</b> ★ NEW · his requests' status · my debits</small></div>
+      <div class="ar">if he spent his own money for the site</div>
+      <div class="fb"><b>Expense request (within his limit, e.g. ₹2,000)</b><small>amount · bill photo · category · voice note</small></div>
+      <div class="ar">goes to</div>
+      <div class="fb a"><b>Accountant approves / rejects</b> <span class="badge chg">CHANGED — was Team Head / SM</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3><span class="pt w">W-2</span> ID card with guardian details <span class="badge new">★ NEW</span></h3>
+    <p>Why: if a worker leaves the site without informing anyone, or there is an emergency, the Site Manager or you can <b>directly call his family</b>.</p>
+    <table class="rt">
+      <tr><th>Detail</th><th>Who fills it</th><th>Who can change it later</th></tr>
+      <tr><td>Worker's own mobile number</td><td rowspan="3">filled <b>once, at joining</b>, by whoever onboards him (supervisor / site manager)</td><td rowspan="3"><b style="color:var(--sm)">Only the Site Manager</b> (and you). The worker and the supervisor cannot edit it afterwards.</td></tr>
+      <tr><td>Parent / guardian name</td></tr>
+      <tr><td>Guardian / emergency mobile</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3>What the Worker can and cannot do</h3>
+    <table class="rt">
+      <tr><th>Area</th><th class="c">Access</th><th>Note</th></tr>
+      <tr><td>ID card (with guardian info)</td><td class="c"><span class="tag-ok">✓ view</span></td><td>cannot edit after joining</td></tr>
+      <tr><td>Money request → Accountant</td><td class="c"><span class="tag-ok">✓ within limit</span></td><td>never auto-approved</td></tr>
+      <tr><td>My requests status</td><td class="c"><span class="tag-ok">✓ own</span></td><td>approved / rejected + reason</td></tr>
+      <tr><td>My debits (personal withdrawals)</td><td class="c"><span class="tag-ok">✓ own</span></td><td>★ NEW — date-wise list</td></tr>
+      <tr><td>Emergency numbers (tap to call)</td><td class="c"><span class="tag-ok">✓</span></td><td>SM, supervisor, police, ambulance…</td></tr>
+      <tr><td>Anyone else's data / site totals</td><td class="c"><span class="tag-no">✗</span></td><td>sees only himself</td></tr>
+      <tr><td>Direct expense / approving anything</td><td class="c"><span class="tag-no">✗</span></td><td>request only</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ================= 7. DRIVER ================= -->
+<section id="driver">
+  <h2 class="sec">7 · Driver · ड्राइवर <small>same daily rhythm — plus a supervisor above him and the diesel double-check</small></h2>
+  <div class="secline"></div>
+
+  <div class="card">
+    <h3><span class="pt d">D-1</span> His day in one picture</h3>
+    <div class="flow">
+      <div class="fb d"><b>Morning — compulsory</b><small>meter photo + start reading (unchanged)</small></div>
+      <div class="ar">during the day</div>
+      <div class="split3">
+        <div class="fb"><b>Diesel received</b><small>★ NEW — his side of the double-check (F-1)</small></div>
+        <div class="fb"><b>Trips + material</b><small>★ NEW — picks the material from the site's list (MT-3)</small></div>
+        <div class="fb"><b>Damage / vehicle change</b><small>unchanged — with photos &amp; lifecycle</small></div>
+      </div>
+      <div class="ar">evening — optional</div>
+      <div class="fb d"><b>Evening update</b><small>closing reading · hours · loads (unchanged)</small></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>What the Driver can and cannot do</h3>
+    <table class="rt">
+      <tr><th>Area</th><th class="c">Access</th><th>Note</th></tr>
+      <tr><td>One supervisor above him</td><td class="c"><span class="tag-ok">✓</span></td><td>★ NEW — every driver belongs to one supervisor</td></tr>
+      <tr><td>Daily vehicle updates (own vehicle)</td><td class="c"><span class="tag-ok">✓</span></td><td>morning compulsory / evening optional</td></tr>
+      <tr><td>Diesel received log</td><td class="c"><span class="tag-ok">✓</span></td><td>★ NEW — matched against the supervisor's entry</td></tr>
+      <tr><td>Trips + material pick</td><td class="c"><span class="tag-ok">✓</span></td><td>★ NEW — from the SM's material list</td></tr>
+      <tr><td>Damage report · vehicle change</td><td class="c"><span class="tag-ok">✓</span></td><td>unchanged</td></tr>
+      <tr><td>Money request → Accountant</td><td class="c"><span class="tag-ok">✓ within limit</span></td><td>CHANGED — decider is now the Accountant</td></tr>
+      <tr><td>My khata + my debits</td><td class="c"><span class="tag-ok">✓ own</span></td><td>received · spent · left + withdrawals</td></tr>
+      <tr><td>Vehicle averages / analytics</td><td class="c"><span class="tag-no">✗</span></td><td>sees his readings, never the analysis</td></tr>
+      <tr><td>Other vehicles / other people</td><td class="c"><span class="tag-no">✗</span></td><td>—</td></tr>
+      <tr><td>Approving anything</td><td class="c"><span class="tag-no">✗</span></td><td>—</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ================= 8. SUPERVISOR ================= -->
+<section id="supervisor">
+  <h2 class="sec">8 · Supervisor · सुपरवाइज़र <small>the field boss — everything on the ground, NOTHING with money</small></h2>
+  <div class="secline"></div>
+
+  <div class="card">
+    <h3><span class="pt t">SUP-1</span> His world in one picture</h3>
+    <div class="flow">
+      <div class="fb t"><b>Supervisor</b><small>one crew = his workers + his drivers</small></div>
+      <div class="ar">runs the ground</div>
+      <div class="split">
+        <div class="fb"><b>People side</b><small>attendance · progress reports with photos · onboards new workers (fills guardian details once)</small></div>
+        <div class="fb"><b>Stock side</b><small>material in/out (MT-2) · diesel issued to vehicles (F-1)</small></div>
+      </div>
+      <div class="ar">and for money?</div>
+      <div class="fb no"><b>NOTHING.</b><small>He can only raise a request for himself, like a worker (≤ worker limit). He approves nothing, holds no cash, sees no money reports.</small></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3><span class="pt t">SUP-2</span> What changed from "Team Head"</h3>
+    <table class="rt">
+      <tr><th>Before (Team Head)</th><th>Now (Supervisor)</th></tr>
+      <tr><td>Led workers only; drivers went straight to the SM</td><td>Leads <b>workers AND drivers</b> — every worker/driver has exactly one supervisor</td></tr>
+      <tr><td>Spent directly up to ₹25,000/entry</td><td><span class="tag-no">✗ ₹0 direct</span> — any spend becomes a request to the Accountant</td></tr>
+      <tr><td>Approved his workers' expense requests</td><td><span class="tag-no">✗ approves NO money request</span> — the Accountant does</td></tr>
+      <tr><td>Part of the cash chain (held advance money)</td><td><span class="tag-no">✗ removed from the cash chain</span></td></tr>
+      <tr><td>—</td><td>★ NEW duties: material in/out (MT-2) + diesel issuing (F-1)</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3>What the Supervisor can and cannot do</h3>
+    <table class="rt">
+      <tr><th>Area</th><th class="c">Access</th><th>Note</th></tr>
+      <tr><td>His crew (workers + drivers)</td><td class="c"><span class="tag-ok">✓ view &amp; manage</span></td><td>attendance, progress, day-to-day</td></tr>
+      <tr><td>Progress reports (photos + voice)</td><td class="c"><span class="tag-ok">✓</span></td><td>unchanged</td></tr>
+      <tr><td>Material in/out</td><td class="c"><span class="tag-ok">✓ responsible person</span></td><td>★ NEW (MT-2)</td></tr>
+      <tr><td>Diesel issued to vehicles</td><td class="c"><span class="tag-ok">✓ logs it</span></td><td>★ NEW — matched with the driver's entry (F-1)</td></tr>
+      <tr><td>Onboard new workers</td><td class="c"><span class="tag-ok">✓ + guardian details once</span></td><td>cannot edit those details later — SM only</td></tr>
+      <tr><td>Vehicle change requests (his drivers)</td><td class="c"><span class="tag-ok">✓ decides</span></td><td>not money — kept (Q-4)</td></tr>
+      <tr><td>Own money request</td><td class="c"><span class="tag-ok">✓ ≤ worker limit</span></td><td>like a worker → Accountant decides</td></tr>
+      <tr><td><b>Direct expense</b></td><td class="c"><span class="tag-no">✗ ₹0</span></td><td>CHANGED — was ₹25,000</td></tr>
+      <tr><td><b>Approving money requests</b></td><td class="c"><span class="tag-no">✗ never</span></td><td>CHANGED — Accountant's job now</td></tr>
+      <tr><td><b>Holding / giving cash</b></td><td class="c"><span class="tag-no">✗</span></td><td>removed from the chain</td></tr>
+      <tr><td>Money reports / khata rollup</td><td class="c"><span class="tag-no">✗</span></td><td>sees only his own khata</td></tr>
+      <tr><td>Vehicle averages / analytics</td><td class="c"><span class="tag-no">✗</span></td><td>SM + Owner only</td></tr>
+      <tr><td>Removing (deactivating) people</td><td class="c"><span class="tag-no">✗</span></td><td>SM only</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ================= 9. ACCOUNTANT ================= -->
+<section id="accountant">
+  <h2 class="sec">9 · Accountant · अकाउंटेंट <small>★ NEW ROLE — every rupee passes through him; he sees money and only money</small></h2>
+  <div class="secline"></div>
+
+  <div class="card">
+    <h3><span class="pt a">ACC-1</span> His world in one picture</h3>
+    <div class="flow">
+      <div class="fb a"><b>Accountant — the company's money desk</b></div>
+      <div class="ar">four jobs</div>
+      <div class="split">
+        <div class="fb"><b>1 · Approve requests</b><small>every money request from worker / driver / supervisor / SM-over-limit — any amount</small></div>
+        <div class="fb"><b>2 · Cash desk</b><small>gives working cash, takes returns, records staff withdrawals (debits)</small></div>
+      </div>
+      <div class="split">
+        <div class="fb"><b>3 · Vendor khata</b><small>credit purchases · payments to vendors · vendor money-IN (MN-4)</small></div>
+        <div class="fb"><b>4 · Watch the flags</b><small>🚩 diesel mismatches land on his screen first (F-2)</small></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>What the Accountant can and cannot do</h3>
+    <table class="rt">
+      <tr><th>Area</th><th class="c">Access</th><th>Note</th></tr>
+      <tr><td>Approve / reject money requests</td><td class="c"><span class="tag-ok">✓ ALL, any amount</span></td><td>the only routine decider (Owner can override)</td></tr>
+      <tr><td>All expenses, all sites</td><td class="c"><span class="tag-ok">✓ view</span></td><td>the full money picture</td></tr>
+      <tr><td>Cash khata (give / receive / rollup)</td><td class="c"><span class="tag-ok">✓</span></td><td>main cash node under you</td></tr>
+      <tr><td>Vendor accounts incl. money-IN</td><td class="c"><span class="tag-ok">✓</span></td><td>★ NEW inflow recording</td></tr>
+      <tr><td>Everyone's debits / advances</td><td class="c"><span class="tag-ok">✓</span></td><td>records &amp; views</td></tr>
+      <tr><td>🚩 Diesel red flags</td><td class="c"><span class="tag-ok">✓</span></td><td>first watcher</td></tr>
+      <tr><td>Money reports (Excel)</td><td class="c"><span class="tag-ok">✓</span></td><td>financial sections</td></tr>
+      <tr><td>Progress reports / site photos</td><td class="c"><span class="tag-no">✗</span></td><td rowspan="4">he is the money person — the app shows him <b>only the financial side</b> of the business</td></tr>
+      <tr><td>People management / attendance</td><td class="c"><span class="tag-no">✗</span></td></tr>
+      <tr><td>Vehicle averages / analytics</td><td class="c"><span class="tag-no">✗</span></td></tr>
+      <tr><td>Site settings</td><td class="c"><span class="tag-no">✗</span></td></tr>
+    </table>
+    <p class="dim">Q-1: one accountant for the whole company, or one per site?</p>
+  </div>
+</section>
+
+<!-- ================= 10. SITE MANAGER ================= -->
+<section id="sitemanager">
+  <h2 class="sec">10 · Site Manager · साइट मैनेजर <small>still the head of his site — money deciding moves to the Accountant</small></h2>
+  <div class="secline"></div>
+
+  <div class="card">
+    <h3><span class="pt s">S-1</span> His world in one picture</h3>
+    <div class="flow">
+      <div class="fb s"><b>Site Manager — one site, everything on it visible</b></div>
+      <div class="ar">his powers</div>
+      <div class="split">
+        <div class="fb ok"><b>Money he keeps</b><small>direct spend ≤ ₹1,00,000/entry · sees all site finances · 🚩 diesel flags</small></div>
+        <div class="fb no"><b>Money he loses</b><small>no longer approves others' requests — that is the Accountant's job now</small></div>
+      </div>
+      <div class="split">
+        <div class="fb"><b>Only-he powers</b><small>edit worker guardian details (W-2) · create material types (MT-1) · deactivate people · site settings</small></div>
+        <div class="fb"><b>With Owner only</b><small>vehicle insights — daily/weekly/monthly/3-month averages, running cost</small></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>What the Site Manager can and cannot do</h3>
+    <table class="rt">
+      <tr><th>Area</th><th class="c">Access</th><th>Note</th></tr>
+      <tr><td>Everything on HIS site</td><td class="c"><span class="tag-ok">✓ view</span></td><td>progress, expenses, people, fleet, requests</td></tr>
+      <tr><td>Direct expense</td><td class="c"><span class="tag-ok">✓ ≤ ₹1,00,000/entry</span></td><td>above → request (Q-2, Q-3)</td></tr>
+      <tr><td>Vehicle insights (averages)</td><td class="c"><span class="tag-ok">✓</span></td><td>only he + Owner see these</td></tr>
+      <tr><td>Edit worker guardian / ID details</td><td class="c"><span class="tag-ok">✓ sole editor</span></td><td>★ NEW rule (W-2)</td></tr>
+      <tr><td>Material types</td><td class="c"><span class="tag-ok">✓ creates the list</span></td><td>★ NEW (MT-1)</td></tr>
+      <tr><td>🚩 Diesel red flags</td><td class="c"><span class="tag-ok">✓</span></td><td>with Accountant + Owner</td></tr>
+      <tr><td>People: add / deactivate / settings</td><td class="c"><span class="tag-ok">✓</span></td><td>unchanged</td></tr>
+      <tr><td>Damage close · vehicle-change approvals</td><td class="c"><span class="tag-ok">✓</span></td><td>non-money approvals stay with him</td></tr>
+      <tr><td><b>Approving others' money requests</b></td><td class="c"><span class="tag-no">✗</span></td><td>CHANGED — Accountant decides</td></tr>
+      <tr><td>Another site's anything</td><td class="c"><span class="tag-no">✗</span></td><td>sealed box rule</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ================= 11. OWNER ================= -->
+<section id="owner">
+  <h2 class="sec">11 · Owner · मालिक <small>you — everything, everywhere, final word</small></h2>
+  <div class="secline"></div>
+  <div class="card">
+    <h3><span class="pt o">O-1</span> Your view in one picture</h3>
+    <div class="flow">
+      <div class="fb o"><b>Owner</b></div>
+      <div class="ar">= both worlds combined</div>
+      <div class="split">
+        <div class="fb s"><b>Everything every Site Manager sees</b><small>all sites: progress, people, fleet, vehicle insights, 🚩 flags</small></div>
+        <div class="fb a"><b>Everything the Accountant sees</b><small>every rupee: requests, khata, vendors, debits</small></div>
+      </div>
+      <div class="ar">plus</div>
+      <div class="fb"><b>Owner-only powers</b><small>decide/override ANY request · company-wide settings &amp; limits · Excel reports of everything</small></div>
+    </div>
+    <table class="rt">
+      <tr><th>Area</th><th class="c">Access</th><th>Note</th></tr>
+      <tr><td>Every site, every screen, every rupee</td><td class="c"><span class="tag-ok">✓</span></td><td>SM-visible ⇒ Owner-visible, always</td></tr>
+      <tr><td>Decide / override any request</td><td class="c"><span class="tag-ok">✓</span></td><td>on top of the Accountant</td></tr>
+      <tr><td>Company defaults &amp; all limits</td><td class="c"><span class="tag-ok">✓</span></td><td>each limit is set one level above</td></tr>
+      <tr><td>Excel reports</td><td class="c"><span class="tag-ok">✓ all sections</span></td><td>download or email</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ================= 12. MATRIX ================= -->
+<section id="matrix">
+  <h2 class="sec">12 · Master table — who sees what</h2>
+  <div class="secline"></div>
+  <div class="card">
+    <div class="tbl-scroll">
+    <table class="rt">
+      <tr>
+        <th>Surface</th>
+        <th class="c" style="color:var(--owner)">OWNER</th>
+        <th class="c" style="color:var(--sm)">SM</th>
+        <th class="c" style="color:var(--acct)">ACCT</th>
+        <th class="c" style="color:var(--sup)">SUP</th>
+        <th class="c" style="color:var(--driver)">DRIVER</th>
+        <th class="c" style="color:var(--worker)">WORKER</th>
+      </tr>
+      <tr><td>Vehicle insights (averages, running cost)</td><td class="c">✓</td><td class="c">✓ his site</td><td class="c">✗</td><td class="c">✗</td><td class="c">✗</td><td class="c">✗</td></tr>
+      <tr><td>🚩 Diesel red flags</td><td class="c">✓</td><td class="c">✓ his site</td><td class="c">✓</td><td class="c">✗</td><td class="c">✗</td><td class="c">✗</td></tr>
+      <tr><td>Approve money requests</td><td class="c">✓</td><td class="c">✗</td><td class="c">✓ ALL</td><td class="c">✗</td><td class="c">✗</td><td class="c">✗</td></tr>
+      <tr><td>All expenses / cash rollup</td><td class="c">✓</td><td class="c">✓ his site</td><td class="c">✓ all sites</td><td class="c">✗</td><td class="c">✗</td><td class="c">✗</td></tr>
+      <tr><td>Vendor khata (incl. money-IN)</td><td class="c">✓</td><td class="c">✓ his site</td><td class="c">✓</td><td class="c">✗</td><td class="c">✗</td><td class="c">✗</td></tr>
+      <tr><td>Debits / withdrawals</td><td class="c">✓ all</td><td class="c">✓ his site</td><td class="c">✓ all</td><td class="c">own</td><td class="c">own</td><td class="c">own</td></tr>
+      <tr><td>Edit worker guardian details</td><td class="c">✓</td><td class="c">✓</td><td class="c">✗</td><td class="c">set once only</td><td class="c">✗</td><td class="c">✗</td></tr>
+      <tr><td>Material types (create list)</td><td class="c">✓</td><td class="c">✓</td><td class="c">✗</td><td class="c">uses</td><td class="c">uses</td><td class="c">✗</td></tr>
+      <tr><td>Progress / attendance</td><td class="c">✓</td><td class="c">✓ his site</td><td class="c">✗</td><td class="c">✓ his crew</td><td class="c">own</td><td class="c">own</td></tr>
+      <tr><td>Direct expense entry</td><td class="c">✓</td><td class="c">≤ ₹1L</td><td class="c">records</td><td class="c">₹0</td><td class="c">✗</td><td class="c">✗</td></tr>
+    </table>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 13. QUESTIONS ================= -->
+<section id="questions">
+  <h2 class="sec">13 · Your decisions needed <small>answer with the Q code — one line each is enough</small></h2>
+  <div class="secline"></div>
+  <div class="card">
+    <table class="rt">
+      <tr><th>Code</th><th>Question</th><th>If you don't say — we will do</th></tr>
+      <tr><td><span class="pt q">Q-1</span></td><td>One accountant for the whole company, or one per site?</td><td>One for the whole company</td></tr>
+      <tr><td><span class="pt q">Q-2</span></td><td>Site Manager keeps direct spending up to ₹1,00,000 without approval?</td><td>Yes</td></tr>
+      <tr><td><span class="pt q">Q-3</span></td><td>SM's above-₹1L entries — Accountant approves, or you?</td><td>Accountant (you can always step in)</td></tr>
+      <tr><td><span class="pt q">Q-4</span></td><td>Supervisor still approves vehicle-change requests (not money)?</td><td>Yes — vehicle change only</td></tr>
+      <tr><td><span class="pt q">Q-5</span></td><td>Supervisor's request limit same as the worker's (₹2,000)?</td><td>Yes</td></tr>
+      <tr><td><span class="pt q">Q-6</span></td><td>Diesel match — exact litres, or allow ±1–2 L difference?</td><td>Exact</td></tr>
+      <tr><td><span class="pt q">Q-7</span></td><td>Site Manager can also hand out cash, or ALL cash via the accountant?</td><td>Both can</td></tr>
+      <tr><td><span class="pt q">Q-8</span></td><td>Current Team Heads simply become Supervisors, same logins?</td><td>Yes — same people, new name &amp; powers</td></tr>
+      <tr><td><span class="pt q">Q-9</span></td><td>When cash is handed over, should the receiver tap "yes, received"?</td><td>No extra tap (giver's record is enough)</td></tr>
+      <tr><td><span class="pt q">Q-10</span></td><td>If someone's balance is ₹200 and he requests ₹500 — block, or allow &amp; show minus?</td><td>Allow, show minus</td></tr>
+      <tr><td><span class="pt q">Q-11</span></td><td>Evening WhatsApp summary to you (expense total, photos, pending) — yes/no?</td><td>Not built until you say yes</td></tr>
+      <tr><td><span class="pt q">Q-12</span></td><td>Monthly site budget with an 80% warning — yes/no?</td><td>Not built until you say yes</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ================= 14. FEEDBACK ================= -->
 <section id="feedback">
-  <h2 class="sec">13 · How to send feedback</h2>
+  <h2 class="sec">14 · How to send feedback</h2>
   <div class="secline"></div>
   <div class="howbox">
-    <b>Three ways to say it — always start with the point code:</b>
+    <b>Always start with the point code:</b>
     <ul class="pl">
-      <li><b>Change something:</b> "W-3 — let workers attach 5 photos."</li>
-      <li><b>Add something:</b> "S-5 — also show monthly diesel average per vehicle."</li>
-      <li><b>Remove something:</b> "D-3 — we don't need the trucks-filled box."</li>
+      <li><b>Change something:</b> "SUP-5 — supervisor limit ₹3,000, not ₹2,000."</li>
+      <li><b>Add something:</b> "ACC-1 — accountant should also see a monthly summary page."</li>
+      <li><b>Answer a question:</b> "Q-1 — one accountant. Q-6 — allow ±2 litres."</li>
     </ul>
-    <span class="ex">You can also react to ideas: "SUG-1 and SUG-3 — yes. SUG-2 — not now."</span>
+    <span class="ex">Codes in this version: W (worker) · D (driver) · SUP (supervisor) · ACC (accountant) · S (site manager) · O (owner) · MN (money) · F (diesel) · MT (materials) · Q (your decisions).</span>
   </div>
 </section>
 
 </div>
 
 <footer>
-  <div class="wrap">techBuilder · app plan for review · every point has a code (W·D·T·S·O·N·SUG) — quote it when you reply.</div>
+  <div class="wrap">techBuilder · app plan v2 (Supervisor + Accountant) · every point has a code — quote it when you reply. Previous version codes (T-x, M-x, V-x, SUG-x) are retired.</div>
 </footer>
 </body>
 </html>

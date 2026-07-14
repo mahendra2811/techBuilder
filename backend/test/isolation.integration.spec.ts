@@ -48,7 +48,7 @@ const expBySmA = uuidv7(); // SM-A expense at site A (outside TH's crew slice)
 const principal = (userId: string, role: Principal['role']): Principal => ({ userId, orgId, role, deviceId: 'test' });
 const OWNER = () => principal(ownerId, 'OWNER');
 const SM_A = () => principal(smAId, 'SITE_MANAGER');
-const TH_A = () => principal(thAId, 'TEAM_HEAD');
+const TH_A = () => principal(thAId, 'SUPERVISOR');
 const DRIVER_A = () => principal(driverAId, 'DRIVER');
 
 const TODAY = businessDateNow(new Date(), '20:00');
@@ -76,7 +76,7 @@ describe.skipIf(!HAS_DB)('WO-15 sealed-box isolation (live DB, RLS app role)', (
     const config = parseOrgConfig({
       brand: { name: 'IsoTest Co', primaryColor: '#333333' },
       locale: {},
-      roles: { enabled: ['OWNER', 'SITE_MANAGER', 'TEAM_HEAD', 'DRIVER', 'WORKER'] },
+      roles: { enabled: ['OWNER', 'SITE_MANAGER', 'SUPERVISOR', 'DRIVER', 'WORKER'] },
       records: { enabled: ['progress', 'expense', 'fuel'] },
       features: {},
       vehicleTypes: [{ key: 'truck', labelHi: 'ट्रक', labelEn: 'Truck', trackingMode: 'KM', extraFields: [] }],
@@ -96,13 +96,13 @@ describe.skipIf(!HAS_DB)('WO-15 sealed-box isolation (live DB, RLS app role)', (
         { id: pWB, orgId, name: 'Iso Worker B', active: true, ...audit(ownerId) },
         { id: pDA, orgId, name: 'Iso Driver A', skill: 'DRIVER', active: true, ...audit(ownerId) },
       ]);
-      await tx.insert(schema.crews).values({ id: crewA, orgId, siteId: siteA, teamHeadUserId: thAId, name: 'Iso Crew A', ...audit(ownerId) });
+      await tx.insert(schema.crews).values({ id: crewA, orgId, siteId: siteA, supervisorUserId: thAId, name: 'Iso Crew A', ...audit(ownerId) });
       await tx.insert(schema.crewMembers).values([{ orgId, crewId: crewA, personId: pWA }]);
       await tx.insert(schema.users).values([
         { id: ownerId, orgId, name: 'Iso Owner', username: `io-${ownerId.slice(-8)}`, role: 'OWNER', passwordHash: 'x', mustChangePassword: false, active: true, ...audit(ownerId) },
         { id: smAId, orgId, name: 'Iso SM A', username: `isma-${smAId.slice(-8)}`, role: 'SITE_MANAGER', assignedSiteId: siteA, passwordHash: 'x', mustChangePassword: false, active: true, ...audit(ownerId) },
         { id: smBId, orgId, name: 'Iso SM B', username: `ismb-${smBId.slice(-8)}`, role: 'SITE_MANAGER', assignedSiteId: siteB, passwordHash: 'x', mustChangePassword: false, active: true, ...audit(ownerId) },
-        { id: thAId, orgId, name: 'Iso TH A', username: `ith-${thAId.slice(-8)}`, role: 'TEAM_HEAD', assignedSiteId: siteA, crewId: crewA, passwordHash: 'x', mustChangePassword: false, active: true, ...audit(ownerId) },
+        { id: thAId, orgId, name: 'Iso TH A', username: `ith-${thAId.slice(-8)}`, role: 'SUPERVISOR', assignedSiteId: siteA, crewId: crewA, passwordHash: 'x', mustChangePassword: false, active: true, ...audit(ownerId) },
         { id: driverAId, orgId, name: 'Iso Driver A', username: `ida-${driverAId.slice(-8)}`, role: 'DRIVER', personId: pDA, passwordHash: 'x', mustChangePassword: false, active: true, ...audit(ownerId) },
         { id: workerAId, orgId, name: 'Iso Worker A', username: `iwa-${workerAId.slice(-8)}`, role: 'WORKER', personId: pWA, assignedSiteId: siteA, crewId: crewA, passwordHash: 'x', mustChangePassword: false, active: true, ...audit(ownerId) },
         { id: workerBId, orgId, name: 'Iso Worker B', username: `iwb-${workerBId.slice(-8)}`, role: 'WORKER', personId: pWB, assignedSiteId: siteB, passwordHash: 'x', mustChangePassword: false, active: true, ...audit(ownerId) },
@@ -154,11 +154,10 @@ describe.skipIf(!HAS_DB)('WO-15 sealed-box isolation (live DB, RLS app role)', (
     await expect(insights.getPersonInsights(SM_A(), workerBId, WEEK_AGO, TODAY)).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 
-  it('TH(A) person-insights outside his crew is FORBIDDEN; his day view excludes non-crew entries', async () => {
+  it('SUPERVISOR(A) insights are FORBIDDEN outright — Round 2 (CW-9) lockdown is SM/Owner only', async () => {
     await expect(insights.getPersonInsights(TH_A(), workerBId, WEEK_AGO, TODAY)).rejects.toMatchObject({ code: 'FORBIDDEN' });
-    // Positive crew-slice: SM-A's ₹77 expense at site A must NOT appear in the TH's crew-sliced day.
-    const day = await insights.getDayInsights(TH_A(), siteA, TODAY);
-    expect(day.expenses.some((e) => e.id === expBySmA)).toBe(false);
+    await expect(insights.getDayInsights(TH_A(), siteA, TODAY)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(insights.getPeriodInsights(TH_A(), siteA, WEEK_AGO, TODAY)).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 
   // ---- vendors (udhaar) ----

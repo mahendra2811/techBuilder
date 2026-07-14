@@ -226,20 +226,20 @@ async function main(): Promise<void> {
         });
       }
 
-      // ---- crews (site + team head) ----
+      // ---- crews (site + supervisor) ----
       const crewIdByName = new Map<string, string>();
       for (const r of crewsCsv) {
         const id = uuidv7();
         const name = need(r, 'name', 'crews.csv');
         crewIdByName.set(name.toLowerCase(), id);
         const siteCode = need(r, 'site', 'crews.csv');
-        const thUsername = need(r, 'teamHeadUsername', 'crews.csv');
+        const thUsername = need(r, 'supervisorUsername', 'crews.csv');
         const siteId = siteIdByCode.get(siteCode);
         const thId = userIdByUsername.get(thUsername);
         if (!siteId) throw new Error(`crews.csv: unknown site code "${siteCode}"`);
-        if (!thId) throw new Error(`crews.csv: unknown teamHeadUsername "${thUsername}"`);
-        await tx.insert(schema.crews).values({ id, orgId, siteId, teamHeadUserId: thId, name, createdBy: seededBy, updatedBy: seededBy });
-        // the team head user belongs to their crew
+        if (!thId) throw new Error(`crews.csv: unknown supervisorUsername "${thUsername}"`);
+        await tx.insert(schema.crews).values({ id, orgId, siteId, supervisorUserId: thId, name, createdBy: seededBy, updatedBy: seededBy });
+        // the supervisor user belongs to their crew
         await tx.update(schema.users).set({ crewId: id }).where(eq(schema.users.id, thId));
       }
 

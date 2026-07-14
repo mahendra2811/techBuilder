@@ -105,9 +105,9 @@ export class AuthService {
    * NEVER an error: a contacts footer must not break a dashboard.
    *
    * SITE_MANAGER gets the UNION of emergency contacts across every site in their
-   * scope (`loadScope` — assigned + managed), deduped by phone; siteManager/teamHead
+   * scope (`loadScope` — assigned + managed), deduped by phone; siteManager/supervisor
    * stay null for them (an SM is never their own contact). Everyone else never sees
-   * themselves surfaced as their own siteManager/teamHead (self-filtered by id).
+   * themselves surfaced as their own siteManager/supervisor (self-filtered by id).
    */
   async contacts(p: Principal): Promise<ContactPanel> {
     return this.dbs.runInTenant(p.orgId, async (tx) => {
@@ -134,11 +134,11 @@ export class AuthService {
           const list = (site.emergencyContacts as EmergencyContact[] | null) ?? [];
           for (const c of list) if (!byPhone.has(c.phone)) byPhone.set(c.phone, c);
         }
-        return { siteManager: null, teamHead: null, emergency: [...byPhone.values()] };
+        return { siteManager: null, supervisor: null, emergency: [...byPhone.values()] };
       }
 
       const me = await loadUser(p.userId);
-      if (!me) return { siteManager: null, teamHead: null, emergency: [] };
+      if (!me) return { siteManager: null, supervisor: null, emergency: [] };
 
       let siteManager: ContactPerson | null = null;
       let emergency: EmergencyContact[] = [];
@@ -155,16 +155,16 @@ export class AuthService {
         }
       }
 
-      let teamHead: ContactPerson | null = null;
+      let supervisor: ContactPerson | null = null;
       if (me.crewId) {
         const [crew] = await tx
           .select()
           .from(schema.crews)
           .where(and(eq(schema.crews.id, me.crewId), isNull(schema.crews.deletedAt)));
-        if (crew && crew.teamHeadUserId !== p.userId) teamHead = toPerson(await loadUser(crew.teamHeadUserId));
+        if (crew && crew.supervisorUserId !== p.userId) supervisor = toPerson(await loadUser(crew.supervisorUserId));
       }
 
-      return { siteManager, teamHead, emergency };
+      return { siteManager, supervisor, emergency };
     });
   }
 

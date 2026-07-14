@@ -22,13 +22,14 @@ import { forbidScope, inSet, loadScope } from '../common/scope.util';
 import { addDays, businessDateNow } from '../common/business-date';
 import { loadEodCutoff } from '../common/org-config.util';
 
-/** Cascade: each role may only create roles "below" it (Owner→SM→TH). */
+/** Cascade: each role may only create roles "below" it (Owner→SM→Supervisor). */
 const CAN_CREATE: Record<Role, Role[]> = {
-  OWNER: ['OWNER', 'SITE_MANAGER', 'TEAM_HEAD', 'DRIVER', 'WORKER'],
-  SITE_MANAGER: ['TEAM_HEAD', 'DRIVER', 'WORKER'],
-  TEAM_HEAD: ['WORKER', 'DRIVER'],
+  OWNER: ['OWNER', 'SITE_MANAGER', 'SUPERVISOR', 'DRIVER', 'WORKER', 'ACCOUNTANT'],
+  SITE_MANAGER: ['SUPERVISOR', 'DRIVER', 'WORKER'],
+  SUPERVISOR: ['WORKER', 'DRIVER'],
   DRIVER: [],
   WORKER: [],
+  ACCOUNTANT: [], // TODO(Round-2 CW-2/CW-3): revisit
 };
 
 @Injectable()
@@ -47,9 +48,9 @@ export class UsersService {
         if (!input.assignedSiteId || !ctx.siteIds.includes(input.assignedSiteId)) {
           forbidScope('Site managers may only create users assigned to their own site');
         }
-      } else if (ctx.role === 'TEAM_HEAD') {
+      } else if (ctx.role === 'SUPERVISOR') {
         if (!input.crewId || !ctx.crewIds.includes(input.crewId)) {
-          forbidScope('Team heads may only create users attached to their own crew');
+          forbidScope('Supervisors may only create users attached to their own crew');
         }
       }
       const [dupe] = await tx
@@ -91,11 +92,12 @@ export class UsersService {
   async list(p: Principal): Promise<User[]> {
     return this.dbs.runInTenant(p.orgId, async (tx) => {
       const ctx = await loadScope(tx, p);
-      // WP-1: Owner sees all; SM their site's users; TH their crew's users; others only self.
+      // WP-1: Owner sees all; SM their site's users; Supervisor their crew's users; others only self.
+      // Round 2: the ACCOUNTANT reads his sites' directory too (name resolution + ledger recipients).
       let scope: SQL | undefined;
-      if (ctx.role === 'SITE_MANAGER') {
+      if (ctx.role === 'SITE_MANAGER' || ctx.role === 'ACCOUNTANT') {
         scope = or(eq(schema.users.id, ctx.userId), inSet(schema.users.assignedSiteId, ctx.siteIds)) as SQL;
-      } else if (ctx.role === 'TEAM_HEAD') {
+      } else if (ctx.role === 'SUPERVISOR') {
         scope = or(eq(schema.users.id, ctx.userId), inSet(schema.users.crewId, ctx.crewIds)) as SQL;
       } else if (ctx.role !== 'OWNER') {
         scope = eq(schema.users.id, ctx.userId) as SQL;
@@ -112,10 +114,10 @@ export class UsersService {
   async deactivate(p: Principal, id: string): Promise<void> {
     await this.dbs.runInTenant(p.orgId, async (tx) => {
       const ctx = await loadScope(tx, p);
-      // Client-plan v1 (T-5): a Team Head may CREATE people but never deactivate —
+      // Client-plan v1 (T-5): a Supervisor may CREATE people but never deactivate —
       // removing a person is Site-Manager-and-above only.
-      if (ctx.role === 'TEAM_HEAD') {
-        forbidScope('Team heads cannot deactivate people — ask your Site Manager');
+      if (ctx.role === 'SUPERVISOR') {
+        forbidScope('Supervisors cannot deactivate people — ask your Site Manager');
       }
       const [target] = await tx.select().from(schema.users).where(eq(schema.users.id, id));
       if (!target) throw new ApiException('NOT_FOUND', 'User not found');
@@ -124,7 +126,7 @@ export class UsersService {
         if (!CAN_CREATE[ctx.role].includes(target.role)) {
           forbidScope(`${ctx.role} cannot deactivate role ${target.role}`);
         }
-        // TEAM_HEAD was rejected above (T-5) — only SITE_MANAGER reaches this scope check.
+        // SUPERVISOR was rejected above (T-5) — only SITE_MANAGER reaches this scope check.
         const inScope =
           ctx.role === 'SITE_MANAGER' && !!target.assignedSiteId && ctx.siteIds.includes(target.assignedSiteId);
         if (!inScope) forbidScope('User is outside your scope');
@@ -153,7 +155,7 @@ export class UsersService {
 
   /**
    * WO-9 (wave 2) — admin password reset. Scope mirrors deactivate() (Owner: anyone;
-   * Site Manager: only roles they may create, inside their own site scope; Team Head:
+   * Site Manager: only roles they may create, inside their own site scope; Supervisor:
    * forbidden), plus never yourself (use POST /auth/change-password for that). Forces
    * `mustChangePassword` and revokes every refresh token the target holds — old sessions
    * on other devices die immediately, matching the intent of a forced credential reset.
@@ -162,7 +164,7 @@ export class UsersService {
     await this.dbs.runInTenant(p.orgId, async (tx) => {
       if (id === p.userId) forbidScope('Use /auth/change-password to change your own password');
       const ctx = await loadScope(tx, p);
-      if (ctx.role === 'TEAM_HEAD') forbidScope('Team heads cannot reset passwords — ask your Site Manager');
+      if (ctx.role === 'SUPERVISOR') forbidScope('Supervisors cannot reset passwords — ask your Site Manager');
       const [target] = await tx.select().from(schema.users).where(eq(schema.users.id, id));
       if (!target || target.deletedAt) throw new ApiException('NOT_FOUND', 'User not found');
       if (ctx.role !== 'OWNER') {
@@ -334,6 +336,9 @@ function mapPerson(r: typeof schema.people.$inferSelect): Person {
     updatedBy: r.updatedBy ?? r.id,
     deletedAt: r.deletedAt ? r.deletedAt.toISOString() : null,
     version: r.version,
+    // frozen.8 (Round-2 guardian/ID-card fields) — plain passthrough; no create/edit UI yet.
+    guardianName: r.guardianName ?? null,
+    guardianPhone: r.guardianPhone ?? null,
   };
 }
 
@@ -395,6 +400,9 @@ function mapFuelLog(r: typeof schema.fuelLogs.$inferSelect): FuelLog {
     updatedBy: r.updatedBy ?? r.id,
     deletedAt: r.deletedAt ? r.deletedAt.toISOString() : null,
     version: r.version,
+    // frozen.8 (Round-2 C7 diesel two-sided match) — plain passthrough, matching not wired yet.
+    status: r.status,
+    matchedIssuanceId: r.matchedIssuanceId ?? null,
   };
 }
 
@@ -438,5 +446,10 @@ function mapExpense(r: typeof schema.expenses.$inferSelect): Expense {
     updatedBy: r.updatedBy ?? r.id,
     deletedAt: r.deletedAt ? r.deletedAt.toISOString() : null,
     version: r.version,
+    // frozen.8 (Round-2 two-tick rule) — plain passthrough, no verification workflow wired yet.
+    verifiedBy: r.verifiedBy ?? null,
+    verifiedAt: r.verifiedAt ? r.verifiedAt.toISOString() : null,
+    flagged: r.flagged,
+    flagNote: r.flagNote ?? null,
   };
 }

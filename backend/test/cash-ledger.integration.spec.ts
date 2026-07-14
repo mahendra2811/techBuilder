@@ -36,7 +36,7 @@ const workerBId = uuidv7();
 const principal = (userId: string, role: Principal['role']): Principal => ({ userId, orgId, role, deviceId: 'test' });
 const OWNER = () => principal(ownerId, 'OWNER');
 const SM_A = () => principal(smAId, 'SITE_MANAGER');
-const TH = () => principal(thId, 'TEAM_HEAD');
+const TH = () => principal(thId, 'SUPERVISOR');
 const WORKER = () => principal(workerId, 'WORKER');
 const WORKER_B = () => principal(workerBId, 'WORKER');
 
@@ -58,7 +58,7 @@ describe.skipIf(!HAS_DB)('WO-9 cash ledger (live DB, RLS app role)', () => {
     const config = parseOrgConfig({
       brand: { name: 'CashTest Co', primaryColor: '#222222' },
       locale: {},
-      roles: { enabled: ['OWNER', 'SITE_MANAGER', 'TEAM_HEAD', 'DRIVER', 'WORKER'] },
+      roles: { enabled: ['OWNER', 'SITE_MANAGER', 'SUPERVISOR', 'DRIVER', 'WORKER'] },
       records: { enabled: ['progress', 'expense', 'fuel'] },
       features: {},
       vehicleTypes: [{ key: 'truck', labelHi: 'ट्रक', labelEn: 'Truck', trackingMode: 'KM', extraFields: [] }],
@@ -75,13 +75,13 @@ describe.skipIf(!HAS_DB)('WO-9 cash ledger (live DB, RLS app role)', () => {
         { id: siteB, orgId, name: 'Site B', code: 'CB', siteManagerId: smBId, ...audit(ownerId) },
       ]);
       await tx.insert(schema.people).values([{ id: pW1, orgId, name: 'Worker One', skill: 'UNSKILLED', active: true, ...audit(ownerId) }]);
-      await tx.insert(schema.crews).values({ id: crewA, orgId, siteId: siteA, teamHeadUserId: thId, name: 'Crew A', ...audit(ownerId) });
+      await tx.insert(schema.crews).values({ id: crewA, orgId, siteId: siteA, supervisorUserId: thId, name: 'Crew A', ...audit(ownerId) });
       await tx.insert(schema.crewMembers).values([{ orgId, crewId: crewA, personId: pW1 }]);
       await tx.insert(schema.users).values([
         { id: ownerId, orgId, name: 'Owner', username: `co-${ownerId.slice(-8)}`, role: 'OWNER', passwordHash: 'x', mustChangePassword: false, active: true, ...audit(ownerId) },
         { id: smAId, orgId, name: 'SM A', username: `csma-${smAId.slice(-8)}`, role: 'SITE_MANAGER', assignedSiteId: siteA, passwordHash: 'x', mustChangePassword: false, active: true, ...audit(ownerId) },
         { id: smBId, orgId, name: 'SM B', username: `csmb-${smBId.slice(-8)}`, role: 'SITE_MANAGER', assignedSiteId: siteB, passwordHash: 'x', mustChangePassword: false, active: true, ...audit(ownerId) },
-        { id: thId, orgId, name: 'TH', username: `cth-${thId.slice(-8)}`, role: 'TEAM_HEAD', assignedSiteId: siteA, crewId: crewA, passwordHash: 'x', mustChangePassword: false, active: true, ...audit(ownerId) },
+        { id: thId, orgId, name: 'TH', username: `cth-${thId.slice(-8)}`, role: 'SUPERVISOR', assignedSiteId: siteA, crewId: crewA, passwordHash: 'x', mustChangePassword: false, active: true, ...audit(ownerId) },
         { id: workerId, orgId, name: 'Worker', username: `cw-${workerId.slice(-8)}`, role: 'WORKER', personId: pW1, assignedSiteId: siteA, crewId: crewA, passwordHash: 'x', mustChangePassword: false, active: true, ...audit(ownerId) },
         // worker on the OTHER site, no crew — used to prove chain + scope rejections
         { id: workerBId, orgId, name: 'Worker B', username: `cwb-${workerBId.slice(-8)}`, role: 'WORKER', assignedSiteId: siteB, passwordHash: 'x', mustChangePassword: false, active: true, ...audit(ownerId) },
@@ -126,7 +126,9 @@ describe.skipIf(!HAS_DB)('WO-9 cash ledger (live DB, RLS app role)', () => {
   });
 
   // ② SM GIVEs ₹500 to a worker; worker's approved ₹300 CASH expense debits the worker's khata.
-  it('② SM GIVEs ₹500 to worker; worker ₹300 CASH expense (TH-approved) → worker balance ₹200', async () => {
+  // (Round 2: the SUPERVISOR decides nothing — the SM approves here; khata debits on booking,
+  //  the accountant's verify tick is the audit mark, not the booking.)
+  it('② SM GIVEs ₹500 to worker; worker ₹300 CASH expense (SM-approved) → worker balance ₹200', async () => {
     await cash.create(SM_A(), { id: uuidv7(), toUserId: workerId, amountPaise: 50_000, kind: 'GIVE', businessDate: TODAY });
 
     const reqId = uuidv7();
@@ -135,7 +137,7 @@ describe.skipIf(!HAS_DB)('WO-9 cash ledger (live DB, RLS app role)', () => {
       type: 'EXPENSE_ADD',
       payload: { category: 'FOOD', amountPaise: 30_000, businessDate: TODAY },
     });
-    const decided = await approvals.decideRequest(TH(), reqId, { approve: true });
+    const decided = await approvals.decideRequest(SM_A(), reqId, { approve: true });
     expect(decided.status).toBe('APPROVED');
 
     // the materialized expense is a CASH expense entered by the worker → debits HIS khata

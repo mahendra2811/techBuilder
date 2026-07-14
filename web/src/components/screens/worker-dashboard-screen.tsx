@@ -14,16 +14,25 @@ import { useQuery } from '@tanstack/react-query';
 import { CircleUserRound } from 'lucide-react';
 import type { Person, Site } from '@techbuilder/contracts';
 import { api } from '@/lib/api-client';
-import { useMessages } from '@/lib/i18n/locale-context';
+import { useLocale, useMessages } from '@/lib/i18n/locale-context';
 import { roleHome } from '@/lib/roles';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ContactPanel } from '@/components/contact-panel';
 import { KhataCard } from '@/components/khata-card';
+import { MyMoneyCard } from '@/components/my-money-card';
 import { LoadingState, EmptyState, ErrorState } from '@/components/entry/states';
 import { MyExpenseRequestsSummary } from '@/components/requests/my-requests';
 
+// Round 2 (CW-4): ID-card labels for the worker's own mobile + guardian details.
+const UI = {
+  en: { mobile: 'Mobile', guardianName: 'Guardian name', guardianPhone: 'Guardian mobile' },
+  hi: { mobile: 'मोबाइल', guardianName: 'अभिभावक का नाम', guardianPhone: 'अभिभावक का मोबाइल' },
+} as const;
+
 export function WorkerDashboardScreen() {
   const m = useMessages();
+  const locale = useLocale();
+  const ui = UI[locale];
 
   const peopleQ = useQuery({ queryKey: ['people'], queryFn: () => api<Person[]>('GET', '/people') });
   const sitesQ = useQuery({ queryKey: ['sites'], queryFn: () => api<Site[]>('GET', '/sites') });
@@ -60,7 +69,21 @@ export function WorkerDashboardScreen() {
                   </span>
                   {site ? `${m.ENTRY_UI.site}: ${site.name} (${site.code})` : m.ENTRY_UI.noSites}
                 </p>
-                {person.phone && <p className="truncate text-xs text-muted-foreground">{person.phone}</p>}
+                {person.phone && (
+                  <p className="truncate text-xs text-muted-foreground" data-testid="worker-mobile">
+                    {ui.mobile}: {person.phone}
+                  </p>
+                )}
+                {person.guardianName && (
+                  <p className="truncate text-xs text-muted-foreground" data-testid="worker-guardian-name">
+                    {ui.guardianName}: {person.guardianName}
+                  </p>
+                )}
+                {person.guardianPhone && (
+                  <p className="truncate text-xs text-muted-foreground" data-testid="worker-guardian-phone">
+                    {ui.guardianPhone}: {person.guardianPhone}
+                  </p>
+                )}
               </div>
             </div>
           )}
@@ -70,6 +93,8 @@ export function WorkerDashboardScreen() {
       <MyExpenseRequestsSummary href={`${roleHome('WORKER')}/requests`} />
 
       <KhataCard />
+
+      <MyMoneyCard />
 
       <ContactPanel />
     </div>

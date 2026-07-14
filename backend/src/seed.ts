@@ -26,7 +26,7 @@ async function main(): Promise<void> {
   const config: OrgConfig = parseOrgConfig({
     brand: { name: 'Acme Builders Pvt Ltd', primaryColor: '#1A5276' },
     locale: {},
-    roles: { enabled: ['OWNER', 'SITE_MANAGER', 'TEAM_HEAD', 'DRIVER', 'WORKER'] },
+    roles: { enabled: ['OWNER', 'SITE_MANAGER', 'SUPERVISOR', 'DRIVER', 'WORKER'] },
     records: {
       enabled: ['progress', 'expense', 'fuel', 'trip', 'materialUsage', 'materialMove', 'issue', 'attendance', 'leave', 'vehicleStartEnd'],
     },

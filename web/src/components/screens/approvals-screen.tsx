@@ -22,10 +22,26 @@
  * column, so no backend change) + an accordion list — a PENDING row collapses to
  * name/type/one-liner/status and expands on tap to the full payload + decide
  * form; a decided row never expands (nothing left to do, so nothing to reveal).
+ *
+ * Round 2 (CW-3): the ACCOUNTANT variant — he decides EXPENSE_ADD only (mirrors the
+ * backend's assertDecideScope: "the accountant decides money requests only"), and his
+ * approve IS the verify tick in one act (decideRequest auto-stamps verifiedBy/verifiedAt
+ * when the decider is ACCOUNTANT/OWNER) — no separate verify step for a row HE decided.
+ * Two-tick extras layered on top of the existing decide UI, for every viewer:
+ *   - a ✓ Verified / 🚩 Flagged badge on a decided EXPENSE_ADD row that carries a verdict,
+ *   - for ACCOUNTANT/OWNER viewers, a verify ✓ / flag 🚩 action on an APPROVED EXPENSE_ADD
+ *     row that is NOT yet verified/flagged (an SM's own approval stays unverified until the
+ *     accountant separately ticks it via POST /requests/:id/verify).
+ * NOTE: GET /requests has no ACCOUNTANT scope branch server-side yet (falls back to
+ * "own requests only", same gap as GET /users) — this is a known backend gap (not fixed
+ * here, out of web-only scope): an accountant's PENDING tab will only ever show requests
+ * he raised himself, which self-approval already excludes, so it will read empty in
+ * practice until that's fixed upstream. The dashboard's "pending requests" quick view
+ * (GET /accountant/queue) is unaffected — that endpoint IS correctly site-scoped.
  */
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronDown } from 'lucide-react';
+import { Check, ChevronDown, Flag } from 'lucide-react';
 import { EXPENSE_CATEGORIES } from '@techbuilder/contracts';
 import type {
   ApprovalRequest,
@@ -35,11 +51,12 @@ import type {
   Site,
   User,
   UUID,
+  VerifyInput,
 } from '@techbuilder/contracts';
 import { ApiClientError, api, me } from '@/lib/api-client';
 import { formatKolkataDateTime } from '@/lib/business-date';
 import { apiErrorMessage } from '@/lib/i18n/messages';
-import { useMessages } from '@/lib/i18n/locale-context';
+import { useLocale, useMessages } from '@/lib/i18n/locale-context';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -50,11 +67,43 @@ import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry
 import { PayloadSummary, RequestStatusBadge, payloadOneLiner } from '@/components/requests/request-bits';
 import { cn } from '@/lib/utils';
 
-type DecideRole = 'OWNER' | 'SITE_MANAGER' | 'TEAM_HEAD';
+type DecideRole = 'OWNER' | 'SITE_MANAGER' | 'SUPERVISOR' | 'ACCOUNTANT';
 type Filter = ApprovalStatus | 'ALL';
+
+// Module-local — the frozen APPROVALS_UI catalog predates the two-tick verify/flag UI.
+const VERIFY_UI = {
+  en: {
+    verifiedBadge: '✓ Verified',
+    flaggedBadge: '🚩 Flagged',
+    verify: 'Verify',
+    flag: 'Flag',
+    flagNotePlaceholder: "What didn't match?",
+    flagNoteRequired: 'A note is required to flag',
+    flagSubmit: 'Submit flag',
+    cancel: 'Cancel',
+    verifying: 'Saving…',
+    verifiedNotice: 'Verified.',
+    flaggedNotice: 'Flagged.',
+  },
+  hi: {
+    verifiedBadge: '✓ सत्यापित',
+    flaggedBadge: '🚩 फ़्लैग किया',
+    verify: 'सत्यापित करें',
+    flag: 'फ़्लैग करें',
+    flagNotePlaceholder: 'क्या मेल नहीं खाया?',
+    flagNoteRequired: 'फ़्लैग करने के लिए नोट ज़रूरी है',
+    flagSubmit: 'फ़्लैग भेजें',
+    cancel: 'रद्द करें',
+    verifying: 'सेव हो रहा है…',
+    verifiedNotice: 'सत्यापित हो गया।',
+    flaggedNotice: 'फ़्लैग कर दिया।',
+  },
+} as const;
 
 export function ApprovalsScreen({ role }: { role: DecideRole }) {
   const m = useMessages();
+  const locale = useLocale();
+  const verifyUi = VERIFY_UI[locale];
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<Filter>('PENDING');
   const [siteTab, setSiteTab] = useState<'ALL' | UUID>('ALL');
@@ -93,9 +142,21 @@ export function ApprovalsScreen({ role }: { role: DecideRole }) {
     if (r.status !== 'PENDING') return false;
     if (!myUserId || r.requestedBy === myUserId) return false;
     if (role === 'OWNER') return true;
-    if (role === 'TEAM_HEAD' && r.type !== 'VEHICLE_SWITCH' && r.type !== 'EXPENSE_ADD') return false;
+    // Round 2: the SUPERVISOR decides NOTHING — this screen is read-only crew visibility for him.
+    if (role === 'SUPERVISOR') return false;
+    // CW-3: the accountant decides money requests only (assertDecideScope server-side).
+    if (role === 'ACCOUNTANT' && r.type !== 'EXPENSE_ADD') return false;
     return usersById.has(r.requestedBy); // in-scope requester ⟺ present in scoped users list
   };
+
+  /** CW-3 two-tick: ACCOUNTANT/OWNER may separately verify/flag an APPROVED EXPENSE_ADD row
+   * that nobody has ticked yet (an SM's own approval stays unverified — see file header). */
+  const canVerify = (r: ApprovalRequest): boolean =>
+    (role === 'ACCOUNTANT' || role === 'OWNER') &&
+    r.type === 'EXPENSE_ADD' &&
+    r.status === 'APPROVED' &&
+    !r.verifiedAt &&
+    !r.flagged;
 
   /** EXPENSE_ADD category-override select: the decider's pick, defaulting to the payload's category. */
   const categoryFor = (r: ApprovalRequest): ExpenseCategory => {
@@ -178,6 +239,41 @@ export function ApprovalsScreen({ role }: { role: DecideRole }) {
       categoryOverride: approve && r.type === 'EXPENSE_ADD' ? categoryFor(r) : undefined,
     });
   };
+
+  // CW-3 two-tick: ACCOUNTANT/OWNER verify ✓ / flag 🚩 an APPROVED EXPENSE_ADD request
+  // that nobody has ticked yet (POST /requests/:id/verify — VerifySchema {ok, flagNote?}).
+  const [verifyFlagging, setVerifyFlagging] = useState<Record<UUID, boolean>>({});
+  const [verifyNotes, setVerifyNotes] = useState<Record<UUID, string>>({});
+  const [verifyNoteErrors, setVerifyNoteErrors] = useState<Record<UUID, string>>({});
+  const [verifyDone, setVerifyDone] = useState<{ id: UUID; ok: boolean } | null>(null);
+
+  const verify = useMutation({
+    mutationFn: ({ id, input }: { id: UUID; input: VerifyInput }) =>
+      api<ApprovalRequest>('POST', `/requests/${id}/verify`, input),
+    onSuccess: (updated) => {
+      setVerifyDone({ id: updated.id, ok: !updated.flagged });
+      setVerifyFlagging((f) => ({ ...f, [updated.id]: false }));
+      void queryClient.invalidateQueries({ queryKey: ['requests'] });
+      void queryClient.invalidateQueries({ queryKey: ['accountant-queue'] });
+    },
+  });
+
+  const submitVerify = (r: ApprovalRequest, ok: boolean) => {
+    setVerifyDone(null);
+    if (!ok) {
+      const note = verifyNotes[r.id]?.trim();
+      if (!note) {
+        setVerifyNoteErrors((e) => ({ ...e, [r.id]: verifyUi.flagNoteRequired }));
+        return;
+      }
+      verify.mutate({ id: r.id, input: { ok: false, flagNote: note } });
+      return;
+    }
+    verify.mutate({ id: r.id, input: { ok: true } });
+  };
+
+  const verifyServerError =
+    verify.error instanceof ApiClientError ? apiErrorMessage(m, verify.error.code) : verify.error ? apiErrorMessage(m) : null;
 
   const serverError =
     decide.error instanceof ApiClientError &&
@@ -280,11 +376,15 @@ export function ApprovalsScreen({ role }: { role: DecideRole }) {
           testIdPrefix="approvals-list"
           renderItem={(r) => {
             const decidable = canDecide(r);
+            const verifiable = canVerify(r);
             const isOwn = r.requestedBy === myUserId;
             const busy = decide.isPending && decide.variables?.id === r.id;
+            const verifyBusy = verify.isPending && verify.variables?.id === r.id;
             const isPending = r.status === 'PENDING';
             const isExpanded = isPending && expandedId === r.id;
             const oneLiner = payloadOneLiner(m, r.type, r.payload);
+            // Two-tick badge: only meaningful once decided, and only for money requests.
+            const showTickBadge = r.type === 'EXPENSE_ADD' && r.status === 'APPROVED' && (!!r.verifiedAt || r.flagged);
             return (
               <li key={r.id}>
                 <Card data-testid={`approval-card-${r.id}`}>
@@ -302,6 +402,19 @@ export function ApprovalsScreen({ role }: { role: DecideRole }) {
                           {m.APPROVAL_TYPE_LABELS[r.type]}
                         </span>
                         <RequestStatusBadge status={r.status} />
+                        {showTickBadge && (
+                          <span
+                            data-testid={`approval-tick-${r.id}`}
+                            className={cn(
+                              'inline-block w-fit shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium',
+                              r.flagged
+                                ? 'bg-destructive/10 text-destructive'
+                                : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
+                            )}
+                          >
+                            {r.flagged ? verifyUi.flaggedBadge : verifyUi.verifiedBadge}
+                          </span>
+                        )}
                       </div>
                       <p className="truncate text-xs text-muted-foreground">
                         {nameOf(r.requestedBy)}
@@ -322,6 +435,96 @@ export function ApprovalsScreen({ role }: { role: DecideRole }) {
                       {r.decidedAt ? ` · ${formatKolkataDateTime(r.decidedAt)}` : ''}
                       {r.comment ? ` · ${r.comment}` : ''}
                     </p>
+                  )}
+
+                  {verifiable && verifyDone?.id !== r.id && (
+                    <div className="grid gap-2 px-(--card-spacing) pb-(--card-spacing)">
+                      {!verifyFlagging[r.id] ? (
+                        <div className="grid grid-cols-2 gap-2">
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            data-testid={`approval-verify-flag-${r.id}`}
+                            disabled={verifyBusy}
+                            onClick={() => setVerifyFlagging((f) => ({ ...f, [r.id]: true }))}
+                          >
+                            <Flag className="size-3.5" aria-hidden="true" />
+                            {verifyUi.flag}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            className={cn('bg-emerald-600 text-white hover:bg-emerald-600/90')}
+                            data-testid={`approval-verify-ok-${r.id}`}
+                            disabled={verifyBusy}
+                            onClick={() => submitVerify(r, true)}
+                          >
+                            <Check className="size-3.5" aria-hidden="true" />
+                            {verifyBusy ? verifyUi.verifying : verifyUi.verify}
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="grid gap-2">
+                          <Textarea
+                            aria-label={verifyUi.flagNotePlaceholder}
+                            placeholder={verifyUi.flagNotePlaceholder}
+                            className="min-h-14"
+                            data-testid={`approval-verify-note-${r.id}`}
+                            value={verifyNotes[r.id] ?? ''}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setVerifyNotes((n) => ({ ...n, [r.id]: value }));
+                              setVerifyNoteErrors((err) => {
+                                if (!(r.id in err)) return err;
+                                const next = { ...err };
+                                delete next[r.id];
+                                return next;
+                              });
+                            }}
+                          />
+                          {verifyNoteErrors[r.id] && (
+                            <p className="text-sm text-destructive" role="alert" data-testid={`approval-verify-note-error-${r.id}`}>
+                              {verifyNoteErrors[r.id]}
+                            </p>
+                          )}
+                          <div className="grid grid-cols-2 gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              data-testid={`approval-verify-flag-cancel-${r.id}`}
+                              onClick={() => setVerifyFlagging((f) => ({ ...f, [r.id]: false }))}
+                            >
+                              {verifyUi.cancel}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="sm"
+                              data-testid={`approval-verify-flag-submit-${r.id}`}
+                              disabled={verifyBusy}
+                              onClick={() => submitVerify(r, false)}
+                            >
+                              {verifyBusy ? verifyUi.verifying : verifyUi.flagSubmit}
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                      {verifyServerError && verify.variables?.id === r.id && (
+                        <Notice tone="error" testId={`approval-verify-error-${r.id}`}>
+                          {verifyServerError}
+                        </Notice>
+                      )}
+                    </div>
+                  )}
+
+                  {verifyDone?.id === r.id && (
+                    <div className="px-(--card-spacing) pb-(--card-spacing)">
+                      <Notice tone={verifyDone.ok ? 'success' : 'warning'} testId={`approval-verify-done-${r.id}`}>
+                        {verifyDone.ok ? verifyUi.verifiedNotice : verifyUi.flaggedNotice}
+                      </Notice>
+                    </div>
                   )}
 
                   {done?.id === r.id && (

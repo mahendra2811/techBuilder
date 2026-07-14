@@ -5,7 +5,7 @@
  * password client-side (same helper the create-user form uses — the backend
  * just hashes whatever is sent) and reveals it once on success, exactly like
  * a newly created login's temp password. Scope (Owner any / SM own-created
- * roles / never TEAM_HEAD / never yourself) is enforced by the caller via
+ * roles / never SUPERVISOR / never yourself) is enforced by the caller via
  * whether this component is rendered at all, and re-enforced server-side. */
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';

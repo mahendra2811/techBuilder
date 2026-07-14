@@ -45,6 +45,11 @@ import {
   NOTIFICATION_TYPES,
   COMPLETENESS_SCOPES,
   COMPLETENESS_STATES,
+  MONEY_TAGS,
+  VENDOR_PAYMENT_KINDS,
+  COMPLAINT_TARGETS,
+  REMINDER_KINDS,
+  REMINDER_RECURRENCES,
 } from '../enums';
 
 // ---- pgEnums (derived from the frozen enum arrays — single source) ----
@@ -70,6 +75,12 @@ export const cashTransferKindEnum = pgEnum('cash_transfer_kind', CASH_TRANSFER_K
 export const notificationTypeEnum = pgEnum('notification_type', NOTIFICATION_TYPES);
 export const completenessScopeEnum = pgEnum('completeness_scope', COMPLETENESS_SCOPES);
 export const completenessStateEnum = pgEnum('completeness_state', COMPLETENESS_STATES);
+// Round 2 (frozen.8):
+export const moneyTagEnum = pgEnum('money_tag', MONEY_TAGS);
+export const vendorPaymentKindEnum = pgEnum('vendor_payment_kind', VENDOR_PAYMENT_KINDS);
+export const complaintTargetEnum = pgEnum('complaint_target', COMPLAINT_TARGETS);
+export const reminderKindEnum = pgEnum('reminder_kind', REMINDER_KINDS);
+export const reminderRecurrenceEnum = pgEnum('reminder_recurrence', REMINDER_RECURRENCES);
 
 // ---- reusable column groups (functions → fresh builder instances per table) ----
 const audit = () => ({
@@ -84,6 +95,14 @@ const pk = () => ({ id: uuid('id').primaryKey() }); // client-supplied UUIDv7
 const orgCol = () => ({ orgId: uuid('org_id').notNull() });
 const base = () => ({ ...pk(), ...orgCol(), ...audit() });
 const money = (name: string) => bigint(name, { mode: 'number' }); // integer paise
+/** Round 2 two-tick rule: the accountant's VERIFIED mark on a money row.
+ *  verified_at set → row is immutable; flagged → 🚩 visible to SM + Owner. */
+const verification = () => ({
+  verifiedBy: uuid('verified_by'),
+  verifiedAt: timestamp('verified_at', { withTimezone: true }),
+  flagged: boolean('flagged').notNull().default(false),
+  flagNote: text('flag_note'),
+});
 
 // ---- identity & org ----
 export const orgs = pgTable('orgs', {
@@ -104,6 +123,9 @@ export const people = pgTable(
     skill: personSkillEnum('skill'),
     defaultWagePaise: money('default_wage_paise'),
     active: boolean('active').notNull().default(true),
+    /** Round 2 (C6): ID-card family details — set once at onboarding; edited by SM/Owner ONLY. */
+    guardianName: text('guardian_name'),
+    guardianPhone: text('guardian_phone'),
   },
   (t) => [index('people_org_idx').on(t.orgId)],
 );
@@ -142,6 +164,8 @@ export const sites = pgTable(
     expectedEndDate: date('expected_end_date'),
     budgetPaise: money('budget_paise'),
     siteManagerId: uuid('site_manager_id'),
+    /** Round 2: the site's per-site ACCOUNTANT (mirrors siteManagerId; Owner-assigned). */
+    accountantId: uuid('accountant_id'),
     /** EmergencyContact[] (config.ts EmergencyContactSchema) — curated by the SM, shown to workers/drivers. */
     emergencyContacts: jsonb('emergency_contacts').notNull().default('[]'),
     /** SiteExpenseFormConfig (config.ts) — per-site limits/categories/field-toggles; null = org defaults. */
@@ -162,12 +186,14 @@ export const siteHolidays = pgTable(
   (t) => [index('site_holidays_idx').on(t.orgId, t.siteId, t.date)],
 );
 
+/** Round 2: the crew head is the SUPERVISOR (workers AND drivers belong to crews now). */
 export const crews = pgTable(
   'crews',
   {
     ...base(),
     siteId: uuid('site_id').notNull(),
-    teamHeadUserId: uuid('team_head_user_id').notNull(),
+    /** TS name renamed for Round 2; DB column keeps its legacy name on purpose (no destructive migration). */
+    supervisorUserId: uuid('team_head_user_id').notNull(),
     name: text('name').notNull(),
   },
   (t) => [index('crews_org_site_idx').on(t.orgId, t.siteId)],
@@ -324,9 +350,12 @@ export const expenses = pgTable(
     businessDate: date('business_date').notNull(),
     enteredBy: uuid('entered_by').notNull(),
     void: boolean('void').notNull().default(false),
+    ...verification(), // Round 2: mandatory accountant tick on every booked expense
   },
   (t) => [
     index('expenses_site_day_idx').on(t.orgId, t.siteId, t.businessDate),
+    // Round 2: the accountant's unverified-work queue
+    index('expenses_unverified_idx').on(t.orgId, t.siteId, t.verifiedAt),
     // frozen.5: person-scoped reads (khata spent, person insights, own-entries filters)
     index('expenses_entered_by_idx').on(t.orgId, t.enteredBy, t.businessDate),
   ],
@@ -342,8 +371,11 @@ export const cashTransfers = pgTable(
     toUserId: uuid('to_user_id').notNull(),
     amountPaise: money('amount_paise').notNull(),
     kind: cashTransferKindEnum('kind').notNull(),
+    /** Round 2: WORK = khata advance; SALARY/PERSONAL = personal draw (three-giver rule, "money I've taken"). */
+    tag: moneyTagEnum('tag').notNull().default('WORK'),
     businessDate: date('business_date').notNull(),
     note: text('note'),
+    ...verification(), // Round 2: giver raises the claim; the accountant's tick makes it real
   },
   (t) => [
     index('cash_transfers_org_date_idx').on(t.orgId, t.businessDate),
@@ -352,19 +384,24 @@ export const cashTransfers = pgTable(
   ],
 );
 
-/** Payments made TO a vendor/shop against its credit (udhaar) account. */
+/** Vendor money moves. PAYMENT = we pay the vendor (udhaar settle);
+ *  RECEIPT (Round 2) = the vendor hands the site money (money-IN). */
 export const vendorPayments = pgTable(
   'vendor_payments',
   {
     ...base(),
     vendorId: uuid('vendor_id').notNull(),
+    kind: vendorPaymentKindEnum('kind').notNull().default('PAYMENT'),
     amountPaise: money('amount_paise').notNull(),
     businessDate: date('business_date').notNull(),
     note: text('note'),
+    ...verification(), // Round 2: accountant tick on vendor money moves too
   },
   (t) => [index('vendor_payments_vendor_idx').on(t.orgId, t.vendorId, t.businessDate)],
 );
 
+/** Driver-side fuel entry. Round 2 (C7): also the RECEIVED side of the diesel double-check —
+ *  matched against the supervisor's fuel_issuances row (same vehicle + business date + litres). */
 export const fuelLogs = pgTable(
   'fuel_logs',
   {
@@ -375,8 +412,44 @@ export const fuelLogs = pgTable(
     reading: doublePrecision('reading').notNull(),
     receiptMediaId: uuid('receipt_media_id'),
     businessDate: date('business_date').notNull(),
+    /** Diesel match state (reuses PENDING/CONFIRMED/MISMATCH). */
+    status: materialTxnStatusEnum('status').notNull().default('PENDING'),
+    matchedIssuanceId: uuid('matched_issuance_id'),
   },
   (t) => [index('fuel_vehicle_day_idx').on(t.orgId, t.vehicleId, t.businessDate)],
+);
+
+/** Round 2 (C7): supervisor buys diesel in bulk for the site — stock = purchases − issuances. */
+export const fuelStockPurchases = pgTable(
+  'fuel_stock_purchases',
+  {
+    ...base(),
+    siteId: uuid('site_id').notNull(),
+    litres: doublePrecision('litres').notNull(),
+    amountPaise: money('amount_paise'),
+    receiptMediaId: uuid('receipt_media_id'),
+    purchasedBy: uuid('purchased_by').notNull(),
+    businessDate: date('business_date').notNull(),
+    note: text('note'),
+  },
+  (t) => [index('fuel_stock_site_day_idx').on(t.orgId, t.siteId, t.businessDate)],
+);
+
+/** Round 2 (C7): supervisor's ISSUED side of the diesel double-check ("40 L to vehicle X"). */
+export const fuelIssuances = pgTable(
+  'fuel_issuances',
+  {
+    ...base(),
+    siteId: uuid('site_id').notNull(),
+    vehicleId: uuid('vehicle_id').notNull(),
+    litres: doublePrecision('litres').notNull(),
+    issuedBy: uuid('issued_by').notNull(),
+    businessDate: date('business_date').notNull(),
+    status: materialTxnStatusEnum('status').notNull().default('PENDING'),
+    matchedFuelLogId: uuid('matched_fuel_log_id'),
+    note: text('note'),
+  },
+  (t) => [index('fuel_issuance_vehicle_day_idx').on(t.orgId, t.vehicleId, t.businessDate)],
 );
 
 export const vehicleLogs = pgTable(
@@ -413,6 +486,8 @@ export const materials = pgTable('materials', {
   ...base(),
   name: text('name').notNull(),
   uom: uomEnum('uom').notNull(),
+  /** Round 2 (C11): MaterialTypeConfig (config.ts) — per-type entry rules set by the SM; null = defaults. */
+  config: jsonb('config'),
 });
 
 export const materialBalances = pgTable(
@@ -441,6 +516,10 @@ export const materialTxns = pgTable(
     relatedTxnId: uuid('related_txn_id'),
     status: materialTxnStatusEnum('status').notNull().default('CONFIRMED'),
     businessDate: date('business_date').notNull(),
+    /** Round 2 (C11): who entered it (SUPERVISOR = final; DRIVER = data-only pick). */
+    enteredRole: roleEnum('entered_role'),
+    /** Supervisor entries are FINAL (true); driver picks are inputs (false) until reviewed. */
+    finalized: boolean('finalized').notNull().default(true),
   },
   (t) => [index('mattxn_site_day_idx').on(t.orgId, t.siteId, t.businessDate)],
 );
@@ -492,10 +571,65 @@ export const approvalRequests = pgTable(
     approverUserId: uuid('approver_user_id'),
     decidedAt: timestamp('decided_at', { withTimezone: true }),
     comment: text('comment'),
+    ...verification(), // Round 2: approval alone doesn't finish a money request — the accountant's tick does
   },
   (t) => [
     index('requests_status_idx').on(t.orgId, t.status),
     index('requests_requested_by_idx').on(t.orgId, t.requestedBy), // frozen.5: my-requests/person insights
+  ],
+);
+
+// ---- Round 2 (frozen.8): complaints · vehicle document vault + reminders ----
+
+/** Complaint box (C-round-2): worker/driver/supervisor/accountant → SM (Owner sees too) or Owner-only. */
+export const complaints = pgTable(
+  'complaints',
+  {
+    ...base(),
+    raisedBy: uuid('raised_by').notNull(),
+    target: complaintTargetEnum('target').notNull(),
+    siteId: uuid('site_id'),
+    text: text('text').notNull(),
+    mediaIds: uuid('media_ids').array(),
+    status: issueStatusEnum('status').notNull().default('OPEN'),
+  },
+  (t) => [index('complaints_status_idx').on(t.orgId, t.status)],
+);
+
+/** Per-vehicle document vault (SM + Owner ONLY — every read/write role-locked in the service). */
+export const vehicleDocuments = pgTable(
+  'vehicle_documents',
+  {
+    ...base(),
+    vehicleId: uuid('vehicle_id').notNull(),
+    kind: vehicleDocKindEnum('kind').notNull(),
+    title: text('title').notNull(),
+    mediaId: uuid('media_id'),
+    expiryDate: date('expiry_date'),
+    note: text('note'),
+  },
+  (t) => [index('vehicle_docs_vehicle_idx').on(t.orgId, t.vehicleId)],
+);
+
+/** Vehicle reminders: X-days-before an expiry, monthly EMI, yearly — fires VEHICLE_DOC_DUE to SM + Owner. */
+export const vehicleReminders = pgTable(
+  'vehicle_reminders',
+  {
+    ...base(),
+    vehicleId: uuid('vehicle_id').notNull(),
+    documentId: uuid('document_id'),
+    label: text('label').notNull(),
+    kind: reminderKindEnum('kind').notNull(),
+    dueDate: date('due_date').notNull(),
+    recurrence: reminderRecurrenceEnum('recurrence').notNull().default('ONCE'),
+    remindDaysBefore: integer('remind_days_before').notNull().default(7),
+    active: boolean('active').notNull().default(true),
+    /** The dueDate a notification was last sent for — prevents duplicate daily pings per cycle. */
+    lastNotifiedFor: date('last_notified_for'),
+  },
+  (t) => [
+    index('vehicle_reminders_due_idx').on(t.orgId, t.active, t.dueDate),
+    index('vehicle_reminders_vehicle_idx').on(t.orgId, t.vehicleId),
   ],
 );
 
@@ -550,4 +684,6 @@ export const TENANT_TABLES = [
   'advances', 'progress_notes', 'vendors', 'expenses', 'cash_transfers', 'vendor_payments', 'fuel_logs', 'vehicle_logs', 'trips',
   'materials', 'material_balances', 'material_txns', 'issues', 'media', 'approval_requests',
   'notifications', 'audit_logs', 'completeness',
+  // Round 2 (frozen.8):
+  'fuel_stock_purchases', 'fuel_issuances', 'complaints', 'vehicle_documents', 'vehicle_reminders',
 ] as const;

@@ -2,10 +2,10 @@
 
 /**
  * WO-13 — date-wise "pick a day, see everything" insights (client plan S-1/T-1/O-1),
- * one component for Owner + Site Manager + Team Head. Backend GET /insights/day and
- * /insights/period are site+scope enforced server-side (OWNER: any site; SM: his
- * sites; TH: his own site, data pre-filtered to his crew's slice) — this screen just
- * renders whatever the server returns.
+ * one component for Owner + Site Manager. Backend GET /insights/day and /insights/period
+ * are site+scope enforced server-side (OWNER: any site; SM: his sites) — this screen just
+ * renders whatever the server returns. Round 2 (CW-9): insights are SM/Owner ONLY —
+ * SUPERVISOR (was TEAM_HEAD) lost this surface entirely, no crew-sliced variant anymore.
  *
  * Single-day mode (from === to, the default — "Today"): three blocks — Progress
  * (red "no progress" banner when noProgress), Expenses, Requests.
@@ -27,7 +27,7 @@ import { DatePresets, type DateRange } from '@/components/insights/date-presets'
 import { ProgressList, ExpenseList, RequestList } from '@/components/insights/record-lists';
 import { PeriodSummary } from '@/components/insights/period-summary';
 
-type InsightsRole = 'OWNER' | 'SITE_MANAGER' | 'TEAM_HEAD';
+type InsightsRole = 'OWNER' | 'SITE_MANAGER';
 
 export function InsightsScreen({ role }: { role: InsightsRole }) {
   const m = useMessages();

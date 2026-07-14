@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { z } from 'zod';
 import { APPROVAL_TYPES, EXPENSE_CATEGORIES } from '@techbuilder/contracts';
-import type { SubmitRequestInput, DecideRequestInput, ApprovalStatus } from '@techbuilder/contracts';
+import type { SubmitRequestInput, DecideRequestInput, ApprovalStatus, VerifyInput } from '@techbuilder/contracts';
 import { ApprovalsService } from './approvals.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RbacGuard, RequireAction } from '../common/rbac.guard';
@@ -19,6 +19,12 @@ const DecideRequestSchema = z.object({
   comment: z.string().max(2000).optional(),
   /** EXPENSE_ADD only: decider's final category ("the approver creates the final expense"). */
   categoryOverride: z.enum(EXPENSE_CATEGORIES).optional(),
+});
+
+/** Round 2 two-tick: the accountant's verdict (shared shape across money surfaces). */
+export const VerifySchema = z.object({
+  ok: z.boolean(),
+  flagNote: z.string().max(2000).optional(),
 });
 
 @UseGuards(JwtAuthGuard, RbacGuard)
@@ -43,6 +49,18 @@ export class ApprovalsController {
     @Body(new ZodBody(DecideRequestSchema)) body: DecideRequestInput,
   ) {
     return this.approvals.decideRequest(u, id, body);
+  }
+
+  // ENDPOINTS.requestVerify — Round 2 two-tick. Coarse gate: request.decide (ACCOUNTANT/SM/OWNER
+  // hold it); the service narrows to the site's accountant / Owner.
+  @RequireAction('request.decide')
+  @Post(':id/verify')
+  verifyRequest(
+    @CurrentUser() u: Principal,
+    @Param('id') id: string,
+    @Body(new ZodBody(VerifySchema)) body: VerifyInput,
+  ) {
+    return this.approvals.verifyRequest(u, id, body);
   }
 
   @RequireAction('view.all')

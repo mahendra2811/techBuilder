@@ -43,7 +43,7 @@ import { SitePicker } from '@/components/entry/site-picker';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
 import { cn } from '@/lib/utils';
 
-type EntryRole = 'OWNER' | 'SITE_MANAGER' | 'TEAM_HEAD';
+type EntryRole = 'OWNER' | 'SITE_MANAGER' | 'SUPERVISOR';
 
 interface RowEdit {
   status?: AttendanceStatus;
@@ -72,7 +72,7 @@ export function AttendanceScreen({ role }: { role: EntryRole }) {
   const [date, setDate] = useState<BusinessDate>(today);
   const [pickedSiteId, setPickedSiteId] = useState<UUID | ''>('');
 
-  const meQ = useQuery({ queryKey: ['me'], queryFn: me, enabled: role === 'TEAM_HEAD' });
+  const meQ = useQuery({ queryKey: ['me'], queryFn: me, enabled: role === 'SUPERVISOR' });
   const sitesQ = useQuery({ queryKey: ['sites'], queryFn: () => api<Site[]>('GET', '/sites') });
   const peopleQ = useQuery({ queryKey: ['people'], queryFn: () => api<Person[]>('GET', '/people') });
 
@@ -149,7 +149,7 @@ export function AttendanceScreen({ role }: { role: EntryRole }) {
     if (!siteId || changedRows.length === 0) return;
     const input: MarkAttendanceInput = {
       siteId,
-      crewId: role === 'TEAM_HEAD' ? (meQ.data?.user.crewId ?? undefined) : undefined,
+      crewId: role === 'SUPERVISOR' ? (meQ.data?.user.crewId ?? undefined) : undefined,
       businessDate: date,
       rows: changedRows.map((p) => {
         const ot = parseOt(effectiveOt(p.id));

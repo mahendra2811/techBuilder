@@ -10,6 +10,11 @@
  * this sits alongside the existing RequestsScreen (VEHICLE_SWITCH), which has
  * its own generic "my requests" list — this one stays scoped to the expense
  * flow so the two don't show duplicate/confusing entries.
+ *
+ * Round 2 (CW-3): the two-tick state is visible here too — an APPROVED row shows
+ * a ✓ "verified by accountant" badge once `verifiedAt` is set, or a 🚩 "flagged"
+ * badge if the accountant's tick came back negative (`flagged`), so a requester
+ * sees the full lifecycle, not just "Approved".
  */
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
@@ -17,11 +22,18 @@ import type { ApprovalRequest, ApprovalStatus, ExpenseCategory } from '@techbuil
 import { api, me } from '@/lib/api-client';
 import { formatBusinessDateShort } from '@/lib/business-date';
 import { formatPaise } from '@/lib/money';
-import { useMessages } from '@/lib/i18n/locale-context';
+import { useLocale, useMessages } from '@/lib/i18n/locale-context';
 import type { Messages } from '@/lib/i18n/messages';
+import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
 import { RequestStatusBadge } from '@/components/requests/request-bits';
+
+// Module-local — the frozen EXPENSE_REQUEST_UI catalog predates the two-tick badges.
+const TICK_UI = {
+  en: { verified: '✓ Verified by accountant', flagged: '🚩 Flagged — under review' },
+  hi: { verified: '✓ अकाउंटेंट ने जाँच लिया', flagged: '🚩 जाँच में अटका' },
+} as const;
 
 function useMyExpenseRequests() {
   const meQ = useQuery({ queryKey: ['me'], queryFn: me });
@@ -84,9 +96,12 @@ export function MyExpenseRequests() {
 
 function ExpenseRequestRow({ request: r }: { request: ApprovalRequest }) {
   const m = useMessages();
+  const locale = useLocale();
+  const tickUi = TICK_UI[locale];
   const amount = amountFrom(r.payload);
   const category = categoryFrom(m, r.payload);
   const date = dateFrom(r.payload);
+  const showTick = r.status === 'APPROVED' && (!!r.verifiedAt || r.flagged);
 
   return (
     <li className="grid gap-1.5 rounded-lg border border-input p-3" data-testid={`my-expense-request-${r.id}`}>
@@ -99,6 +114,19 @@ function ExpenseRequestRow({ request: r }: { request: ApprovalRequest }) {
         {category && <span>{category}</span>}
         {date && <span>{date}</span>}
       </div>
+      {showTick && (
+        <span
+          data-testid={`my-expense-request-${r.id}-tick`}
+          className={cn(
+            'inline-block w-fit rounded px-1.5 py-0.5 text-[11px] font-medium',
+            r.flagged
+              ? 'bg-destructive/10 text-destructive'
+              : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
+          )}
+        >
+          {r.flagged ? tickUi.flagged : tickUi.verified}
+        </span>
+      )}
       {r.status === 'REJECTED' && r.comment && (
         <Notice tone="error" testId={`my-expense-request-${r.id}-reason`}>
           {m.EXPENSE_REQUEST_UI.rejectedReasonPrefix} {r.comment}

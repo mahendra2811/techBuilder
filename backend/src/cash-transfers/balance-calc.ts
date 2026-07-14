@@ -11,14 +11,17 @@
 import type { CashTransferKind, MyBalance, Role } from '@techbuilder/contracts';
 
 /**
- * The authority chain: OWNER > SITE_MANAGER > TEAM_HEAD > (DRIVER = WORKER at the bottom).
+ * The authority chain: OWNER > ACCOUNTANT > SITE_MANAGER > SUPERVISOR > (DRIVER = WORKER at the bottom).
  * DRIVER and WORKER are deliberately EQUAL rank — neither is "above" the other, so neither
  * may hand cash to the other (a worker→worker / driver→worker GIVE is forbidden by rank alone).
+ * ACCOUNTANT slots in between OWNER and SITE_MANAGER per the Round-2 design (CW-1 rename pass —
+ * every pre-existing pair relation is preserved; ACCOUNTANT's own chain behavior is a later WO).
  */
 export const ROLE_RANK: Record<Role, number> = {
-  OWNER: 4,
+  OWNER: 5,
+  ACCOUNTANT: 4,
   SITE_MANAGER: 3,
-  TEAM_HEAD: 2,
+  SUPERVISOR: 2,
   DRIVER: 1,
   WORKER: 1,
 };

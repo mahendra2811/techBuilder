@@ -18,8 +18,13 @@ import type {
   VehicleDocKind,
   PaymentMode,
   CashTransferKind,
+  MoneyTag,
+  VendorPaymentKind,
+  ComplaintTarget,
+  ReminderKind,
+  ReminderRecurrence,
 } from './enums';
-import type { EmergencyContact, SiteExpenseFormConfig } from './config';
+import type { EmergencyContact, SiteExpenseFormConfig, MaterialTypeConfig } from './config';
 
 export interface LoginInput {
   username: string;
@@ -51,6 +56,19 @@ export interface CreatePersonInput {
   phone?: string;
   skill?: PersonSkill;
   defaultWagePaise?: Paise;
+  /** Round 2 (C6): set once at onboarding by whoever creates the person. */
+  guardianName?: string;
+  guardianPhone?: string;
+}
+
+/** Round 2: person edit. Guardian/phone changes are stripped server-side unless the caller is SM (own site) / Owner. */
+export interface UpdatePersonInput {
+  name?: string;
+  phone?: string;
+  skill?: PersonSkill;
+  defaultWagePaise?: Paise;
+  guardianName?: string;
+  guardianPhone?: string;
 }
 
 export interface CreateSiteInput {
@@ -65,6 +83,14 @@ export interface CreateSiteInput {
   expectedEndDate?: BusinessDate;
   budgetPaise?: Paise;
   siteManagerId?: UUID;
+  /** Round 2: the site's per-site accountant (Owner-assigned). */
+  accountantId?: UUID;
+}
+
+/** Round 2: narrow Owner-only site update (role assignments; NOT the SM config path). */
+export interface UpdateSiteInput {
+  siteManagerId?: UUID | null;
+  accountantId?: UUID | null;
 }
 
 export interface CreateVehicleTypeInput {
@@ -222,8 +248,18 @@ export interface CreateCashTransferInput {
   toUserId: UUID;
   amountPaise: Paise;
   kind: CashTransferKind;
+  /** Round 2: WORK (default) = khata advance; SALARY/PERSONAL = personal draw (givers: Owner/SM/Accountant only). */
+  tag?: MoneyTag;
   businessDate: BusinessDate;
   note?: string;
+}
+
+/** Round 2 two-tick rule: the accountant's verdict on a money event (expense / request / cash transfer). */
+export interface VerifyInput {
+  /** true = verified ✓ (row becomes immutable); false = flagged 🚩 (SM + Owner notified). */
+  ok: boolean;
+  /** Required when ok=false — what didn't match. */
+  flagNote?: string;
 }
 
 export interface CreateVendorInput {
@@ -237,9 +273,87 @@ export interface CreateVendorInput {
 export interface CreateVendorPaymentInput {
   id: UUID;
   vendorId: UUID;
+  /** Round 2: PAYMENT (default) = pay the vendor; RECEIPT = vendor money-IN. */
+  kind?: VendorPaymentKind;
   amountPaise: Paise;
   businessDate: BusinessDate;
   note?: string;
+}
+
+// ---- Round 2 (frozen.8): diesel · materials · complaints · vehicle docs ----
+
+export interface CreateFuelStockPurchaseInput {
+  id: UUID;
+  siteId: UUID;
+  litres: number;
+  amountPaise?: Paise;
+  receiptMediaId?: UUID;
+  businessDate: BusinessDate;
+  note?: string;
+}
+
+export interface CreateFuelIssuanceInput {
+  id: UUID;
+  /** Derived from the vehicle's assigned site when omitted. */
+  siteId?: UUID;
+  vehicleId: UUID;
+  litres: number;
+  businessDate: BusinessDate;
+  note?: string;
+}
+
+export interface CreateMaterialInput {
+  id: UUID;
+  name: string;
+  uom: Uom;
+  config?: MaterialTypeConfig;
+}
+export interface UpdateMaterialInput {
+  name?: string;
+  config?: MaterialTypeConfig;
+}
+
+export interface CreateComplaintInput {
+  id: UUID;
+  /** SITE_MANAGER-addressed complaints are Owner-visible too; OWNER = private to the Owner. */
+  target: ComplaintTarget;
+  text: string;
+  mediaIds?: UUID[];
+}
+
+export interface CreateVehicleDocumentInput {
+  id: UUID;
+  vehicleId: UUID;
+  kind: VehicleDocKind;
+  title: string;
+  mediaId?: UUID;
+  expiryDate?: BusinessDate;
+  note?: string;
+}
+export interface UpdateVehicleDocumentInput {
+  kind?: VehicleDocKind;
+  title?: string;
+  mediaId?: UUID | null;
+  expiryDate?: BusinessDate | null;
+  note?: string | null;
+}
+
+export interface CreateVehicleReminderInput {
+  id: UUID;
+  vehicleId: UUID;
+  documentId?: UUID;
+  label: string;
+  kind: ReminderKind;
+  dueDate: BusinessDate;
+  recurrence?: ReminderRecurrence; // default ONCE
+  remindDaysBefore?: number; // default 7
+}
+export interface UpdateVehicleReminderInput {
+  label?: string;
+  dueDate?: BusinessDate;
+  recurrence?: ReminderRecurrence;
+  remindDaysBefore?: number;
+  active?: boolean;
 }
 
 /** SM-scoped narrow site-config update (NOT full site.manage). */

@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { z } from 'zod';
-import type { CreateSiteInput, UpdateSiteConfigInput } from '@techbuilder/contracts';
+import type { CreateSiteInput, UpdateSiteConfigInput, UpdateSiteInput } from '@techbuilder/contracts';
 import { EmergencyContactSchema, SiteExpenseFormConfigSchema } from '@techbuilder/contracts';
 import { SitesService } from './sites.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -28,6 +28,12 @@ const CreateSiteSchema = z.object({
 const UpdateSiteConfigSchema = z.object({
   emergencyContacts: z.array(EmergencyContactSchema).optional(),
   expenseFormConfig: SiteExpenseFormConfigSchema.optional(),
+});
+
+// Round 2 (frozen.8): Owner-only site role assignments (SM + per-site accountant).
+const UpdateSiteSchema = z.object({
+  siteManagerId: z.string().uuid().nullable().optional(),
+  accountantId: z.string().uuid().nullable().optional(),
 });
 
 @UseGuards(JwtAuthGuard, RbacGuard)
@@ -62,5 +68,16 @@ export class SitesController {
     @Body(new ZodBody(UpdateSiteConfigSchema)) body: UpdateSiteConfigInput,
   ) {
     return this.sites.updateConfig(u, id, body);
+  }
+
+  // ENDPOINTS.siteUpdate — Round 2: Owner assigns the SM + the per-site accountant.
+  @RequireAction('site.manage')
+  @Patch(':id')
+  update(
+    @CurrentUser() u: Principal,
+    @Param('id') id: string,
+    @Body(new ZodBody(UpdateSiteSchema)) body: UpdateSiteInput,
+  ) {
+    return this.sites.update(u, id, body);
   }
 }

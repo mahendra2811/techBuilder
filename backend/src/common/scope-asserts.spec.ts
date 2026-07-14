@@ -6,7 +6,7 @@ import { ApiException } from './api-exception';
 
 const ctx = (over: Partial<ScopeContext>): ScopeContext => ({
   userId: 'u1',
-  role: 'TEAM_HEAD',
+  role: 'SUPERVISOR',
   personId: null,
   siteIds: [],
   crewIds: [],
@@ -35,8 +35,8 @@ describe('assertSiteInScope', () => {
     expect(forbidden(() => assertSiteInScope(sm, 'attendance.mark', 'site-B'))).toBe(true);
   });
 
-  it('TEAM_HEAD is bound to crew sites', () => {
-    const th = ctx({ role: 'TEAM_HEAD', siteIds: ['site-A'] });
+  it('SUPERVISOR is bound to crew sites', () => {
+    const th = ctx({ role: 'SUPERVISOR', siteIds: ['site-A'] });
     expect(forbidden(() => assertSiteInScope(th, 'record.enter', 'site-A'))).toBe(false);
     expect(forbidden(() => assertSiteInScope(th, 'record.enter', 'site-B'))).toBe(true);
   });
@@ -48,18 +48,21 @@ describe('assertSiteInScope', () => {
 });
 
 describe('assertPersonInScope', () => {
-  it('TEAM_HEAD passes for own-crew person, FORBIDDEN for outsiders', () => {
-    const th = ctx({ role: 'TEAM_HEAD', crewPersonIds: ['per-1', 'per-2'] });
-    expect(forbidden(() => assertPersonInScope(th, 'attendance.mark', 'per-1'))).toBe(false);
-    expect(forbidden(() => assertPersonInScope(th, 'attendance.mark', 'per-9'))).toBe(true);
+  // NOTE (CW-1 rename): Round-2 removed attendance.mark from SUPERVISOR entirely (scope NONE),
+  // so these crew-scope assertions now exercise 'record.enter' (still OWN_CREW for SUPERVISOR)
+  // to keep testing the SAME crew-membership scope logic. Judgment call — see CW-1 report.
+  it('SUPERVISOR passes for own-crew person, FORBIDDEN for outsiders', () => {
+    const th = ctx({ role: 'SUPERVISOR', crewPersonIds: ['per-1', 'per-2'] });
+    expect(forbidden(() => assertPersonInScope(th, 'record.enter', 'per-1'))).toBe(false);
+    expect(forbidden(() => assertPersonInScope(th, 'record.enter', 'per-9'))).toBe(true);
   });
 
   it('OWNER passes for anyone', () => {
     expect(forbidden(() => assertPersonInScope(ctx({ role: 'OWNER' }), 'attendance.mark', 'per-9'))).toBe(false);
   });
 
-  it('empty crew (misconfigured TH) denies everyone — fail closed', () => {
-    const th = ctx({ role: 'TEAM_HEAD', crewPersonIds: [] });
-    expect(forbidden(() => assertPersonInScope(th, 'attendance.mark', 'per-1'))).toBe(true);
+  it('empty crew (misconfigured SUPERVISOR) denies everyone — fail closed', () => {
+    const th = ctx({ role: 'SUPERVISOR', crewPersonIds: [] });
+    expect(forbidden(() => assertPersonInScope(th, 'record.enter', 'per-1'))).toBe(true);
   });
 });

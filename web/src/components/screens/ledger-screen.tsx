@@ -1,11 +1,11 @@
 'use client';
 
 /**
- * Cash ledger — money khata (WO-9-UI). Owner / Site-Manager / Team-Head screen:
+ * Cash ledger — money khata (WO-9-UI). Owner / Site-Manager / Supervisor screen:
  *   (a) "Give / receive-back money" form — POST /cash-transfers. Person select
  *       from GET /users (already scoped server-side), filtered CLIENT-side to
- *       roles BELOW the caller (Owner→SM/TH/DRIVER/WORKER, SM→TH/DRIVER/WORKER,
- *       TH→WORKER — mirrors the backend's GIVE hierarchy check). Kind toggle:
+ *       roles BELOW the caller (Owner→SM/Supervisor/DRIVER/WORKER, SM→Supervisor/DRIVER/WORKER,
+ *       Supervisor→WORKER — mirrors the backend's GIVE hierarchy check). Kind toggle:
  *       GIVE ("gave money") or RETURN ("received back" — the senior records
  *       that the junior returned cash TO him; stored junior→senior server-side,
  *       so toUserId is ALWAYS the selected junior for both kinds).
@@ -13,8 +13,19 @@
  *       site's; Owner all), names resolved via the /users list (self via /me),
  *       falling back to a shortened id for out-of-scope users.
  *   (c) Rollup — GET /ledger/rollup, rendered ONLY for OWNER and SITE_MANAGER
- *       (the API 403s for TEAM_HEAD): per-person balance + received/given/
- *       spent + ₹-per-category chips — the "where did my one lakh go" view.
+ *       (the API 403s for SUPERVISOR/ACCOUNTANT): per-person balance + received/
+ *       given/spent + ₹-per-category chips — the "where did my one lakh go" view.
+ *
+ * Round 2 (CW-3): the ACCOUNTANT variant — his own khata + give/return-cash form
+ * work exactly like the SM's (rank 4, giving down to SITE_MANAGER/SUPERVISOR/
+ * DRIVER/WORKER — see backend balance-calc.ts ROLE_RANK + cash-transfers.service.ts),
+ * and the rollup stays hidden (server-side 403 for non-SM/Owner). KNOWN GAP: the
+ * recipient picker sources GET /users, which for ACCOUNTANT currently returns only
+ * himself (no ACCOUNTANT branch in backend UsersService.list — falls to self-only,
+ * same gap noted on the approvals screen) — so `candidates` filters to empty and
+ * the give/return form shows a "coming soon" note instead (see TransferForm below),
+ * even though the backend would otherwise allow the transfer. Not fixed here
+ * (backend/**), flagged in the CW-3 handoff.
  */
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -32,7 +43,7 @@ import type {
 import { ApiClientError, api, me } from '@/lib/api-client';
 import { todayKolkata } from '@/lib/business-date';
 import { apiErrorMessage } from '@/lib/i18n/messages';
-import { useMessages } from '@/lib/i18n/locale-context';
+import { useLocale, useMessages } from '@/lib/i18n/locale-context';
 import { formatPaise, formatSignedPaise, rupeesToPaise } from '@/lib/money';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -44,14 +55,22 @@ import { ShowMore } from '@/components/ui/show-more';
 import { DateField } from '@/components/entry/date-field';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
 
-type LedgerRole = Extract<Role, 'OWNER' | 'SITE_MANAGER' | 'TEAM_HEAD'>;
+type LedgerRole = Extract<Role, 'OWNER' | 'SITE_MANAGER' | 'SUPERVISOR' | 'ACCOUNTANT'>;
 
 /** Roles BELOW each caller — who they may hand cash to (mirrors the backend). */
 const TARGET_ROLES: Record<LedgerRole, readonly Role[]> = {
-  OWNER: ['SITE_MANAGER', 'TEAM_HEAD', 'DRIVER', 'WORKER'],
-  SITE_MANAGER: ['TEAM_HEAD', 'DRIVER', 'WORKER'],
-  TEAM_HEAD: ['WORKER'],
+  OWNER: ['SITE_MANAGER', 'SUPERVISOR', 'DRIVER', 'WORKER'],
+  SITE_MANAGER: ['SUPERVISOR', 'DRIVER', 'WORKER'],
+  SUPERVISOR: ['WORKER'],
+  ACCOUNTANT: ['SITE_MANAGER', 'SUPERVISOR', 'DRIVER', 'WORKER'],
 };
+
+// Module-local — the frozen LEDGER_UI catalog predates the ACCOUNTANT variant's
+// "recipients not reachable yet" note (see the backend-gap comment above).
+const COMING_SOON_UI = {
+  en: 'Giving/returning cash from here is coming soon.',
+  hi: 'यहाँ से पैसे देना/वापस लेना जल्द आ रहा है।',
+} as const;
 
 export function LedgerScreen({ role }: { role: LedgerRole }) {
   const m = useMessages();
@@ -68,7 +87,7 @@ export function LedgerScreen({ role }: { role: LedgerRole }) {
 
       <TransferForm role={role} usersQ={usersQ} />
       <TransfersHistory usersQ={usersQ} />
-      {role !== 'TEAM_HEAD' && <RollupSection />}
+      {role !== 'SUPERVISOR' && role !== 'ACCOUNTANT' && <RollupSection />}
     </div>
   );
 }
@@ -79,6 +98,7 @@ export function LedgerScreen({ role }: { role: LedgerRole }) {
 
 function TransferForm({ role, usersQ }: { role: LedgerRole; usersQ: ReturnType<typeof useQuery<User[]>> }) {
   const m = useMessages();
+  const locale = useLocale();
   const queryClient = useQueryClient();
   const today = useMemo(() => todayKolkata(), []);
 
@@ -157,6 +177,11 @@ function TransferForm({ role, usersQ }: { role: LedgerRole; usersQ: ReturnType<t
           <LoadingState />
         ) : usersQ.error ? (
           <ErrorState error={usersQ.error} onRetry={() => void usersQ.refetch()} />
+        ) : candidates.length === 0 && role === 'ACCOUNTANT' ? (
+          // Backend gap (see file header): GET /users returns only himself for ACCOUNTANT,
+          // so `candidates` always filters to empty — a distinct note, not the generic
+          // "no people" copy, since the reason isn't that no one exists.
+          <EmptyState label={COMING_SOON_UI[locale]} />
         ) : candidates.length === 0 ? (
           <EmptyState label={m.LEDGER_UI.noPeople} />
         ) : (

@@ -71,13 +71,20 @@ export async function loadScope(tx: Tx, p: Principal): Promise<ScopeContext> {
         .where(and(isNull(schema.crews.deletedAt), inSet(schema.crews.siteId, ctx.siteIds)));
       ctx.crewIds = crews.map((c) => c.id);
     }
-  } else if (u.role === 'TEAM_HEAD') {
+  } else if (u.role === 'SUPERVISOR') {
     const led = await tx
       .select({ id: schema.crews.id, siteId: schema.crews.siteId })
       .from(schema.crews)
-      .where(and(isNull(schema.crews.deletedAt), eq(schema.crews.teamHeadUserId, u.id)));
+      .where(and(isNull(schema.crews.deletedAt), eq(schema.crews.supervisorUserId, u.id)));
     ctx.crewIds = uniq([u.crewId, ...led.map((c) => c.id)]);
     ctx.siteIds = uniq([u.assignedSiteId, ...led.map((c) => c.siteId)]);
+  } else if (u.role === 'ACCOUNTANT') {
+    // Round 2: per-site money desk — mirrors the SM pattern on sites.accountantId.
+    const managed = await tx
+      .select({ id: schema.sites.id })
+      .from(schema.sites)
+      .where(and(isNull(schema.sites.deletedAt), eq(schema.sites.accountantId, u.id)));
+    ctx.siteIds = uniq([u.assignedSiteId, ...managed.map((s) => s.id)]);
   } else if (u.role === 'DRIVER') {
     if (u.personId) {
       const vs = await tx
@@ -98,6 +105,27 @@ export async function loadScope(tx: Tx, p: Principal): Promise<ScopeContext> {
       .from(schema.crewMembers)
       .where(inSet(schema.crewMembers.crewId, ctx.crewIds));
     ctx.crewPersonIds = uniq(members.map((m) => m.personId));
+
+    // Round 2: crews now include DRIVERS (linked via users.crewId). Fold crew drivers into the
+    // person set, and give the SUPERVISOR reach over his crew drivers' vehicles.
+    const crewDrivers = await tx
+      .select({ personId: schema.users.personId })
+      .from(schema.users)
+      .where(
+        and(isNull(schema.users.deletedAt), eq(schema.users.role, 'DRIVER'), inSet(schema.users.crewId, ctx.crewIds)),
+      );
+    const driverPersonIds = uniq(crewDrivers.map((d) => d.personId));
+    if (driverPersonIds.length) {
+      ctx.crewPersonIds = uniq([...ctx.crewPersonIds, ...driverPersonIds]);
+      if (u.role === 'SUPERVISOR') {
+        const vs = await tx
+          .select({ id: schema.vehicles.id, siteId: schema.vehicles.assignedSiteId })
+          .from(schema.vehicles)
+          .where(and(isNull(schema.vehicles.deletedAt), inSet(schema.vehicles.assignedDriverPersonId, driverPersonIds)));
+        ctx.vehicleIds = uniq([...ctx.vehicleIds, ...vs.map((v) => v.id)]);
+        ctx.siteIds = uniq([...ctx.siteIds, ...vs.map((v) => v.siteId)]);
+      }
+    }
   }
   return ctx;
 }

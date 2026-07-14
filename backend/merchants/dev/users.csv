@@ -1,8 +1,8 @@
 name,username,role,phone,site,crew,personName,tempPassword
 Owner Sahab,owner,OWNER,9810000001,,,,changeme123
 Rajesh Site Manager,sm1,SITE_MANAGER,9810000002,GF,,,changeme123
-Mistri Greenfield,th1,TEAM_HEAD,9810000003,GF,,,changeme123
-Mistri Sunrise,th2,TEAM_HEAD,9810000004,ST,,,changeme123
+Mistri Greenfield,th1,SUPERVISOR,9810000003,GF,,,changeme123
+Mistri Sunrise,th2,SUPERVISOR,9810000004,ST,,,changeme123
 Dinesh Driver,driver1,DRIVER,9800000007,GF,,Dinesh Driver,changeme123
 Ramesh Driver,driver2,DRIVER,9800000008,GF,,Ramesh Driver,changeme123
 Suraj Driver,driver3,DRIVER,9800000009,ST,,Suraj Driver,changeme123

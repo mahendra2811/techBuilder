@@ -94,9 +94,10 @@ export const en = {
   ROLE_LABELS: {
     OWNER: "Owner",
     SITE_MANAGER: "Site Manager",
-    TEAM_HEAD: "Team Head",
+    SUPERVISOR: "Supervisor",
     DRIVER: "Driver",
     WORKER: "Worker",
+    ACCOUNTANT: "Accountant",
   } satisfies Record<Role, string>,
 
   /** Navigation item labels, keyed by nav id (see src/lib/nav.ts). */
@@ -118,6 +119,10 @@ export const en = {
     ledger: "Khata",
     insights: "Insights",
     settings: "Settings",
+    // Round 2 (frozen.8):
+    materials: "Materials",
+    diesel: "Diesel",
+    complaints: "Complaints",
   },
 
   /** Attendance status labels (enum values come from the frozen contracts). */
@@ -579,7 +584,7 @@ export const en = {
     smTitle: "Site dashboard",
     smSubtitle: "Your sites at a glance.",
 
-    // Team-head dashboard
+    // Supervisor dashboard
     thCrewTitle: "Today's attendance",
     thCrewSubtitle: "Your crew, today.",
     thOnSiteLabel: "on site today (present + half day)",
@@ -599,7 +604,7 @@ export const en = {
     workerAttTitle: "My attendance",
     workerAttSubtitle: "This month, day by day.",
     workerAttEmpty: "No attendance marked this month yet.",
-    workerViewOnly: "View only — your team head marks the attendance.",
+    workerViewOnly: "View only — your supervisor marks the attendance.",
   },
 
   /** Driver's day (WO-7): vehicle snapshot card + morning start / evening end forms. */
@@ -642,7 +647,7 @@ export const en = {
     people: "People",
     emergency: "Emergency",
     siteManager: "Site Manager",
-    teamHead: "Team Head",
+    supervisor: "Supervisor",
     KIND_LABELS: {
       POLICE: "Police",
       AMBULANCE: "Ambulance",
@@ -746,7 +751,7 @@ export const en = {
     activeNo: "Inactive",
     crewPrefillNote: "This login joins your crew.",
     noCrewNote:
-      "A team head's crew is set up separately — here you only pick their site.",
+      "A supervisor's crew is set up separately — here you only pick their site.",
     noCrewWarning:
       "Your account has no crew assigned, so you cannot create logins yet.",
     createPersonTitle: "Add a worker (labour list)",
@@ -875,12 +880,12 @@ export const en = {
   /** Worker/Driver expense-addition request form + "my requests" (WO-5). */
   EXPENSE_REQUEST_UI: {
     title: "New expense request",
-    subtitle: "Ask your Team Head / Site Manager to add an expense.",
+    subtitle: "Ask your Supervisor / Site Manager to add an expense.",
     noSite: "No site is assigned to your account yet.",
     amountLabel: "Amount (₹)",
     amountInvalid: "Enter an amount greater than 0.",
     amountOverCapPrefix: "This is over your request limit of",
-    amountOverCapSuffix: " — ask your Team Head / Site Manager to enter it directly.",
+    amountOverCapSuffix: " — ask your Supervisor / Site Manager to enter it directly.",
     dateLabel: "Date",
     dateToday: "Today",
     dateYesterday: "Yesterday",
@@ -909,9 +914,9 @@ export const en = {
     noSite: "No site is assigned to you yet.",
 
     limitsTitle: "Limits",
-    limitsSubtitle: "Amounts your workers/drivers and Team Head can enter directly.",
+    limitsSubtitle: "Amounts your workers/drivers and Supervisor can enter directly.",
     requestCapLabel: "Worker / driver request cap (₹)",
-    thLimitLabel: "Team Head per-entry limit (₹)",
+    thLimitLabel: "Supervisor per-entry limit (₹)",
     smLimitLabel: "Your (Site Manager) per-entry limit (₹)",
     smLimitReadOnlyNote: "Set by the Owner — you cannot change this.",
     effectivePrefix: "Currently:",

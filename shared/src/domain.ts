@@ -27,8 +27,22 @@ import type {
   Locale,
   PaymentMode,
   CashTransferKind,
+  MoneyTag,
+  VendorPaymentKind,
+  ComplaintTarget,
+  ReminderKind,
+  ReminderRecurrence,
 } from './enums';
-import type { OrgConfig, EmergencyContact, SiteExpenseFormConfig } from './config';
+import type { OrgConfig, EmergencyContact, SiteExpenseFormConfig, MaterialTypeConfig } from './config';
+
+/** Round 2 two-tick rule: the accountant's VERIFIED mark carried by money rows.
+ *  verifiedAt set → immutable; flagged → 🚩 SM + Owner see it, Owner resolves. */
+export interface VerificationFields {
+  verifiedBy: UUID | null;
+  verifiedAt: Timestamp | null;
+  flagged: boolean;
+  flagNote: string | null;
+}
 
 export interface Org {
   id: UUID;
@@ -63,13 +77,17 @@ export interface Person extends AuditFields {
   skill: PersonSkill | null;
   defaultWagePaise: Paise | null;
   active: boolean;
+  /** Round 2 (C6): ID-card family details — SM/Owner-only edit after onboarding. */
+  guardianName: string | null;
+  guardianPhone: string | null;
 }
 
 export interface Crew extends AuditFields {
   id: UUID;
   orgId: UUID;
   siteId: UUID;
-  teamHeadUserId: UUID;
+  /** Round 2: renamed from teamHeadUserId — the crew's SUPERVISOR. */
+  supervisorUserId: UUID;
   name: string;
   memberPersonIds: UUID[];
 }
@@ -87,6 +105,8 @@ export interface Site extends AuditFields {
   expectedEndDate: BusinessDate | null;
   budgetPaise: Paise | null;
   siteManagerId: UUID | null;
+  /** Round 2: the site's per-site accountant (Owner-assigned). */
+  accountantId: UUID | null;
   emergencyContacts: EmergencyContact[];
   expenseFormConfig: SiteExpenseFormConfig | null;
 }
@@ -135,7 +155,7 @@ export interface Attendance extends AuditFields {
   businessDate: BusinessDate;
   status: AttendanceStatus;
   otHours: number; // default 0
-  markedBy: UUID; // ALWAYS a TEAM_HEAD or SITE_MANAGER
+  markedBy: UUID; // legacy: attendance is OUT of the app for every role (Round 2)
 }
 
 export interface Leave extends AuditFields {
@@ -185,7 +205,7 @@ export interface Vendor extends AuditFields {
   sells: string | null;
 }
 
-export interface Expense extends AuditFields {
+export interface Expense extends AuditFields, VerificationFields {
   id: UUID;
   orgId: UUID;
   siteId: UUID;
@@ -210,6 +230,48 @@ export interface FuelLog extends AuditFields {
   reading: number; // odometer/hour-meter at fill
   receiptMediaId: UUID | null;
   businessDate: BusinessDate;
+  /** Round 2 (C7): diesel-match state vs the supervisor's issuance. */
+  status: MaterialTxnStatus;
+  matchedIssuanceId: UUID | null;
+}
+
+/** Round 2 (C7): supervisor's bulk diesel purchase — site stock = purchases − issuances. */
+export interface FuelStockPurchase extends AuditFields {
+  id: UUID;
+  orgId: UUID;
+  siteId: UUID;
+  litres: number;
+  amountPaise: Paise | null;
+  receiptMediaId: UUID | null;
+  purchasedBy: UUID;
+  businessDate: BusinessDate;
+  note: string | null;
+}
+
+/** Round 2 (C7): supervisor's ISSUED side of the diesel double-check. */
+export interface FuelIssuance extends AuditFields {
+  id: UUID;
+  orgId: UUID;
+  siteId: UUID;
+  vehicleId: UUID;
+  litres: number;
+  issuedBy: UUID;
+  businessDate: BusinessDate;
+  status: MaterialTxnStatus;
+  matchedFuelLogId: UUID | null;
+  note: string | null;
+}
+
+/** Round 2 (C7): one row of the diesel red-flag list (accountant / SM / Owner). */
+export interface FuelMatchFlag {
+  vehicleId: UUID;
+  siteId: UUID;
+  businessDate: BusinessDate;
+  issuedLitres: number | null; // null = supervisor side missing
+  receivedLitres: number | null; // null = driver side missing
+  status: MaterialTxnStatus;
+  issuanceId: UUID | null;
+  fuelLogId: UUID | null;
 }
 
 export interface VehicleLog extends AuditFields {
@@ -241,6 +303,8 @@ export interface Material extends AuditFields {
   orgId: UUID;
   name: string;
   uom: Uom;
+  /** Round 2 (C11): per-type entry rules (SM-set); null = defaults (supervisor-only logs). */
+  config: MaterialTypeConfig | null;
 }
 
 export interface MaterialBalance {
@@ -264,6 +328,9 @@ export interface MaterialTxn extends AuditFields {
   relatedTxnId: UUID | null; // links DISPATCH ↔ RECEIVE
   status: MaterialTxnStatus;
   businessDate: BusinessDate;
+  /** Round 2 (C11): SUPERVISOR entry = final; DRIVER pick = data-only input. */
+  enteredRole: Role | null;
+  finalized: boolean;
 }
 
 export interface Issue extends AuditFields {
@@ -294,7 +361,7 @@ export interface Media {
   takenAt: Timestamp;
 }
 
-export interface ApprovalRequest extends AuditFields {
+export interface ApprovalRequest extends AuditFields, VerificationFields {
   id: UUID;
   orgId: UUID;
   type: ApprovalType;
@@ -415,17 +482,20 @@ export interface ContactPerson {
 /** Resolved tap-to-call panel for the calling user (worker/driver dashboards). */
 export interface ContactPanel {
   siteManager: ContactPerson | null;
-  teamHead: ContactPerson | null;
+  /** Round 2: renamed from teamHead. */
+  supervisor: ContactPerson | null;
   emergency: EmergencyContact[];
 }
 
-export interface CashTransfer extends AuditFields {
+export interface CashTransfer extends AuditFields, VerificationFields {
   id: UUID;
   orgId: UUID;
   fromUserId: UUID;
   toUserId: UUID;
   amountPaise: Paise;
   kind: CashTransferKind;
+  /** Round 2: WORK = khata advance; SALARY/PERSONAL = personal draw. */
+  tag: MoneyTag;
   businessDate: BusinessDate;
   note: string | null;
 }
@@ -449,23 +519,28 @@ export interface LedgerRollupRow {
   byCategory: Partial<Record<ExpenseCategory, Paise>>;
 }
 
-export interface VendorPayment extends AuditFields {
+export interface VendorPayment extends AuditFields, VerificationFields {
   id: UUID;
   orgId: UUID;
   vendorId: UUID;
+  /** Round 2: PAYMENT = pay the vendor; RECEIPT = vendor money-IN. */
+  kind: VendorPaymentKind;
   amountPaise: Paise;
   businessDate: BusinessDate;
   note: string | null;
 }
 
-/** Shop khata: purchased (credit expenses) vs paid, month-wise ('YYYY-MM'). */
+/** Shop khata: purchased (credit expenses) vs paid vs received (money-IN), month-wise ('YYYY-MM').
+ *  balance = purchased + received − paid (what the site owes the vendor). */
 export interface VendorLedger {
   vendorId: UUID;
   name: string;
   purchasedPaise: Paise;
   paidPaise: Paise;
+  /** Round 2: vendor money-IN total (RECEIPT rows). */
+  receivedPaise: Paise;
   balancePaise: Paise;
-  months: Array<{ month: string; purchasedPaise: Paise; paidPaise: Paise }>;
+  months: Array<{ month: string; purchasedPaise: Paise; paidPaise: Paise; receivedPaise: Paise }>;
 }
 
 export interface DayInsights {
@@ -535,6 +610,73 @@ export interface DriverDetail {
   fuel: FuelLog[];
   trips: Trip[];
   expenses: Expense[];
+}
+
+// ---- Round 2 (frozen.8) read models: complaints · vehicle docs · my-money · accountant queue ----
+
+export interface Complaint extends AuditFields {
+  id: UUID;
+  orgId: UUID;
+  raisedBy: UUID;
+  target: ComplaintTarget;
+  siteId: UUID | null;
+  text: string;
+  mediaIds: UUID[];
+  status: IssueStatus;
+}
+
+/** Per-vehicle document vault entry (SM + Owner ONLY). */
+export interface VehicleDocument extends AuditFields {
+  id: UUID;
+  orgId: UUID;
+  vehicleId: UUID;
+  kind: VehicleDocKind;
+  title: string;
+  mediaId: UUID | null;
+  expiryDate: BusinessDate | null;
+  note: string | null;
+}
+
+export interface VehicleReminder extends AuditFields {
+  id: UUID;
+  orgId: UUID;
+  vehicleId: UUID;
+  documentId: UUID | null;
+  label: string;
+  kind: ReminderKind;
+  dueDate: BusinessDate;
+  recurrence: ReminderRecurrence;
+  remindDaysBefore: number;
+  active: boolean;
+  lastNotifiedFor: BusinessDate | null;
+}
+
+/** "Money I've taken" (C10): one verified personal draw shown to its receiver. */
+export interface MyMoneyEntry {
+  id: UUID;
+  businessDate: BusinessDate;
+  amountPaise: Paise;
+  tag: MoneyTag; // SALARY | PERSONAL
+  fromUserId: UUID;
+  fromName: string;
+  note: string | null;
+  verifiedAt: Timestamp;
+}
+export interface MyMoney {
+  entries: MyMoneyEntry[];
+  totalPaise: Paise;
+}
+
+/** The accountant's screen: a WORK QUEUE, not analytics (client decision). */
+export interface AccountantQueue {
+  pendingRequests: ApprovalRequest[];
+  unverifiedExpenses: Expense[];
+  unverifiedTransfers: CashTransfer[];
+  unverifiedVendorPayments: VendorPayment[];
+  fuelFlags: FuelMatchFlag[];
+  decidedToday: { approved: number; rejected: number; verified: number };
+  /** Cash currently in the accountant's own hands (his khata balance). */
+  cashInHandPaise: Paise;
 }
 
 export interface AuthSession {

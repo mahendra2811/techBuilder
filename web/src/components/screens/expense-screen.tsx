@@ -60,7 +60,7 @@ import { RecentEntries } from '@/components/entry/recent-entries';
 import { SitePicker } from '@/components/entry/site-picker';
 import { Notice } from '@/components/entry/states';
 
-type EntryRole = 'SITE_MANAGER' | 'TEAM_HEAD';
+type EntryRole = 'SITE_MANAGER' | 'SUPERVISOR';
 const MAX_BILL_PHOTOS = 1;
 const MAX_EXTRA_PHOTOS = 2;
 
@@ -96,12 +96,10 @@ export function ExpenseScreen({ role }: { role: EntryRole }) {
   ).filter((c) => c.enabled);
   const categoryLabel = (c: ExpenseCategoryConfig) => (locale === 'hi' ? c.labelHi : c.labelEn);
 
-  // Limit-editing rule (frozen): TH's cap is org/site-configured; SM's likewise — each edited one
-  // role above the one it binds. Undefined until org config has loaded (no client hint yet).
-  const directLimitPaise =
-    role === 'TEAM_HEAD'
-      ? (selectedSite?.expenseFormConfig?.thDirectLimitPaise ?? orgExpense?.thDirectLimitPaise)
-      : (selectedSite?.expenseFormConfig?.smDirectLimitPaise ?? orgExpense?.smDirectLimitPaise);
+  // Round 2: the SUPERVISOR has ZERO direct authority — his entry ALWAYS routes as a money
+  // request to the accountant (no cap on the request). The SM books any amount directly
+  // (the v1 ₹1L ladder is gone) — his entries await the accountant's verify tick instead.
+  const directLimitPaise = role === 'SUPERVISOR' ? 0 : undefined;
 
   const recentWindow = { from: addDays(today, -7), to: today };
   const recentQs = siteId
@@ -379,7 +377,7 @@ function ExpenseForm({
             {fieldErrors.amount}
           </p>
         )}
-        {limitsReady && directLimitPaise !== undefined && (
+        {limitsReady && directLimitPaise !== undefined && directLimitPaise > 0 && (
           <p className="text-xs text-muted-foreground" data-testid="expense-limit-hint">
             {m.EXPENSE_UI.limitHintPrefix} {formatPaise(directLimitPaise)}
           </p>

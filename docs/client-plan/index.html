@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>techBuilder — Plan Hub</title>
+<style>
+  :root{
+    --bg:#F8F6F1; --card:#FFFFFF; --ink:#25282C; --muted:#6C6F75; --line:#E3E0D7; --accent:#C05E1A;
+    --mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#17191D; --card:#1F2228; --ink:#E7E5E0; --muted:#9DA0A8; --line:#33373E; --accent:#E08A45; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 system-ui,-apple-system,'Segoe UI',Roboto,'Noto Sans',sans-serif}
+  .wrap{max-width:860px;margin:0 auto;padding:0 18px}
+  a{color:inherit}
+  header{padding:36px 0 20px;border-bottom:3px solid var(--ink)}
+  .eyebrow{font:700 11px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+  h1{font-size:clamp(24px,5vw,34px);margin:10px 0;font-weight:800;letter-spacing:-.01em}
+  .lead{color:var(--muted);max-width:64ch;margin:0}
+  .grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin:26px 0}
+  @media(max-width:720px){.grid{grid-template-columns:1fr}}
+  .tile{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px}
+  .tile.hero{border:2px solid var(--accent)}
+  .tile h2{margin:0 0 4px;font-size:18px}
+  .tile .st{font:700 10.5px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .tile p{margin:8px 0 12px;font-size:14px;color:var(--muted)}
+  .tile a.btn{display:inline-block;font:700 13px/1 var(--mono);text-decoration:none;background:var(--accent);color:#fff;border-radius:8px;padding:9px 12px;margin:0 6px 6px 0}
+  .tile a.btn.alt{background:transparent;color:var(--accent);border:1.5px solid var(--accent)}
+  .extra{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 18px;margin:0 0 30px;font-size:14px;color:var(--muted)}
+  .extra a{color:var(--accent)}
+  footer{border-top:1px solid var(--line);padding:18px 0 42px;color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="eyebrow">techBuilder · Daily Site Record App</div>
+    <h1>Plan Hub — start here</h1>
+    <p class="lead">Three views of the plan: what was built first (Round 1), what changes (Round 2), and the complete current target (Final). Each has a diagram web page and a written document.</p>
+  </div>
+</header>
+<div class="wrap">
+  <div class="grid">
+    <div class="tile hero">
+      <div class="st">Current target · Round 1 + Round 2 merged</div>
+      <h2>⭐ The Final Plan</h2>
+      <p>The complete app in one place: 6 roles, the money verification system, diesel &amp; material double-checks, who sees what. Start here if you're new.</p>
+      <a class="btn" href="finalindex.html">Diagrams</a>
+      <a class="btn alt" href="finalPlan.md">Document</a>
+    </div>
+    <div class="tile">
+      <div class="st">Agreed 2026-07-12 · not yet built</div>
+      <h2>Round 2 — the changes</h2>
+      <p>Supervisor replaces Team Head, the Accountant verifies every rupee, six new mechanisms. Before → after.</p>
+      <a class="btn" href="2ndroundindex.html">Diagrams</a>
+      <a class="btn alt" href="2ndroundplan.md">Document</a>
+    </div>
+    <div class="tile">
+      <div class="st">Built &amp; live since 2026-07-08</div>
+      <h2>Round 1 — as built</h2>
+      <p>The original 5-role plan with the approval ladder. Superseded in parts by Round 2.</p>
+      <a class="btn" href="1stroundindex.html">Diagrams</a>
+      <a class="btn alt" href="1stroundplan.md">Document</a>
+    </div>
+  </div>
+  <div class="extra">
+    Also here: <a href="round1-client-index.html">the original Round-1 client document</a> (full detail, point codes W/D/T/S/O) ·
+    <a href="techBuilder-Client-Changes-Round2-Supervisor-Accountant.md">the Round-2 developer spec</a> (contracts + work orders CW-0…CW-11).
+  </div>
+</div>
+<footer><div class="wrap">techBuilder · plan hub · all pages self-contained, work offline.</div></footer>
+</body>
+</html>

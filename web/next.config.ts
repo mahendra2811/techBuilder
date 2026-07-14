@@ -7,6 +7,18 @@ const nextConfig: NextConfig = {
   // (`next start` prints a harmless warning but should not be used once this is on — run
   // `node .next/standalone/server.js` per docs/deployment/PRODUCTION_DEPLOYMENT.md.)
   ...(process.env.NEXT_OUTPUT_STANDALONE === "1" ? { output: "standalone" as const } : {}),
+
+  // Round-2 CW-1: TEAM_HEAD → SUPERVISOR rename moved the role area from /team-head to
+  // /supervisor — permanently redirect any stale bookmarks/links.
+  async redirects() {
+    return [
+      {
+        source: "/team-head/:path*",
+        destination: "/supervisor/:path*",
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

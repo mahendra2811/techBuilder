@@ -1,6 +1,6 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { z } from 'zod';
-import type { CreatePersonInput } from '@techbuilder/contracts';
+import type { CreatePersonInput, UpdatePersonInput } from '@techbuilder/contracts';
 import { PeopleService } from './people.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RbacGuard, RequireAction } from '../common/rbac.guard';
@@ -13,6 +13,20 @@ const CreatePersonSchema = z.object({
   phone: z.string().optional(),
   skill: z.enum(['UNSKILLED', 'SEMI_SKILLED', 'SKILLED', 'OPERATOR', 'DRIVER']).optional(),
   defaultWagePaise: z.number().int().optional(),
+  // Round 2 (C6): onboarder sets guardian/ID-card fields once at creation.
+  guardianName: z.string().max(120).optional(),
+  guardianPhone: z.string().max(20).optional(),
+});
+
+// Round 2 (CW-4): all optional — the service decides field-by-field who may actually change
+// what (guardianName/guardianPhone/phone are SM-in-reach/Owner-only; see people.service.ts).
+const UpdatePersonSchema = z.object({
+  name: z.string().min(1).max(120).optional(),
+  phone: z.string().max(20).optional(),
+  skill: z.enum(['UNSKILLED', 'SEMI_SKILLED', 'SKILLED', 'OPERATOR', 'DRIVER']).optional(),
+  defaultWagePaise: z.number().int().optional(),
+  guardianName: z.string().max(120).optional(),
+  guardianPhone: z.string().max(20).optional(),
 });
 
 @UseGuards(JwtAuthGuard, RbacGuard)
@@ -30,5 +44,17 @@ export class PeopleController {
   @Get()
   list(@CurrentUser() u: Principal) {
     return this.people.list(u);
+  }
+
+  // Same action as create — SM/Supervisor/Owner may all reach the route; the service enforces
+  // the narrower field-by-field rule (guardian/phone = SM-in-reach/Owner only).
+  @RequireAction('user.create')
+  @Patch(':id')
+  update(
+    @CurrentUser() u: Principal,
+    @Param('id') id: string,
+    @Body(new ZodBody(UpdatePersonSchema)) body: UpdatePersonInput,
+  ) {
+    return this.people.update(u, id, body);
   }
 }

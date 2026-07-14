@@ -45,21 +45,21 @@ describe('computeBalance — hand-computed fixtures', () => {
 describe('chainAllows — GIVE flows down, RETURN flows up', () => {
   it('GIVE is allowed only when the giver outranks the receiver', () => {
     expect(chainAllows('GIVE', 'OWNER', 'SITE_MANAGER')).toBe(true);
-    expect(chainAllows('GIVE', 'SITE_MANAGER', 'TEAM_HEAD')).toBe(true);
+    expect(chainAllows('GIVE', 'SITE_MANAGER', 'SUPERVISOR')).toBe(true);
     expect(chainAllows('GIVE', 'SITE_MANAGER', 'WORKER')).toBe(true);
-    expect(chainAllows('GIVE', 'TEAM_HEAD', 'WORKER')).toBe(true);
+    expect(chainAllows('GIVE', 'SUPERVISOR', 'WORKER')).toBe(true);
     // same-rank or upward GIVE is forbidden
     expect(chainAllows('GIVE', 'WORKER', 'WORKER')).toBe(false);
     expect(chainAllows('GIVE', 'DRIVER', 'WORKER')).toBe(false); // equal rank
     expect(chainAllows('GIVE', 'WORKER', 'DRIVER')).toBe(false); // equal rank
-    expect(chainAllows('GIVE', 'TEAM_HEAD', 'SITE_MANAGER')).toBe(false); // upward
+    expect(chainAllows('GIVE', 'SUPERVISOR', 'SITE_MANAGER')).toBe(false); // upward
     expect(chainAllows('GIVE', 'WORKER', 'OWNER')).toBe(false);
   });
 
   it('RETURN is allowed only when the receiver outranks the giver (balance handed up)', () => {
-    expect(chainAllows('RETURN', 'WORKER', 'TEAM_HEAD')).toBe(true);
+    expect(chainAllows('RETURN', 'WORKER', 'SUPERVISOR')).toBe(true);
     expect(chainAllows('RETURN', 'WORKER', 'SITE_MANAGER')).toBe(true);
-    expect(chainAllows('RETURN', 'TEAM_HEAD', 'SITE_MANAGER')).toBe(true);
+    expect(chainAllows('RETURN', 'SUPERVISOR', 'SITE_MANAGER')).toBe(true);
     expect(chainAllows('RETURN', 'SITE_MANAGER', 'OWNER')).toBe(true);
     // downward or same-rank RETURN is forbidden
     expect(chainAllows('RETURN', 'SITE_MANAGER', 'WORKER')).toBe(false); // downward
@@ -67,10 +67,10 @@ describe('chainAllows — GIVE flows down, RETURN flows up', () => {
     expect(chainAllows('RETURN', 'DRIVER', 'WORKER')).toBe(false); // equal rank
   });
 
-  it('rank ladder: OWNER > SITE_MANAGER > TEAM_HEAD > DRIVER = WORKER', () => {
+  it('rank ladder: OWNER > SITE_MANAGER > SUPERVISOR > DRIVER = WORKER', () => {
     expect(ROLE_RANK.OWNER).toBeGreaterThan(ROLE_RANK.SITE_MANAGER);
-    expect(ROLE_RANK.SITE_MANAGER).toBeGreaterThan(ROLE_RANK.TEAM_HEAD);
-    expect(ROLE_RANK.TEAM_HEAD).toBeGreaterThan(ROLE_RANK.DRIVER);
+    expect(ROLE_RANK.SITE_MANAGER).toBeGreaterThan(ROLE_RANK.SUPERVISOR);
+    expect(ROLE_RANK.SUPERVISOR).toBeGreaterThan(ROLE_RANK.DRIVER);
     expect(ROLE_RANK.DRIVER).toBe(ROLE_RANK.WORKER);
   });
 });

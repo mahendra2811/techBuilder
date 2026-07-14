@@ -30,7 +30,7 @@ import { ApiClientError, api, me } from '@/lib/api-client';
 import { addDays, todayKolkata } from '@/lib/business-date';
 import { uploadPhotos, uploadVoice } from '@/lib/media-upload';
 import { apiErrorMessage } from '@/lib/i18n/messages';
-import { useMessages } from '@/lib/i18n/locale-context';
+import { useLocale, useMessages } from '@/lib/i18n/locale-context';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -41,9 +41,23 @@ import { VoiceField } from '@/components/entry/voice-field';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
 import { DamageTimeline } from '@/components/vehicle/damage-timeline';
 
+/** Round 2 (CW-9) copy: switching onto an ALLOWED type is log-only (no approval flow) —
+ *  make that explicit, and name both people who now get the widened notification. Module-local
+ *  per convention (never edit the shared i18n catalogs for this). */
+const UI = {
+  en: {
+    logOnlyNotice: 'No approval needed — your supervisor and the site manager will be informed automatically.',
+  },
+  hi: {
+    logOnlyNotice: 'मंज़ूरी की ज़रूरत नहीं — आपके सुपरवाइज़र और साइट मैनेजर को अपने आप सूचना मिल जाएगी।',
+  },
+};
+
 export function VehicleSwitchScreen() {
   const m = useMessages();
   const w = m.VEHICLE_WAVE_UI;
+  const locale = useLocale();
+  const ui = UI[locale];
   const queryClient = useQueryClient();
   const today = useMemo(() => todayKolkata(), []);
 
@@ -100,16 +114,23 @@ export function VehicleSwitchScreen() {
           ) : otherVehicles.length === 0 ? (
             <EmptyState label={w.switchListEmpty} />
           ) : (
-            <ul className="divide-y" data-testid="switch-vehicle-list">
-              {otherVehicles.map((v) => (
-                <SwitchVehicleRow
-                  key={v.id}
-                  vehicle={v}
-                  allowed={allowedTypes.has(v.vehicleTypeId)}
-                  onSwitched={invalidateAfterSwitch}
-                />
-              ))}
-            </ul>
+            <>
+              {otherVehicles.some((v) => allowedTypes.has(v.vehicleTypeId)) && (
+                <Notice tone="success" testId="switch-log-only-notice">
+                  {ui.logOnlyNotice}
+                </Notice>
+              )}
+              <ul className="divide-y" data-testid="switch-vehicle-list">
+                {otherVehicles.map((v) => (
+                  <SwitchVehicleRow
+                    key={v.id}
+                    vehicle={v}
+                    allowed={allowedTypes.has(v.vehicleTypeId)}
+                    onSwitched={invalidateAfterSwitch}
+                  />
+                ))}
+              </ul>
+            </>
           )}
         </CardContent>
       </Card>

@@ -2,8 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { and, desc, eq, gte, isNull, lte, or, sql, type SQL } from 'drizzle-orm';
 import type { PgTable } from 'drizzle-orm/pg-core';
 import * as schema from '@techbuilder/contracts/db/schema';
-import { can, type Action } from '@techbuilder/contracts';
-import { loadExpenseLimits, loadOrgConfig } from '../common/org-config.util';
+import { can, MaterialTypeConfigSchema, type Action } from '@techbuilder/contracts';
+import { loadOrgConfig } from '../common/org-config.util';
 import type {
   CreateProgressNoteInput,
   CreateExpenseInput,
@@ -14,6 +14,7 @@ import type {
   CreateIssueInput,
   ResolveIssueInput,
   CloseIssueInput,
+  VerifyInput,
   ProgressNote,
   Expense,
   FuelLog,
@@ -25,6 +26,8 @@ import type {
 import { DbService, type Tx } from '../db/db.service';
 import { ApiException } from '../common/api-exception';
 import type { Principal } from '../common/current-user.decorator';
+import { assertCanVerify, assertNotVerified, notifyMoneyFlagged, verificationSet } from '../common/verification.util';
+import { matchVerdict } from '../fuel-stock/fuel-match';
 import {
   assertSiteInScope,
   assertVehicleInScope,
@@ -134,21 +137,19 @@ export class RecordsService {
     return this.dbs.runInTenant(p.orgId, async (tx) => {
       const ctx = await loadScope(tx, p);
       assertSiteInScope(ctx, 'record.enter', input.siteId);
-      const cfg = await loadOrgConfig(tx); // once — feeds both the window check and the limits
+      const cfg = await loadOrgConfig(tx);
       await assertBackdateWindow(tx, ctx.role, input.businessDate, RECORD_CREATE_BACKDATE_LIMIT_DAYS, cfg.completion.cutoffLocalTime);
-      // Client-plan v1 per-entry direct limits: TH ≤ ₹25k, SM ≤ ₹1L (site-overridable, edited one
-      // level above). Over the line → the client converts the entry into an EXPENSE_ADD request.
-      if (ctx.role === 'TEAM_HEAD' || ctx.role === 'SITE_MANAGER') {
-        const limits = await loadExpenseLimits(tx, input.siteId, cfg);
-        const directLimit = ctx.role === 'TEAM_HEAD' ? limits.thDirectLimitPaise : limits.smDirectLimitPaise;
-        if (input.amountPaise > directLimit) {
-          throw new ApiException(
-            'VALIDATION_FAILED',
-            'Amount exceeds your direct-entry limit — submit it as a request for approval',
-            { amountPaise: 'OVER_DIRECT_LIMIT' },
-          );
-        }
+      // Round 2: the SUPERVISOR has ZERO direct-expense authority (₹0) — every spend of his is a
+      // money request to the accountant (which has NO cap). The web form auto-converts.
+      if (ctx.role === 'SUPERVISOR') {
+        throw new ApiException(
+          'VALIDATION_FAILED',
+          'Supervisors record spends as money requests — submit it for the accountant instead',
+          { amountPaise: 'OVER_DIRECT_LIMIT' }, // same field code the form already converts on
+        );
       }
+      // SM/Owner: any amount books directly — but it lands UNVERIFIED and waits for the
+      // accountant's tick (the v1 ₹1L→Owner ladder is removed).
       const [row] = await tx
         .insert(schema.expenses)
         .values({
@@ -188,6 +189,21 @@ export class RecordsService {
       const ctx = await loadScope(tx, p);
       await assertVehicleInScope(tx, ctx, 'vehicleLog.enter', input.vehicleId);
       await assertBackdateWindow(tx, ctx.role, input.businessDate, RECORD_CREATE_BACKDATE_LIMIT_DAYS);
+      // Round 2 (C7): the driver's entry is the RECEIVED side of the diesel double-check —
+      // pair it with the supervisor's unmatched issuance of the same vehicle + business day.
+      const [issuance] = await tx
+        .select()
+        .from(schema.fuelIssuances)
+        .where(
+          and(
+            isNull(schema.fuelIssuances.deletedAt),
+            eq(schema.fuelIssuances.vehicleId, input.vehicleId),
+            eq(schema.fuelIssuances.businessDate, input.businessDate),
+            isNull(schema.fuelIssuances.matchedFuelLogId),
+          ),
+        )
+        .orderBy(schema.fuelIssuances.createdAt);
+      const matchStatus = issuance ? matchVerdict(issuance.litres, input.litres) : 'PENDING';
       const [row] = await tx
         .insert(schema.fuelLogs)
         .values({
@@ -199,11 +215,19 @@ export class RecordsService {
           reading: input.reading,
           receiptMediaId: input.receiptMediaId ?? null,
           businessDate: input.businessDate,
+          status: matchStatus,
+          matchedIssuanceId: issuance?.id ?? null,
           createdBy: p.userId,
           updatedBy: p.userId,
         })
         .onConflictDoNothing()
         .returning();
+      if (row && issuance) {
+        await tx
+          .update(schema.fuelIssuances)
+          .set({ status: matchStatus, matchedFuelLogId: row.id, updatedBy: p.userId, updatedAt: new Date() })
+          .where(eq(schema.fuelIssuances.id, issuance.id));
+      }
       if (!row) {
         const [existing] = await tx
           .select()
@@ -304,11 +328,32 @@ export class RecordsService {
   }
 
   // ---- createMaterialTxn ----
+  // Round 2 (CW-8): a SUPERVISOR's entry is the FINAL record (finalized=true); a DRIVER's
+  // entry is a data-only PICK (finalized=false), allowed only when the material's
+  // config.driverPicks is true. Drivers hold vehicleLog.enter, never record.enter (see the
+  // controller's no-@RequireAction comment on this route, same reasoning as createIssue below).
   async createMaterialTxn(p: Principal, input: CreateMaterialTxnInput): Promise<MaterialTxn> {
     return this.dbs.runInTenant(p.orgId, async (tx) => {
       const ctx = await loadScope(tx, p);
-      assertSiteInScope(ctx, 'record.enter', input.siteId);
+      if (ctx.role === 'DRIVER') {
+        assertSiteInScope(ctx, 'vehicleLog.enter', input.siteId);
+      } else {
+        if (!can(ctx.role, 'record.enter')) forbidScope(`Role ${ctx.role} cannot record.enter`);
+        assertSiteInScope(ctx, 'record.enter', input.siteId);
+      }
       await assertBackdateWindow(tx, ctx.role, input.businessDate, RECORD_CREATE_BACKDATE_LIMIT_DAYS);
+
+      const [material] = await tx
+        .select({ id: schema.materials.id, config: schema.materials.config })
+        .from(schema.materials)
+        .where(and(eq(schema.materials.id, input.materialId), isNull(schema.materials.deletedAt)));
+      if (!material) throw new ApiException('NOT_FOUND', 'Material not found');
+      const parsedCfg = MaterialTypeConfigSchema.safeParse(material.config);
+      const cfg = parsedCfg.success ? parsedCfg.data : null;
+      if (ctx.role === 'DRIVER' && cfg?.driverPicks !== true) {
+        throw new ApiException('FORBIDDEN', 'This material is not driver-pickable');
+      }
+
       const [row] = await tx
         .insert(schema.materialTxns)
         .values({
@@ -323,6 +368,8 @@ export class RecordsService {
           relatedTxnId: input.relatedTxnId ?? null,
           status: 'CONFIRMED',
           businessDate: input.businessDate,
+          enteredRole: ctx.role,
+          finalized: ctx.role !== 'DRIVER',
           createdBy: p.userId,
           updatedBy: p.userId,
         })
@@ -468,10 +515,20 @@ export class RecordsService {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const t = table as any;
     const [row] = (await tx
-      .select({ createdBy: t.createdBy, businessDate: t.businessDate, deletedAt: t.deletedAt })
+      .select({
+        createdBy: t.createdBy,
+        businessDate: t.businessDate,
+        deletedAt: t.deletedAt,
+        // Round 2: only the expense family carries verification cols.
+        ...(et === 'expense' ? { verifiedAt: t.verifiedAt } : {}),
+      })
       .from(table)
-      .where(eq(t.id, id))) as Array<{ createdBy: string | null; businessDate: string; deletedAt: Date | null }>;
+      .where(eq(t.id, id))) as Array<{ createdBy: string | null; businessDate: string; deletedAt: Date | null; verifiedAt?: Date | null }>;
     if (!row || row.deletedAt) throw new ApiException('NOT_FOUND', `${et} record not found`);
+    // Round 2 two-tick: accountant-verified money is PERMANENT — no edit/void for ANYONE (incl. Owner).
+    if (row.verifiedAt) {
+      throw new ApiException('CONFLICT', 'This entry is accountant-verified and permanent — it cannot be changed');
+    }
     if (ctx.role === 'OWNER') return; // audited override
 
     const action = ACTION_FOR[et];
@@ -530,6 +587,39 @@ export class RecordsService {
     });
   }
 
+  /**
+   * Round 2 two-tick: the accountant's verdict on a booked expense (SM/Owner direct entries land
+   * unverified; request-materialized ones share the request's stamp). ok=true → permanent;
+   * ok=false → 🚩 flagged + MONEY_FLAGGED to the site SM + Owners.
+   */
+  async verifyExpense(p: Principal, id: string, input: VerifyInput): Promise<Expense> {
+    return this.dbs.runInTenant(p.orgId, async (tx) => {
+      const ctx = await loadScope(tx, p);
+      const [row] = await tx.select().from(schema.expenses).where(eq(schema.expenses.id, id));
+      assertNotVerified(row, 'Expense');
+      const exp = row!;
+      if (exp.void) throw new ApiException('CONFLICT', 'A voided expense cannot be verified');
+      assertCanVerify(ctx, exp.siteId);
+
+      const set = verificationSet(ctx, input);
+      const [updated] = await tx.update(schema.expenses).set(set).where(eq(schema.expenses.id, id)).returning();
+      if (!updated) throw new ApiException('NOT_FOUND', 'Expense not found');
+      // If this expense was materialized from a request (shared id), mirror the verdict there.
+      await tx.update(schema.approvalRequests).set(set).where(eq(schema.approvalRequests.id, id));
+
+      if (!input.ok) {
+        await notifyMoneyFlagged(tx, exp.orgId, exp.siteId, {
+          kind: 'expense',
+          expenseId: exp.id,
+          flagNote: input.flagNote,
+          enteredBy: exp.enteredBy,
+          amountPaise: exp.amountPaise,
+        });
+      }
+      return mapExpense(updated);
+    });
+  }
+
   // ---- listRecords ----
   async listRecords(
     p: Principal,
@@ -549,7 +639,7 @@ export class RecordsService {
             return undefined;
           case 'SITE_MANAGER':
             return inSet(siteCol, ctx.siteIds);
-          case 'TEAM_HEAD':
+          case 'SUPERVISOR':
             return financial ? (eq(enteredByCol, ctx.userId) as SQL) : inSet(siteCol, ctx.siteIds);
           default:
             return eq(enteredByCol, ctx.userId) as SQL; // DRIVER / WORKER → own entries only
@@ -717,6 +807,11 @@ function mapExpense(r: typeof schema.expenses.$inferSelect): Expense {
     updatedBy: r.updatedBy ?? r.id,
     deletedAt: r.deletedAt ? r.deletedAt.toISOString() : null,
     version: r.version,
+    // frozen.8 (Round-2 two-tick rule) — plain passthrough, no verification workflow wired yet.
+    verifiedBy: r.verifiedBy ?? null,
+    verifiedAt: r.verifiedAt ? r.verifiedAt.toISOString() : null,
+    flagged: r.flagged,
+    flagNote: r.flagNote ?? null,
   };
 }
 
@@ -736,6 +831,9 @@ function mapFuelLog(r: typeof schema.fuelLogs.$inferSelect): FuelLog {
     updatedBy: r.updatedBy ?? r.id,
     deletedAt: r.deletedAt ? r.deletedAt.toISOString() : null,
     version: r.version,
+    // Round-2 C7 diesel two-sided match (paired at insert against the supervisor's issuance).
+    status: r.status,
+    matchedIssuanceId: r.matchedIssuanceId ?? null,
   };
 }
 
@@ -798,6 +896,9 @@ function mapMaterialTxn(r: typeof schema.materialTxns.$inferSelect): MaterialTxn
     updatedBy: r.updatedBy ?? r.id,
     deletedAt: r.deletedAt ? r.deletedAt.toISOString() : null,
     version: r.version,
+    // frozen.8 (Round-2 C11 per-type material config) — plain passthrough, not enforced yet.
+    enteredRole: r.enteredRole ?? null,
+    finalized: r.finalized,
   };
 }
 

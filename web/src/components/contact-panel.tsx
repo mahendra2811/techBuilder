@@ -4,13 +4,13 @@
  * WO-4: Emergency & contacts footer panel (worker + driver dashboards).
  *
  * Read-side only — GET /me/contacts resolves the caller's Site Manager (via
- * users.assignedSiteId → sites.siteManagerId), Team Head (via users.crewId →
- * crews.teamHeadUserId) and the site's curated emergency numbers
+ * users.assignedSiteId → sites.siteManagerId), Supervisor (via users.crewId →
+ * crews.supervisorUserId) and the site's curated emergency numbers
  * (sites.emergencyContacts jsonb).
  *
  * Every row is a large tap-to-call <a href="tel:…"> (min 44px). A contacts
  * footer must never break a dashboard: on error it renders NOTHING, and when
- * everything is empty (no SM, no TH, no numbers) it renders nothing either.
+ * everything is empty (no SM, no Supervisor, no numbers) it renders nothing either.
  */
 import type { ComponentType } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -92,8 +92,8 @@ export function ContactPanel() {
   // Never break the dashboard over a contacts footer.
   if (q.error || !q.data) return null;
 
-  const { siteManager, teamHead, emergency } = q.data;
-  if (!siteManager && !teamHead && emergency.length === 0) return null;
+  const { siteManager, supervisor, emergency } = q.data;
+  if (!siteManager && !supervisor && emergency.length === 0) return null;
 
   return (
     <Card data-testid="contact-panel">
@@ -101,7 +101,7 @@ export function ContactPanel() {
         <CardTitle>{m.CONTACTS_UI.title}</CardTitle>
       </CardHeader>
       <CardContent className="grid gap-4">
-        {(siteManager || teamHead) && (
+        {(siteManager || supervisor) && (
           <section>
             <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               {m.CONTACTS_UI.people}
@@ -116,13 +116,13 @@ export function ContactPanel() {
                   testId="contact-site-manager"
                 />
               )}
-              {teamHead && (
+              {supervisor && (
                 <CallRow
                   icon={UserRound}
-                  label={teamHead.name}
-                  caption={m.CONTACTS_UI.teamHead}
-                  phone={teamHead.phone}
-                  testId="contact-team-head"
+                  label={supervisor.name}
+                  caption={m.CONTACTS_UI.supervisor}
+                  phone={supervisor.phone}
+                  testId="contact-supervisor"
                 />
               )}
             </ul>

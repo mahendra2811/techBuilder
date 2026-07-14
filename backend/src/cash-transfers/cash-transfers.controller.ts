@@ -1,18 +1,21 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { z } from 'zod';
-import { CASH_TRANSFER_KINDS } from '@techbuilder/contracts';
-import type { CreateCashTransferInput } from '@techbuilder/contracts';
+import { CASH_TRANSFER_KINDS, MONEY_TAGS } from '@techbuilder/contracts';
+import type { CreateCashTransferInput, VerifyInput } from '@techbuilder/contracts';
 import { CashTransfersService } from './cash-transfers.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RbacGuard } from '../common/rbac.guard';
+import { RbacGuard, RequireAction } from '../common/rbac.guard';
 import { ZodBody } from '../common/zod-body.pipe';
 import { CurrentUser, type Principal } from '../common/current-user.decorator';
+import { VerifySchema } from '../approvals/approvals.controller';
 
 const CreateCashTransferSchema = z.object({
   id: z.string().uuid(),
   toUserId: z.string().uuid(),
   amountPaise: z.number().int().positive(),
   kind: z.enum(CASH_TRANSFER_KINDS),
+  /** Round 2: WORK (default) khata advance · SALARY/PERSONAL personal draw (three-giver rule). */
+  tag: z.enum(MONEY_TAGS).optional(),
   businessDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   note: z.string().max(2000).optional(),
 });
@@ -42,9 +45,20 @@ export class CashTransfersController {
   ) {
     return this.cash.list(u, { limit, from, to });
   }
+
+  // ENDPOINTS.cashTransferVerify — Round 2 two-tick (site accountant / Owner; service-narrowed).
+  @RequireAction('request.decide')
+  @Post(':id/verify')
+  verify(
+    @CurrentUser() u: Principal,
+    @Param('id') id: string,
+    @Body(new ZodBody(VerifySchema)) body: VerifyInput,
+  ) {
+    return this.cash.verifyTransfer(u, id, body);
+  }
 }
 
-/** ENDPOINTS.myBalance = GET /me/balance (self-scoped khata). */
+/** ENDPOINTS.myBalance = GET /me/balance (self-scoped khata) · ENDPOINTS.myMoney = GET /me/money. */
 @UseGuards(JwtAuthGuard, RbacGuard)
 @Controller('me')
 export class MyBalanceController {
@@ -53,6 +67,12 @@ export class MyBalanceController {
   @Get('balance')
   myBalance(@CurrentUser() u: Principal) {
     return this.cash.myBalance(u);
+  }
+
+  // Round 2 (C10): "money I've taken" — the caller's own verified SALARY/PERSONAL draws.
+  @Get('money')
+  myMoney(@CurrentUser() u: Principal) {
+    return this.cash.myMoney(u);
   }
 }
 

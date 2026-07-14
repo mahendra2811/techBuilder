@@ -36,6 +36,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ContactPanel } from '@/components/contact-panel';
 import { KhataCard } from '@/components/khata-card';
+import { MyMoneyCard } from '@/components/my-money-card';
 import { PhotoField } from '@/components/entry/photo-field';
 import { PhotoMultiField } from '@/components/entry/photo-multi-field';
 import { RecentEntries } from '@/components/entry/recent-entries';
@@ -139,6 +140,8 @@ export function DriverDashboardScreen() {
       </Card>
 
       <KhataCard />
+
+      <MyMoneyCard />
 
       {vehicle && driverPersonId && (
         <>

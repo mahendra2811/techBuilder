@@ -74,8 +74,16 @@ export class VehiclesService {
       // from their currently assigned vehicle(s) (loadScope) — a driver with none assigned sees
       // an empty list here, same as they already do on the vehicle-log entry screens.
       let scope: SQL | undefined;
-      if (ctx.role === 'SITE_MANAGER' || ctx.role === 'DRIVER') scope = inSet(schema.vehicles.assignedSiteId, ctx.siteIds);
-      else if (ctx.role !== 'OWNER') scope = sql`false`;
+      // Round 2: SUPERVISOR sees his crew-drivers' site fleet; ACCOUNTANT his sites' fleet
+      // (regNo resolution for diesel flags) — both site-shaped like the SM.
+      if (
+        ctx.role === 'SITE_MANAGER' ||
+        ctx.role === 'DRIVER' ||
+        ctx.role === 'SUPERVISOR' ||
+        ctx.role === 'ACCOUNTANT'
+      ) {
+        scope = inSet(schema.vehicles.assignedSiteId, ctx.siteIds);
+      } else if (ctx.role !== 'OWNER') scope = sql`false`;
       const rows = await tx
         .select()
         .from(schema.vehicles)
@@ -236,6 +244,35 @@ export class VehiclesService {
             id: uuidv7(),
             orgId: p.orgId,
             userId: site.sm,
+            type: 'ASSIGNMENT_CHANGED',
+            payload: {
+              driverUserId: p.userId,
+              fromVehicleId: previous[0]?.id ?? null,
+              toVehicleId: updated.id,
+              fromRegNo: previous[0]?.regNo ?? null,
+              toRegNo: updated.regNo,
+            },
+          });
+        }
+      }
+
+      // Round 2 (CW-9): the SUPERVISOR now heads workers AND drivers — widen the notification
+      // to the driver's crew supervisor too (no crew / no supervisor / self-switch-by-supervisor
+      // → skip, same best-effort shape as the SM notification above).
+      const [driverUser] = await tx
+        .select({ crewId: schema.users.crewId })
+        .from(schema.users)
+        .where(eq(schema.users.id, p.userId));
+      if (driverUser?.crewId) {
+        const [crew] = await tx
+          .select({ supervisorUserId: schema.crews.supervisorUserId })
+          .from(schema.crews)
+          .where(and(eq(schema.crews.id, driverUser.crewId), isNull(schema.crews.deletedAt)));
+        if (crew?.supervisorUserId && crew.supervisorUserId !== p.userId) {
+          await tx.insert(schema.notifications).values({
+            id: uuidv7(),
+            orgId: p.orgId,
+            userId: crew.supervisorUserId,
             type: 'ASSIGNMENT_CHANGED',
             payload: {
               driverUserId: p.userId,
@@ -421,6 +458,9 @@ function mapFuelLog(r: typeof schema.fuelLogs.$inferSelect): FuelLog {
     updatedBy: r.updatedBy ?? r.id,
     deletedAt: r.deletedAt ? r.deletedAt.toISOString() : null,
     version: r.version,
+    // frozen.8 (Round-2 C7 diesel two-sided match) — plain passthrough, matching not wired yet.
+    status: r.status,
+    matchedIssuanceId: r.matchedIssuanceId ?? null,
   };
 }
 

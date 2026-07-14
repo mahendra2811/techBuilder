@@ -20,7 +20,7 @@ export class AttendanceService {
       // bound to their own crew's persons. SM scope is the site itself (persons at the site
       // may legitimately be outside any crew), so the site assert suffices for SM.
       assertSiteInScope(ctx, 'attendance.mark', input.siteId);
-      if (ctx.role === 'TEAM_HEAD') {
+      if (ctx.role === 'SUPERVISOR') {
         for (const row of input.rows) assertPersonInScope(ctx, 'attendance.mark', row.personId);
       }
 
@@ -68,7 +68,7 @@ export class AttendanceService {
       const ctx = await loadScope(tx, p);
       // Site-scoped roles must stay inside their site; crew/self-scoped roles additionally
       // only see their crew's / their own person rows (SM sees the whole site).
-      if (ctx.role === 'SITE_MANAGER' || ctx.role === 'TEAM_HEAD') {
+      if (ctx.role === 'SITE_MANAGER' || ctx.role === 'SUPERVISOR') {
         if (!ctx.siteIds.includes(siteId)) forbidScope('Site out of scope');
       }
       const personFilter =

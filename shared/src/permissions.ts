@@ -48,12 +48,13 @@ export const PERMISSIONS: Record<Role, Partial<Record<Action, Scope>>> = {
     'report.export': 'OWN_SITE',
     'view.all': 'OWN_SITE',
   },
-  TEAM_HEAD: {
+  /** Round 2 (was TEAM_HEAD): field boss of workers AND drivers. ZERO money authority —
+   *  no request.decide (vehicle-switch requests go to the SM now), no attendance (removed
+   *  for every role), ₹0 direct expense (service-enforced; his request has NO cap). */
+  SUPERVISOR: {
     'user.create': 'OWN_CREW',
-    'attendance.mark': 'OWN_CREW',
-    'record.enter': 'OWN_CREW',
+    'record.enter': 'OWN_CREW', // progress, materials (final entries), diesel stock+issuance
     'request.submit': 'OWN_CREW',
-    'request.decide': 'OWN_CREW', // vehicle-switch within crew
     'view.all': 'OWN_CREW',
   },
   DRIVER: {
@@ -64,6 +65,15 @@ export const PERMISSIONS: Record<Role, Partial<Record<Action, Scope>>> = {
   WORKER: {
     'request.submit': 'SELF', // EXPENSE_ADD requests only — the type restriction is enforced in approvals.service
     'view.all': 'SELF',
+  },
+  /** Round 2: per-site money desk. Decides + VERIFIES every money event on his site(s)
+   *  (two-tick rule — service-enforced); work queue only, no analytics (nav + service gated).
+   *  Cash-transfer / vendor writes are service-gated (those controllers carry no action). */
+  ACCOUNTANT: {
+    'request.decide': 'OWN_SITE', // money types only — enforced in approvals.service
+    'wage.view': 'OWN_SITE',
+    'report.export': 'OWN_SITE',
+    'view.all': 'OWN_SITE',
   },
 };
 

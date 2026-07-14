@@ -57,7 +57,7 @@ import { VoiceField } from '@/components/entry/voice-field';
 import { SitePicker } from '@/components/entry/site-picker';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
 
-type EntryRole = 'SITE_MANAGER' | 'TEAM_HEAD';
+type EntryRole = 'SITE_MANAGER' | 'SUPERVISOR';
 const MAX_SITE_PHOTOS = 20;
 const MAX_BILL_PHOTOS = 4;
 

@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * People management (Owner + SM + TH — one component, three thin wrappers).
+ * People management (Owner + SM + Supervisor — one component, three thin wrappers).
  *   (a) the scoped login list (GET /users) with a deactivate action, and
  *   (b) a cascade-aware "create login" form, plus (Owner/SM) a "create worker"
  *       (labour master) form.
@@ -18,6 +18,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { uuidv7 } from 'uuidv7';
+import { Pencil } from 'lucide-react';
 import { PERSON_SKILLS } from '@techbuilder/contracts';
 import type {
   CreatePersonInput,
@@ -26,13 +27,14 @@ import type {
   PersonSkill,
   Role,
   Site,
+  UpdatePersonInput,
   User,
   UUID,
 } from '@techbuilder/contracts';
 import { ApiClientError, api, me } from '@/lib/api-client';
 import { CREATABLE_ROLES, makeTempPassword } from '@/lib/cascade';
 import { apiErrorMessage } from '@/lib/i18n/messages';
-import { useMessages } from '@/lib/i18n/locale-context';
+import { useLocale, useMessages } from '@/lib/i18n/locale-context';
 import { rupeesToPaise } from '@/lib/money';
 import { roleHome } from '@/lib/roles';
 import { Button } from '@/components/ui/button';
@@ -44,7 +46,42 @@ import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry
 import { ShowMore } from '@/components/ui/show-more';
 import { ResetPasswordAction } from '@/components/people/reset-password-action';
 
-type PeopleRole = 'OWNER' | 'SITE_MANAGER' | 'TEAM_HEAD';
+type PeopleRole = 'OWNER' | 'SITE_MANAGER' | 'SUPERVISOR';
+
+// Round 2 (CW-4): ID-card edit affordance — OWNER/SITE_MANAGER only (server enforces the
+// same narrow rule; see backend/src/people/people.service.ts `update()`).
+const ID_CARD_UI = {
+  en: {
+    sectionTitle: 'Labour master (ID cards)',
+    empty: 'No people yet',
+    mobile: 'Mobile',
+    guardianName: 'Guardian name',
+    guardianPhone: 'Guardian mobile',
+    edit: 'Edit ID card',
+    cancel: 'Cancel',
+    save: 'Save',
+    saving: 'Saving…',
+    saved: 'ID card updated',
+    none: 'Not set',
+  },
+  hi: {
+    sectionTitle: 'मज़दूर सूची (ID कार्ड)',
+    empty: 'अभी तक कोई व्यक्ति नहीं',
+    mobile: 'मोबाइल',
+    guardianName: 'अभिभावक का नाम',
+    guardianPhone: 'अभिभावक का मोबाइल',
+    edit: 'ID कार्ड संपादित करें',
+    cancel: 'रद्द करें',
+    save: 'सहेजें',
+    saving: 'सहेजा जा रहा है…',
+    saved: 'ID कार्ड अपडेट हो गया',
+    none: 'सेट नहीं है',
+  },
+} as const;
+// Widened (plain `string` fields): `ID_CARD_UI[locale]` (locale: 'en' | 'hi') resolves to
+// the UNION of both branches' literal-object types, which isn't assignable to either
+// branch alone — components receiving it as a prop need this wider, non-literal shape.
+type IdCardUi = { [K in keyof (typeof ID_CARD_UI)['en']]: string };
 
 export function PeopleScreen({ role }: { role: PeopleRole }) {
   const m = useMessages();
@@ -73,7 +110,174 @@ export function PeopleScreen({ role }: { role: PeopleRole }) {
       />
 
       {(role === 'OWNER' || role === 'SITE_MANAGER') && <CreatePersonForm />}
+
+      <PersonList role={role} peopleQ={peopleQ} />
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Labour master (Person) list + ID-card edit (Round 2 / CW-4)
+// ---------------------------------------------------------------------------
+
+function PersonList({ role, peopleQ }: { role: PeopleRole; peopleQ: UseQueryResult<Person[]> }) {
+  const m = useMessages();
+  const locale = useLocale();
+  const ui = ID_CARD_UI[locale];
+  const canEditIdCard = role === 'OWNER' || role === 'SITE_MANAGER';
+  const [editingId, setEditingId] = useState<UUID | null>(null);
+
+  return (
+    <Card data-testid="person-list">
+      <CardHeader>
+        <CardTitle>{ui.sectionTitle}</CardTitle>
+      </CardHeader>
+      <CardContent className="grid gap-3">
+        {peopleQ.isPending ? (
+          <LoadingState />
+        ) : peopleQ.error ? (
+          <ErrorState error={peopleQ.error} onRetry={() => void peopleQ.refetch()} />
+        ) : !peopleQ.data || peopleQ.data.length === 0 ? (
+          <EmptyState label={ui.empty} />
+        ) : (
+          <ShowMore
+            items={peopleQ.data}
+            initial={10}
+            as="ul"
+            className="divide-y"
+            testIdPrefix="person-list"
+            renderItem={(person) => (
+              <li key={person.id} className="grid gap-2 py-3 first:pt-0 last:pb-0" data-testid={`person-row-${person.id}`}>
+                <div className="flex items-center gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{person.name}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {person.skill ? m.PERSON_SKILL_LABELS[person.skill] : ui.none} ·{' '}
+                      {ui.mobile}: {person.phone ?? ui.none}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground" data-testid={`person-row-guardian-${person.id}`}>
+                      {ui.guardianName}: {person.guardianName ?? ui.none} · {ui.guardianPhone}: {person.guardianPhone ?? ui.none}
+                    </p>
+                  </div>
+                  {canEditIdCard && editingId !== person.id && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      data-testid={`person-edit-toggle-${person.id}`}
+                      onClick={() => setEditingId(person.id)}
+                    >
+                      <Pencil className="mr-1 size-3.5" aria-hidden="true" />
+                      {ui.edit}
+                    </Button>
+                  )}
+                </div>
+                {canEditIdCard && editingId === person.id && (
+                  <PersonIdCardEditForm person={person} ui={ui} onDone={() => setEditingId(null)} />
+                )}
+              </li>
+            )}
+          />
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function PersonIdCardEditForm({
+  person,
+  ui,
+  onDone,
+}: {
+  person: Person;
+  ui: IdCardUi;
+  onDone: () => void;
+}) {
+  const m = useMessages();
+  const queryClient = useQueryClient();
+  const [phone, setPhone] = useState(person.phone ?? '');
+  const [guardianName, setGuardianName] = useState(person.guardianName ?? '');
+  const [guardianPhone, setGuardianPhone] = useState(person.guardianPhone ?? '');
+  const [saved, setSaved] = useState(false);
+
+  const save = useMutation({
+    mutationFn: (input: UpdatePersonInput) => api<Person>('PATCH', `/people/${person.id}`, input),
+    onSuccess: () => {
+      setSaved(true);
+      void queryClient.invalidateQueries({ queryKey: ['people'] });
+    },
+  });
+
+  const serverError =
+    save.error instanceof ApiClientError ? apiErrorMessage(m, save.error.code) : save.error ? apiErrorMessage(m) : null;
+
+  const onSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaved(false);
+    save.mutate({
+      phone: phone.trim(),
+      guardianName: guardianName.trim(),
+      guardianPhone: guardianPhone.trim(),
+    });
+  };
+
+  return (
+    <form
+      className="grid gap-3 rounded-lg border border-input p-3"
+      noValidate
+      onSubmit={onSubmit}
+      data-testid={`person-edit-form-${person.id}`}
+    >
+      <div className="grid gap-2">
+        <Label htmlFor={`person-edit-phone-${person.id}`}>{ui.mobile}</Label>
+        <Input
+          id={`person-edit-phone-${person.id}`}
+          type="tel"
+          inputMode="tel"
+          data-testid={`person-edit-phone-${person.id}`}
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+        />
+      </div>
+      <div className="grid gap-2">
+        <Label htmlFor={`person-edit-guardian-name-${person.id}`}>{ui.guardianName}</Label>
+        <Input
+          id={`person-edit-guardian-name-${person.id}`}
+          data-testid={`person-edit-guardian-name-${person.id}`}
+          value={guardianName}
+          onChange={(e) => setGuardianName(e.target.value)}
+        />
+      </div>
+      <div className="grid gap-2">
+        <Label htmlFor={`person-edit-guardian-phone-${person.id}`}>{ui.guardianPhone}</Label>
+        <Input
+          id={`person-edit-guardian-phone-${person.id}`}
+          type="tel"
+          inputMode="tel"
+          data-testid={`person-edit-guardian-phone-${person.id}`}
+          value={guardianPhone}
+          onChange={(e) => setGuardianPhone(e.target.value)}
+        />
+      </div>
+      {serverError && (
+        <Notice tone="error" testId={`person-edit-error-${person.id}`}>
+          {serverError}
+        </Notice>
+      )}
+      {saved && (
+        <Notice tone="success" testId={`person-edit-success-${person.id}`}>
+          {ui.saved}
+        </Notice>
+      )}
+      <div className="flex gap-2">
+        <Button type="submit" size="sm" data-testid={`person-edit-save-${person.id}`} disabled={save.isPending}>
+          {save.isPending ? ui.saving : ui.save}
+        </Button>
+        <Button type="button" size="sm" variant="outline" data-testid={`person-edit-cancel-${person.id}`} onClick={onDone}>
+          {ui.cancel}
+        </Button>
+      </div>
+    </form>
   );
 }
 
@@ -114,14 +318,14 @@ function UserList({
   });
 
   const creatable = CREATABLE_ROLES[role];
-  // Client-plan T-5: a Team Head creates people but never deactivates — SM-and-above only
+  // Client-plan T-5: a Supervisor creates people but never deactivates — SM-and-above only
   // (server hard-blocks it too; hiding the button avoids a dead affordance).
   const canDeactivate = (u: User) =>
-    role !== 'TEAM_HEAD' && u.active && u.id !== myUserId && creatable.includes(u.role);
+    role !== 'SUPERVISOR' && u.active && u.id !== myUserId && creatable.includes(u.role);
   const canActivate = (u: User) => role === 'OWNER' && !u.active && u.id !== myUserId;
   // Mirrors backend resetPassword scope: Owner any, SM only roles they may create
   // (the users list is already scope-filtered server-side, so presence ⟺ in-scope).
-  const canResetPassword = (u: User) => role !== 'TEAM_HEAD' && u.id !== myUserId && (role === 'OWNER' || creatable.includes(u.role));
+  const canResetPassword = (u: User) => role !== 'SUPERVISOR' && u.id !== myUserId && (role === 'OWNER' || creatable.includes(u.role));
 
   const errorMessage = (err: unknown): string | null =>
     err instanceof ApiClientError ? apiErrorMessage(m, err.code) : err ? apiErrorMessage(m) : null;
@@ -152,13 +356,23 @@ function UserList({
               return (
                 <li key={u.id} className="grid gap-2 py-3 first:pt-0 last:pb-0" data-testid={`user-row-${u.id}`}>
                   <div className="flex items-center gap-3">
-                    {/* WO-13: opens the day-wise insights drill-down for this person. */}
-                    <Link href={`${roleHome(role)}/people/${u.id}`} data-testid={`user-row-link-${u.id}`} className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">{u.name}</p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {u.username} · {m.ROLE_LABELS[u.role]}
-                      </p>
-                    </Link>
+                    {/* WO-13 drill-down — Round 2: person insights are SM/Owner-only now, so the
+                        SUPERVISOR row is plain text (no link to a FORBIDDEN page). */}
+                    {role === 'SUPERVISOR' ? (
+                      <div data-testid={`user-row-link-${u.id}`} className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{u.name}</p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {u.username} · {m.ROLE_LABELS[u.role]}
+                        </p>
+                      </div>
+                    ) : (
+                      <Link href={`${roleHome(role)}/people/${u.id}`} data-testid={`user-row-link-${u.id}`} className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{u.name}</p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {u.username} · {m.ROLE_LABELS[u.role]}
+                        </p>
+                      </Link>
+                    )}
                     <span
                       className={
                         u.active
@@ -267,8 +481,8 @@ function CreateUserForm({
   const showSite = role === 'OWNER' || role === 'SITE_MANAGER';
   const siteRequired = role === 'SITE_MANAGER';
   const showPersonLink = targetRole === 'WORKER' || targetRole === 'DRIVER';
-  // A TH creates inside their own crew — blocked entirely if they have none.
-  const thBlocked = role === 'TEAM_HEAD' && !myCrewId;
+  // A Supervisor creates inside their own crew — blocked entirely if they have none.
+  const thBlocked = role === 'SUPERVISOR' && !myCrewId;
 
   const create = useMutation({
     mutationFn: (input: CreateUserInput) => api<User>('POST', '/users', input),
@@ -303,7 +517,7 @@ function CreateUserForm({
       tempPassword: makeTempPassword(),
       ...(phone.trim() ? { phone: phone.trim() } : {}),
       ...(assignedSiteId ? { assignedSiteId } : {}),
-      ...(role === 'TEAM_HEAD' && myCrewId ? { crewId: myCrewId } : {}),
+      ...(role === 'SUPERVISOR' && myCrewId ? { crewId: myCrewId } : {}),
       ...(showPersonLink && linkPersonId ? { personId: linkPersonId } : {}),
     };
     create.mutate(input);
@@ -397,13 +611,13 @@ function CreateUserForm({
                   </NativeSelect>
                 )}
                 {errors.site && <p className="text-sm text-destructive" role="alert">{errors.site}</p>}
-                {targetRole === 'TEAM_HEAD' && (
+                {targetRole === 'SUPERVISOR' && (
                   <p className="text-xs text-muted-foreground" data-testid="create-th-note">{m.PEOPLE_UI.noCrewNote}</p>
                 )}
               </div>
             )}
 
-            {role === 'TEAM_HEAD' && (
+            {role === 'SUPERVISOR' && (
               <p className="text-xs text-muted-foreground" data-testid="create-crew-note">{m.PEOPLE_UI.crewPrefillNote}</p>
             )}
 

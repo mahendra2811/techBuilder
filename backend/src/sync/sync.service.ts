@@ -144,7 +144,7 @@ async function assertPayloadScope(
   if (entityType === 'attendance') {
     if (!siteId || !personId) throw new ApiException('VALIDATION_FAILED', 'attendance requires siteId + personId');
     assertSiteInScope(ctx, action, siteId);
-    if (ctx.role === 'TEAM_HEAD') assertPersonInScope(ctx, action, personId);
+    if (ctx.role === 'SUPERVISOR') assertPersonInScope(ctx, action, personId);
     return;
   }
   if (entityType === 'leave') {
@@ -161,6 +161,15 @@ async function assertPayloadScope(
     return;
   }
   // progress / expense / material-txn / issue — site-stamped (issue may be vehicle-stamped)
+  // Round 2: the sync path enforces the SUPERVISOR ₹0 direct-expense rule too (no bypass —
+  // same rule as records.createExpense; his spends are money requests to the accountant).
+  if (entityType === 'expense' && ctx.role === 'SUPERVISOR') {
+    throw new ApiException(
+      'VALIDATION_FAILED',
+      'Supervisors record spends as money requests — submit it for the accountant instead',
+      { amountPaise: 'OVER_DIRECT_LIMIT' },
+    );
+  }
   if (siteId) assertSiteInScope(ctx, action, siteId);
   else if (vehicleId) await assertVehicleInScope(tx, ctx, action, vehicleId);
   else if (entityType !== 'issue') throw new ApiException('VALIDATION_FAILED', `${entityType} requires siteId`);

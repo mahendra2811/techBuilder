@@ -29,6 +29,13 @@
       "when": 1783529822552,
       "tag": "0003_motionless_speed_demon",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1784032895219,
+      "tag": "0004_chunky_speed_demon",
+      "breakpoints": true
     }
   ]
 }

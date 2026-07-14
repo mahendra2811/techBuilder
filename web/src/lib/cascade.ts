@@ -14,11 +14,12 @@
 import type { Role } from '@techbuilder/contracts';
 
 export const CREATABLE_ROLES: Record<Role, Role[]> = {
-  OWNER: ['SITE_MANAGER', 'TEAM_HEAD', 'DRIVER', 'WORKER'],
-  SITE_MANAGER: ['TEAM_HEAD', 'DRIVER', 'WORKER'],
-  TEAM_HEAD: ['WORKER', 'DRIVER'],
+  OWNER: ['SITE_MANAGER', 'SUPERVISOR', 'DRIVER', 'WORKER', 'ACCOUNTANT'],
+  SITE_MANAGER: ['SUPERVISOR', 'DRIVER', 'WORKER'],
+  SUPERVISOR: ['WORKER', 'DRIVER'],
   DRIVER: [],
   WORKER: [],
+  ACCOUNTANT: [], // TODO(Round-2 CW-2/CW-3): revisit
 };
 
 /** A crypto-random, human-readable temporary password (unambiguous chars, ≥8 to satisfy the backend). */

@@ -11,7 +11,9 @@ import type {
   CreateIssueInput,
   ResolveIssueInput,
   CloseIssueInput,
+  VerifyInput,
 } from '@techbuilder/contracts';
+import { VerifySchema } from '../approvals/approvals.controller';
 import { RecordsService } from './records.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RbacGuard, RequireAction } from '../common/rbac.guard';
@@ -161,7 +163,11 @@ export class RecordsController {
     return this.records.createTrip(u, body);
   }
 
-  @RequireAction('record.enter')
+  // No @RequireAction: Round 2 (CW-8) DRIVERS may submit a data-only PICK for
+  // driverPicks-enabled material types under vehicleLog.enter — they never hold
+  // record.enter (same bug class as createIssue below: a fixed decorator would 403
+  // every driver pick). The service branches by role: driver → vehicleLog.enter +
+  // per-type driverPicks check; everyone else → record.enter as before.
   @Post('material-txn')
   createMaterialTxn(
     @CurrentUser() u: Principal,
@@ -201,6 +207,18 @@ export class RecordsController {
     @Body(new ZodBody(CloseIssueSchema)) body: CloseIssueInput,
   ) {
     return this.records.closeIssue(u, id, body);
+  }
+
+  // ENDPOINTS.expenseVerify — Round 2 two-tick. Coarse gate: request.decide; the service narrows
+  // to the site's ACCOUNTANT / Owner. Declared before the generic :entityType routes on purpose.
+  @RequireAction('request.decide')
+  @Post('expense/:id/verify')
+  verifyExpense(
+    @CurrentUser() u: Principal,
+    @Param('id') id: string,
+    @Body(new ZodBody(VerifySchema)) body: VerifyInput,
+  ) {
+    return this.records.verifyExpense(u, id, body);
   }
 
   // No @RequireAction here: the action depends on the entity family (fuel/vehicle-log/trip →

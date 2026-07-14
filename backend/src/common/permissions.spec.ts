@@ -32,12 +32,10 @@ describe('RBAC matrix snapshot (frozen contracts)', () => {
         'report.export': 'OWN_SITE',
         'view.all': 'OWN_SITE',
       },
-      TEAM_HEAD: {
+      SUPERVISOR: {
         'user.create': 'OWN_CREW',
-        'attendance.mark': 'OWN_CREW',
         'record.enter': 'OWN_CREW',
         'request.submit': 'OWN_CREW',
-        'request.decide': 'OWN_CREW',
         'view.all': 'OWN_CREW',
       },
       DRIVER: {
@@ -50,6 +48,12 @@ describe('RBAC matrix snapshot (frozen contracts)', () => {
         'request.submit': 'SELF',
         'view.all': 'SELF',
       },
+      ACCOUNTANT: {
+        'request.decide': 'OWN_SITE',
+        'wage.view': 'OWN_SITE',
+        'report.export': 'OWN_SITE',
+        'view.all': 'OWN_SITE',
+      },
     });
   });
 
@@ -60,8 +64,10 @@ describe('RBAC matrix snapshot (frozen contracts)', () => {
     expect(can('WORKER', 'attendance.mark')).toBe(false);
     expect(can('DRIVER', 'record.enter')).toBe(false);
     expect(can('DRIVER', 'wage.view')).toBe(false);
-    expect(can('TEAM_HEAD', 'wage.view')).toBe(false);
-    expect(can('TEAM_HEAD', 'report.export')).toBe(false);
+    expect(can('SUPERVISOR', 'wage.view')).toBe(false);
+    expect(can('SUPERVISOR', 'report.export')).toBe(false);
+    expect(can('SUPERVISOR', 'attendance.mark')).toBe(false);
+    expect(can('SUPERVISOR', 'request.decide')).toBe(false);
   });
 
   it('scopeFor returns NONE for undefined role/action pairs', () => {

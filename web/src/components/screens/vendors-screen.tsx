@@ -15,16 +15,31 @@
  * mean fetching every shop's ledger up front (N+1 client calls for what is
  * meant to be a lightweight directory). Balance is shown once a shop is
  * opened, which is the "light list+detail split" alternative.
+ *
+ * Round 2 (CW-3): also mounted for the ACCOUNTANT (nav.ts `vendors` entry —
+ * SITE_MANAGER + ACCOUNTANT only, OWNER has no vendors nav item at all, so those
+ * are the only two callers). The accountant records payments (backend allows
+ * OWNER/SITE_MANAGER/ACCOUNTANT — his own entry is auto-verified, two-tick) but
+ * may NOT add a shop (backend `VendorsService.create` is OWNER/SITE_MANAGER only)
+ * — a hard role assumption, so the "add shop" form is hidden for him (role read
+ * via GET /me) rather than left to fail with a 403 on every submit.
  */
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
 import { uuidv7 } from 'uuidv7';
-import type { CreateVendorInput, CreateVendorPaymentInput, UUID, Vendor, VendorLedger } from '@techbuilder/contracts';
-import { ApiClientError, api } from '@/lib/api-client';
+import type {
+  CreateVendorInput,
+  CreateVendorPaymentInput,
+  UUID,
+  Vendor,
+  VendorLedger,
+  VendorPaymentKind,
+} from '@techbuilder/contracts';
+import { ApiClientError, api, me } from '@/lib/api-client';
 import { todayKolkata } from '@/lib/business-date';
 import { apiErrorMessage } from '@/lib/i18n/messages';
-import { useMessages } from '@/lib/i18n/locale-context';
+import { useLocale, useMessages } from '@/lib/i18n/locale-context';
 import { formatPaise, formatSignedPaise, rupeesToPaise } from '@/lib/money';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -35,10 +50,40 @@ import { ShowMore } from '@/components/ui/show-more';
 import { DateField } from '@/components/entry/date-field';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
 
+// Round 2 (CW-6): vendor money-IN — a payment can now go either direction. The frozen VENDOR_UI
+// catalog only has PAYMENT-shaped copy (amountLabel = "Amount paid"), so the direction toggle +
+// the direction-aware amount label live here, module-local, per the i18n convention.
+const UI = {
+  en: {
+    directionLabel: 'Direction',
+    directionPayment: 'We paid the shop',
+    directionReceipt: 'Shop gave us money',
+    directionPaymentHint: 'देना — settles what we owe the shop.',
+    directionReceiptHint: 'लेना — the shop handed the site cash (increases what we owe).',
+    amountLabelPayment: 'Amount paid (₹)',
+    amountLabelReceipt: 'Amount received (₹)',
+    receivedLabel: 'Vendor money-IN',
+    monthReceived: 'Received',
+  },
+  hi: {
+    directionLabel: 'दिशा',
+    directionPayment: 'हमने दुकान को दिया',
+    directionReceipt: 'दुकान ने हमें दिया',
+    directionPaymentHint: 'देना — दुकान का बकाया चुकाना।',
+    directionReceiptHint: 'लेना — दुकान ने साइट को पैसे दिए (हमारा बकाया बढ़ता है)।',
+    amountLabelPayment: 'दी गई राशि (₹)',
+    amountLabelReceipt: 'मिली राशि (₹)',
+    receivedLabel: 'दुकान से मिला पैसा (मनी-इन)',
+    monthReceived: 'मिला',
+  },
+} as const;
+
 export function VendorsScreen() {
   const m = useMessages();
+  const meQ = useQuery({ queryKey: ['me'], queryFn: me });
   const vendorsQ = useQuery({ queryKey: ['vendors'], queryFn: () => api<Vendor[]>('GET', '/vendors') });
   const [selectedId, setSelectedId] = useState<UUID | null>(null);
+  const canCreateVendor = meQ.data?.user.role !== 'ACCOUNTANT';
 
   return (
     <div className="grid gap-4" data-testid="vendors-screen">
@@ -58,7 +103,7 @@ export function VendorsScreen() {
       ) : (
         <>
           <VendorList vendorsQ={vendorsQ} onSelect={setSelectedId} />
-          <CreateVendorForm />
+          {canCreateVendor && <CreateVendorForm />}
         </>
       )}
     </div>
@@ -217,6 +262,8 @@ function CreateVendorForm() {
 
 function VendorDetail({ vendorId, vendorName, onBack }: { vendorId: UUID; vendorName: string | undefined; onBack: () => void }) {
   const m = useMessages();
+  const locale = useLocale();
+  const ui = UI[locale];
   const ledgerQ = useQuery({
     queryKey: ['vendor-ledger', vendorId],
     queryFn: () => api<VendorLedger>('GET', `/vendors/${vendorId}/ledger`),
@@ -241,11 +288,17 @@ function VendorDetail({ vendorId, vendorName, onBack }: { vendorId: UUID; vendor
             <ErrorState error={ledgerQ.error} onRetry={() => void ledgerQ.refetch()} />
           ) : ledgerQ.data ? (
             <>
-              <div className="grid grid-cols-3 gap-3 text-center">
+              <div className="grid grid-cols-2 gap-3 text-center sm:grid-cols-4">
                 <div>
                   <p className="text-xs text-muted-foreground">{m.VENDOR_UI.purchasedLabel}</p>
                   <p className="text-sm font-medium" data-testid="vendor-ledger-purchased">
                     {formatPaise(ledgerQ.data.purchasedPaise)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">{ui.receivedLabel}</p>
+                  <p className="text-sm font-medium" data-testid="vendor-ledger-received">
+                    {formatPaise(ledgerQ.data.receivedPaise)}
                   </p>
                 </div>
                 <div>
@@ -279,8 +332,8 @@ function VendorDetail({ vendorId, vendorName, onBack }: { vendorId: UUID; vendor
                       <li key={row.month} className="flex items-center justify-between gap-3 py-2 text-sm first:pt-0 last:pb-0">
                         <span className="font-medium">{row.month}</span>
                         <span className="text-xs text-muted-foreground">
-                          {m.VENDOR_UI.monthPurchased} {formatPaise(row.purchasedPaise)} · {m.VENDOR_UI.monthPaid}{' '}
-                          {formatPaise(row.paidPaise)}
+                          {m.VENDOR_UI.monthPurchased} {formatPaise(row.purchasedPaise)} · {ui.monthReceived}{' '}
+                          {formatPaise(row.receivedPaise)} · {m.VENDOR_UI.monthPaid} {formatPaise(row.paidPaise)}
                         </span>
                       </li>
                     )}
@@ -299,9 +352,14 @@ function VendorDetail({ vendorId, vendorName, onBack }: { vendorId: UUID; vendor
 
 function RecordPaymentForm({ vendorId }: { vendorId: UUID }) {
   const m = useMessages();
+  const locale = useLocale();
+  const ui = UI[locale];
   const queryClient = useQueryClient();
   const today = useMemo(() => todayKolkata(), []);
 
+  // Round 2 (CW-6): direction toggle — PAYMENT (default, देना — we pay the shop) or
+  // RECEIPT (लेना — vendor money-IN, the shop hands the site cash).
+  const [kind, setKind] = useState<VendorPaymentKind>('PAYMENT');
   const [amountRupees, setAmountRupees] = useState('');
   const [date, setDate] = useState(today);
   const [note, setNote] = useState('');
@@ -318,6 +376,7 @@ function RecordPaymentForm({ vendorId }: { vendorId: UUID }) {
       api('POST', `/vendors/${vendorId}/payments`, input),
     onSuccess: () => {
       setSaved(true);
+      setKind('PAYMENT');
       setAmountRupees('');
       setDate(today);
       setNote('');
@@ -336,6 +395,7 @@ function RecordPaymentForm({ vendorId }: { vendorId: UUID }) {
     setAmountError(null);
     create.mutate({
       id: uuidv7(),
+      kind,
       amountPaise,
       businessDate: date,
       ...(note.trim() ? { note: note.trim() } : {}),
@@ -353,7 +413,36 @@ function RecordPaymentForm({ vendorId }: { vendorId: UUID }) {
       <CardContent>
         <form className="grid gap-4" noValidate onSubmit={onSubmit}>
           <div className="grid gap-2">
-            <Label htmlFor="vendor-payment-amount">{m.VENDOR_UI.amountLabel}</Label>
+            <Label>{ui.directionLabel}</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                type="button"
+                variant={kind === 'PAYMENT' ? 'default' : 'outline'}
+                data-testid="vendor-payment-kind-payment"
+                aria-pressed={kind === 'PAYMENT'}
+                onClick={() => setKind('PAYMENT')}
+              >
+                {ui.directionPayment}
+              </Button>
+              <Button
+                type="button"
+                variant={kind === 'RECEIPT' ? 'default' : 'outline'}
+                data-testid="vendor-payment-kind-receipt"
+                aria-pressed={kind === 'RECEIPT'}
+                onClick={() => setKind('RECEIPT')}
+              >
+                {ui.directionReceipt}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {kind === 'PAYMENT' ? ui.directionPaymentHint : ui.directionReceiptHint}
+            </p>
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="vendor-payment-amount">
+              {kind === 'PAYMENT' ? ui.amountLabelPayment : ui.amountLabelReceipt}
+            </Label>
             <Input
               id="vendor-payment-amount"
               type="number"

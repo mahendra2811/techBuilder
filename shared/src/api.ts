@@ -24,9 +24,11 @@ export const ENDPOINTS = {
   usersResetPassword: { method: 'POST', path: '/users/:id/reset-password' },
   peopleList: { method: 'GET', path: '/people' },
   peopleCreate: { method: 'POST', path: '/people' },
+  peopleUpdate: { method: 'PATCH', path: '/people/:id' }, // frozen.8: guardian/ID-card edits (SM/Owner)
   sitesList: { method: 'GET', path: '/sites' },
   sitesCreate: { method: 'POST', path: '/sites' },
   siteGet: { method: 'GET', path: '/sites/:id' },
+  siteUpdate: { method: 'PATCH', path: '/sites/:id' }, // frozen.8: Owner-only role assignments (SM/accountant)
   vehicleTypesList: { method: 'GET', path: '/vehicle-types' },
   vehicleTypesCreate: { method: 'POST', path: '/vehicle-types' },
   vehiclesList: { method: 'GET', path: '/vehicles' },
@@ -107,6 +109,40 @@ export const ENDPOINTS = {
   // Excel export v2 (frozen.6): section-picker download + server-built email delivery
   exportConfig: { method: 'GET', path: '/exports/config' },
   exportEmail: { method: 'POST', path: '/exports/email' },
+
+  // ---- Round 2 (frozen.8) ----
+  // two-tick verification (accountant of the site / Owner)
+  requestVerify: { method: 'POST', path: '/requests/:id/verify' },
+  expenseVerify: { method: 'POST', path: '/records/expense/:id/verify' },
+  cashTransferVerify: { method: 'POST', path: '/cash-transfers/:id/verify' },
+  vendorPaymentVerify: { method: 'POST', path: '/vendors/payments/:id/verify' },
+  // "money I've taken" — verified SALARY/PERSONAL draws of the caller
+  myMoney: { method: 'GET', path: '/me/money' },
+  // materials catalog (SM/Owner manage; supervisor/driver consume)
+  materialsList: { method: 'GET', path: '/materials' },
+  materialsCreate: { method: 'POST', path: '/materials' },
+  materialUpdate: { method: 'PATCH', path: '/materials/:id' },
+  // diesel: bulk stock + issuances + red flags
+  fuelStockCreate: { method: 'POST', path: '/fuel-stock/purchases' },
+  fuelStockList: { method: 'GET', path: '/fuel-stock/purchases' },
+  fuelIssuanceCreate: { method: 'POST', path: '/fuel-stock/issuances' },
+  fuelIssuancesList: { method: 'GET', path: '/fuel-stock/issuances' },
+  fuelMatchFlags: { method: 'GET', path: '/fuel-stock/flags' },
+  // complaint box
+  complaintCreate: { method: 'POST', path: '/complaints' },
+  complaintsList: { method: 'GET', path: '/complaints' },
+  complaintResolve: { method: 'POST', path: '/complaints/:id/resolve' },
+  // vehicle document vault + reminders (SM + Owner ONLY)
+  vehicleDocsList: { method: 'GET', path: '/vehicles/:id/docs' },
+  vehicleDocCreate: { method: 'POST', path: '/vehicles/:id/docs' },
+  vehicleDocUpdate: { method: 'PATCH', path: '/vehicle-docs/:id' },
+  vehicleDocDelete: { method: 'DELETE', path: '/vehicle-docs/:id' },
+  vehicleRemindersList: { method: 'GET', path: '/vehicles/:id/reminders' },
+  vehicleReminderCreate: { method: 'POST', path: '/vehicles/:id/reminders' },
+  vehicleReminderUpdate: { method: 'PATCH', path: '/vehicle-reminders/:id' },
+  vehicleReminderDelete: { method: 'DELETE', path: '/vehicle-reminders/:id' },
+  // the accountant's work queue
+  accountantQueue: { method: 'GET', path: '/accountant/queue' },
 } as const satisfies Record<string, { method: 'GET' | 'POST' | 'PATCH' | 'DELETE'; path: string }>;
 
 export type EndpointKey = keyof typeof ENDPOINTS;

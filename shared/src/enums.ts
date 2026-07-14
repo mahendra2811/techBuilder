@@ -4,7 +4,9 @@
  * Backend and frontend import these. NEVER redefine an enum anywhere else.
  */
 
-export const ROLES = ['OWNER', 'SITE_MANAGER', 'TEAM_HEAD', 'DRIVER', 'WORKER'] as const;
+/** Round 2 (frozen.8): TEAM_HEAD renamed to SUPERVISOR (heads workers AND drivers);
+ *  ACCOUNTANT added (per-site money desk — appended LAST to match `ALTER TYPE ... ADD VALUE`). */
+export const ROLES = ['OWNER', 'SITE_MANAGER', 'SUPERVISOR', 'DRIVER', 'WORKER', 'ACCOUNTANT'] as const;
 export type Role = (typeof ROLES)[number];
 
 export const ATTENDANCE_STATUSES = ['PRESENT', 'ABSENT', 'HALF_DAY'] as const;
@@ -38,6 +40,26 @@ export type PaymentMode = (typeof PAYMENT_MODES)[number];
 /** Cash-ledger transfer direction: GIVE = down the chain; RETURN = balance handed back up (leave/settlement). */
 export const CASH_TRANSFER_KINDS = ['GIVE', 'RETURN'] as const;
 export type CashTransferKind = (typeof CASH_TRANSFER_KINDS)[number];
+
+/** Round 2: what a cash transfer is for. WORK = advance/petty-cash (khata balance);
+ *  SALARY / PERSONAL = personal draws shown on the receiver's "money I've taken" page. */
+export const MONEY_TAGS = ['WORK', 'SALARY', 'PERSONAL'] as const;
+export type MoneyTag = (typeof MONEY_TAGS)[number];
+
+/** Round 2: vendor khata direction. PAYMENT = we pay the vendor (udhaar settle);
+ *  RECEIPT = vendor hands the site money (money-IN). */
+export const VENDOR_PAYMENT_KINDS = ['PAYMENT', 'RECEIPT'] as const;
+export type VendorPaymentKind = (typeof VENDOR_PAYMENT_KINDS)[number];
+
+/** Round 2: complaint routing. SITE_MANAGER-addressed complaints are Owner-visible too. */
+export const COMPLAINT_TARGETS = ['OWNER', 'SITE_MANAGER'] as const;
+export type ComplaintTarget = (typeof COMPLAINT_TARGETS)[number];
+
+/** Round 2: vehicle document/EMI reminders (SM + Owner only). */
+export const REMINDER_KINDS = ['EXPIRY', 'EMI', 'CUSTOM'] as const;
+export type ReminderKind = (typeof REMINDER_KINDS)[number];
+export const REMINDER_RECURRENCES = ['ONCE', 'MONTHLY', 'YEARLY'] as const;
+export type ReminderRecurrence = (typeof REMINDER_RECURRENCES)[number];
 
 /** Site emergency-contact kinds (jsonb content in sites.emergency_contacts — intentionally NOT a pgEnum). */
 export const EMERGENCY_CONTACT_KINDS = ['POLICE', 'AMBULANCE', 'HOSPITAL', 'FIRE', 'SITE_OFFICE', 'OTHER'] as const;
@@ -73,7 +95,8 @@ export type CompletenessScope = (typeof COMPLETENESS_SCOPES)[number];
 export const VEHICLE_LOG_KINDS = ['START', 'END'] as const;
 export type VehicleLogKind = (typeof VEHICLE_LOG_KINDS)[number];
 
-export const VEHICLE_DOC_KINDS = ['RC', 'INSURANCE', 'PUC', 'FITNESS', 'PERMIT'] as const;
+/** Round 2: 'OTHER' appended (any other per-vehicle PDF/photo in the document vault). */
+export const VEHICLE_DOC_KINDS = ['RC', 'INSURANCE', 'PUC', 'FITNESS', 'PERMIT', 'OTHER'] as const;
 export type VehicleDocKind = (typeof VEHICLE_DOC_KINDS)[number];
 
 export const NOTIFICATION_TYPES = [
@@ -83,6 +106,10 @@ export const NOTIFICATION_TYPES = [
   'ISSUE_RAISED',
   'SYNC_FAILED',
   'DAILY_DIGEST',
+  // Round 2 (appended — pgEnum ADD VALUE order):
+  'MONEY_FLAGGED', // accountant flagged/rejected a money event → SM + Owner
+  'VEHICLE_DOC_DUE', // vehicle document expiry / EMI reminder → SM + Owner
+  'COMPLAINT_RAISED', // complaint box → target SM (+Owner) or Owner-only
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 

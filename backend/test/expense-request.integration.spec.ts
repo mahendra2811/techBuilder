@@ -1,19 +1,24 @@
 /**
- * EXPENSE_ADD acceptance (client-plan v1 / WO-3) — runs against the LIVE DB in backend/.env
- * through the real services (RLS app role). Proves the money engine:
- *   caps · windows · type restriction · routing (worker→TH/SM, driver→SM, SM>₹1L→Owner only)
- *   · reject-needs-reason · approve materializes the booked expense · direct-entry limits.
- * Org config is the schema DEFAULTS: cap ₹2,000 · TH ₹25,000 · SM ₹1,00,000 · windows 2d/7d.
+ * Round-2 money engine (CW-2) — runs against the LIVE DB in backend/.env through the real
+ * services (RLS app role). Proves the rewired flow:
+ *   caps (worker ₹2,000 · supervisor NO CAP) · supervisor ₹0 direct · SM ladder removed
+ *   · decider map (accountant per-site / SM may approve / supervisor NEVER / owner override)
+ *   · TWO-TICK verification (approve ≠ verify; accountant approval = both in one act)
+ *   · verified = permanent (no edit/void, even Owner) · 🚩 flag → MONEY_FLAGGED to SM + Owners
+ *   · cash tags (WORK khata vs SALARY/PERSONAL draws) · three-giver rule · supervisor not a cash node
+ *   · crew-scoped supervisor visibility (sees ONLY his own crew's requests).
+ * Org config = schema defaults (worker cap ₹2,000, request window 2d back).
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { uuidv7 } from 'uuidv7';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import * as schema from '@techbuilder/contracts/db/schema';
 import { parseOrgConfig } from '@techbuilder/contracts';
 import { DbService } from '../src/db/db.service';
 import type { Principal } from '../src/common/current-user.decorator';
 import { RecordsService } from '../src/records/records.service';
 import { ApprovalsService } from '../src/approvals/approvals.service';
+import { CashTransfersService } from '../src/cash-transfers/cash-transfers.service';
 import { businessDateNow, addDays } from '../src/common/business-date';
 
 const HAS_DB = !!process.env.DATABASE_URL;
@@ -23,24 +28,33 @@ const orgId = uuidv7();
 const siteA = uuidv7();
 const siteB = uuidv7();
 const crewA1 = uuidv7();
+const crewA2 = uuidv7();
 const vtypeId = uuidv7();
 const vehicleV1 = uuidv7();
 const pW1 = uuidv7();
+const pW2 = uuidv7();
 const pD = uuidv7();
 const ownerId = uuidv7();
 const smAId = uuidv7();
 const smBId = uuidv7();
-const thId = uuidv7();
+const accAId = uuidv7(); // siteA's accountant (per-site desk)
+const accBId = uuidv7(); // siteB's accountant
+const sup1Id = uuidv7(); // crew A1 (worker1 + driver)
+const sup2Id = uuidv7(); // crew A2 (worker2)
 const driverId = uuidv7();
-const workerId = uuidv7();
+const worker1Id = uuidv7();
+const worker2Id = uuidv7();
 
 const principal = (userId: string, role: Principal['role']): Principal => ({ userId, orgId, role, deviceId: 'test' });
 const OWNER = () => principal(ownerId, 'OWNER');
 const SM_A = () => principal(smAId, 'SITE_MANAGER');
-const SM_B = () => principal(smBId, 'SITE_MANAGER');
-const TH = () => principal(thId, 'TEAM_HEAD');
+const ACC_A = () => principal(accAId, 'ACCOUNTANT');
+const ACC_B = () => principal(accBId, 'ACCOUNTANT');
+const SUP1 = () => principal(sup1Id, 'SUPERVISOR');
+const SUP2 = () => principal(sup2Id, 'SUPERVISOR');
 const DRIVER = () => principal(driverId, 'DRIVER');
-const WORKER = () => principal(workerId, 'WORKER');
+const WORKER1 = () => principal(worker1Id, 'WORKER');
+const WORKER2 = () => principal(worker2Id, 'WORKER');
 
 const TODAY = businessDateNow(new Date(), '20:00');
 const audit = (by: string) => ({ createdBy: by, updatedBy: by });
@@ -53,52 +67,64 @@ const expensePayload = (over: Partial<Record<string, unknown>> = {}) => ({
   ...over,
 });
 
-describe.skipIf(!HAS_DB)('EXPENSE_ADD money engine (live DB, RLS app role)', () => {
+describe.skipIf(!HAS_DB)('Round-2 money engine (live DB, RLS app role)', () => {
   let dbs: DbService;
   let records: RecordsService;
   let approvals: ApprovalsService;
+  let cash: CashTransfersService;
 
   beforeAll(async () => {
     dbs = new DbService();
     records = new RecordsService(dbs);
     approvals = new ApprovalsService(dbs);
+    cash = new CashTransfersService(dbs);
 
     const config = parseOrgConfig({
-      brand: { name: 'ExpenseTest Co', primaryColor: '#222222' },
+      brand: { name: 'Round2Test Co', primaryColor: '#222222' },
       locale: {},
-      roles: { enabled: ['OWNER', 'SITE_MANAGER', 'TEAM_HEAD', 'DRIVER', 'WORKER'] },
+      roles: { enabled: ['OWNER', 'SITE_MANAGER', 'SUPERVISOR', 'DRIVER', 'WORKER', 'ACCOUNTANT'] },
       records: { enabled: ['progress', 'expense', 'fuel'] },
       features: {},
       vehicleTypes: [{ key: 'truck', labelHi: 'ट्रक', labelEn: 'Truck', trackingMode: 'KM', extraFields: [] }],
       wage: {},
       reconciliation: {},
       completion: {},
-      // expense: omitted on purpose → schema defaults (cap 200000 / TH 2.5M / SM 10M / 2d / 7d)
     });
 
     await dbs.runInTenant(orgId, async (tx) => {
-      await tx.insert(schema.orgs).values({ id: orgId, name: 'ExpenseTest Co', code: `exptest-${orgId.slice(-8)}`, config, ...audit(ownerId) });
+      await tx.insert(schema.orgs).values({ id: orgId, name: 'Round2Test Co', code: `r2test-${orgId.slice(-8)}`, config, ...audit(ownerId) });
       await tx.insert(schema.sites).values([
-        { id: siteA, orgId, name: 'Site A', code: 'EA', siteManagerId: smAId, ...audit(ownerId) },
-        { id: siteB, orgId, name: 'Site B', code: 'EB', siteManagerId: smBId, ...audit(ownerId) },
+        { id: siteA, orgId, name: 'Site A', code: 'RA', siteManagerId: smAId, accountantId: accAId, ...audit(ownerId) },
+        { id: siteB, orgId, name: 'Site B', code: 'RB', siteManagerId: smBId, accountantId: accBId, ...audit(ownerId) },
       ]);
       await tx.insert(schema.people).values([
         { id: pW1, orgId, name: 'Worker One', skill: 'UNSKILLED', active: true, ...audit(ownerId) },
+        { id: pW2, orgId, name: 'Worker Two', skill: 'UNSKILLED', active: true, ...audit(ownerId) },
         { id: pD, orgId, name: 'Driver Person', skill: 'DRIVER', active: true, ...audit(ownerId) },
       ]);
-      await tx.insert(schema.crews).values({ id: crewA1, orgId, siteId: siteA, teamHeadUserId: thId, name: 'Crew A1', ...audit(ownerId) });
-      await tx.insert(schema.crewMembers).values([{ orgId, crewId: crewA1, personId: pW1 }]);
+      await tx.insert(schema.crews).values([
+        { id: crewA1, orgId, siteId: siteA, supervisorUserId: sup1Id, name: 'Crew A1', ...audit(ownerId) },
+        { id: crewA2, orgId, siteId: siteA, supervisorUserId: sup2Id, name: 'Crew A2', ...audit(ownerId) },
+      ]);
+      await tx.insert(schema.crewMembers).values([
+        { orgId, crewId: crewA1, personId: pW1 },
+        { orgId, crewId: crewA2, personId: pW2 },
+      ]);
       await tx.insert(schema.users).values([
-        { id: ownerId, orgId, name: 'Owner', username: `eo-${ownerId.slice(-8)}`, role: 'OWNER', passwordHash: 'x', mustChangePassword: false, active: true, ...audit(ownerId) },
-        { id: smAId, orgId, name: 'SM A', username: `esma-${smAId.slice(-8)}`, role: 'SITE_MANAGER', assignedSiteId: siteA, passwordHash: 'x', mustChangePassword: false, active: true, ...audit(ownerId) },
-        { id: smBId, orgId, name: 'SM B', username: `esmb-${smBId.slice(-8)}`, role: 'SITE_MANAGER', assignedSiteId: siteB, passwordHash: 'x', mustChangePassword: false, active: true, ...audit(ownerId) },
-        { id: thId, orgId, name: 'TH', username: `eth-${thId.slice(-8)}`, role: 'TEAM_HEAD', assignedSiteId: siteA, crewId: crewA1, passwordHash: 'x', mustChangePassword: false, active: true, ...audit(ownerId) },
-        // driver has NO crewId (site-level by decision) — his site derives from his vehicle
-        { id: driverId, orgId, name: 'Driver', username: `ed-${driverId.slice(-8)}`, role: 'DRIVER', personId: pD, passwordHash: 'x', mustChangePassword: false, active: true, ...audit(ownerId) },
-        { id: workerId, orgId, name: 'Worker', username: `ew-${workerId.slice(-8)}`, role: 'WORKER', personId: pW1, assignedSiteId: siteA, crewId: crewA1, passwordHash: 'x', mustChangePassword: false, active: true, ...audit(ownerId) },
+        { id: ownerId, orgId, name: 'Owner', username: `r2o-${ownerId.slice(-8)}`, role: 'OWNER', passwordHash: 'x', mustChangePassword: false, active: true, ...audit(ownerId) },
+        { id: smAId, orgId, name: 'SM A', username: `r2sma-${smAId.slice(-8)}`, role: 'SITE_MANAGER', assignedSiteId: siteA, passwordHash: 'x', mustChangePassword: false, active: true, ...audit(ownerId) },
+        { id: smBId, orgId, name: 'SM B', username: `r2smb-${smBId.slice(-8)}`, role: 'SITE_MANAGER', assignedSiteId: siteB, passwordHash: 'x', mustChangePassword: false, active: true, ...audit(ownerId) },
+        { id: accAId, orgId, name: 'Accountant A', username: `r2aa-${accAId.slice(-8)}`, role: 'ACCOUNTANT', assignedSiteId: siteA, passwordHash: 'x', mustChangePassword: false, active: true, ...audit(ownerId) },
+        { id: accBId, orgId, name: 'Accountant B', username: `r2ab-${accBId.slice(-8)}`, role: 'ACCOUNTANT', assignedSiteId: siteB, passwordHash: 'x', mustChangePassword: false, active: true, ...audit(ownerId) },
+        { id: sup1Id, orgId, name: 'Sup One', username: `r2s1-${sup1Id.slice(-8)}`, role: 'SUPERVISOR', assignedSiteId: siteA, crewId: crewA1, passwordHash: 'x', mustChangePassword: false, active: true, ...audit(ownerId) },
+        { id: sup2Id, orgId, name: 'Sup Two', username: `r2s2-${sup2Id.slice(-8)}`, role: 'SUPERVISOR', assignedSiteId: siteA, crewId: crewA2, passwordHash: 'x', mustChangePassword: false, active: true, ...audit(ownerId) },
+        // Round 2: the driver BELONGS to crew A1 (drivers have exactly one supervisor now)
+        { id: driverId, orgId, name: 'Driver', username: `r2d-${driverId.slice(-8)}`, role: 'DRIVER', personId: pD, crewId: crewA1, passwordHash: 'x', mustChangePassword: false, active: true, ...audit(ownerId) },
+        { id: worker1Id, orgId, name: 'Worker1', username: `r2w1-${worker1Id.slice(-8)}`, role: 'WORKER', personId: pW1, assignedSiteId: siteA, crewId: crewA1, passwordHash: 'x', mustChangePassword: false, active: true, ...audit(ownerId) },
+        { id: worker2Id, orgId, name: 'Worker2', username: `r2w2-${worker2Id.slice(-8)}`, role: 'WORKER', personId: pW2, assignedSiteId: siteA, crewId: crewA2, passwordHash: 'x', mustChangePassword: false, active: true, ...audit(ownerId) },
       ]);
       await tx.insert(schema.vehicleTypes).values({ id: vtypeId, orgId, name: 'Truck', trackingMode: 'KM', fieldsSchema: [], ...audit(ownerId) });
-      await tx.insert(schema.vehicles).values({ id: vehicleV1, orgId, vehicleTypeId: vtypeId, regNo: 'EXP-V1', assignedSiteId: siteA, assignedDriverPersonId: pD, status: 'ACTIVE', docs: [], values: {}, ...audit(ownerId) });
+      await tx.insert(schema.vehicles).values({ id: vehicleV1, orgId, vehicleTypeId: vtypeId, regNo: 'R2-V1', assignedSiteId: siteA, assignedDriverPersonId: pD, status: 'ACTIVE', docs: [], values: {}, ...audit(ownerId) });
     });
   }, 120_000);
 
@@ -108,6 +134,7 @@ describe.skipIf(!HAS_DB)('EXPENSE_ADD money engine (live DB, RLS app role)', () 
       for (const t of [
         schema.notifications,
         schema.approvalRequests,
+        schema.cashTransfers,
         schema.expenses,
         schema.crewMembers,
         schema.crews,
@@ -125,99 +152,227 @@ describe.skipIf(!HAS_DB)('EXPENSE_ADD money engine (live DB, RLS app role)', () 
     await dbs.onModuleDestroy();
   }, 120_000);
 
-  // ---- submit-side rules ----
-  it('WORKER submits an in-cap expense request → PENDING, site derived server-side', async () => {
+  const getExpense = (id: string) =>
+    dbs.runInTenant(orgId, (tx) => tx.select().from(schema.expenses).where(eq(schema.expenses.id, id))).then((r) => r[0]);
+  const getRequest = (id: string) =>
+    dbs.runInTenant(orgId, (tx) => tx.select().from(schema.approvalRequests).where(eq(schema.approvalRequests.id, id))).then((r) => r[0]);
+
+  // ---- submit-side: caps ----
+  it('WORKER submits an in-cap request → PENDING, site derived server-side', async () => {
     const id = uuidv7();
-    const req = await approvals.submitRequest(WORKER(), { id, type: 'EXPENSE_ADD', payload: expensePayload() });
+    const req = await approvals.submitRequest(WORKER1(), { id, type: 'EXPENSE_ADD', payload: expensePayload() });
     expect(req.status).toBe('PENDING');
     expect((req.payload as { siteId?: string }).siteId).toBe(siteA);
   });
 
   it('WORKER over the ₹2,000 cap is blocked at submit', async () => {
     await expect(
-      approvals.submitRequest(WORKER(), { id: uuidv7(), type: 'EXPENSE_ADD', payload: expensePayload({ amountPaise: 250_000 }) }),
+      approvals.submitRequest(WORKER1(), { id: uuidv7(), type: 'EXPENSE_ADD', payload: expensePayload({ amountPaise: 250_000 }) }),
     ).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
   });
 
   it('WORKER may not submit any other request type', async () => {
     await expect(
-      approvals.submitRequest(WORKER(), { id: uuidv7(), type: 'LEAVE', payload: { personId: pW1 } }),
+      approvals.submitRequest(WORKER1(), { id: uuidv7(), type: 'LEAVE', payload: { personId: pW1 } }),
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 
-  it('WORKER backdating beyond the 3-day window (today+2) is blocked', async () => {
+  it('WORKER backdating beyond the window is blocked', async () => {
     await expect(
-      approvals.submitRequest(WORKER(), { id: uuidv7(), type: 'EXPENSE_ADD', payload: expensePayload({ businessDate: addDays(TODAY, -3) }) }),
+      approvals.submitRequest(WORKER1(), { id: uuidv7(), type: 'EXPENSE_ADD', payload: expensePayload({ businessDate: addDays(TODAY, -3) }) }),
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 
-  // ---- decide-side: TH approves worker; materialization ----
-  it('TH approves a worker request with a category override → booked expense (id=request, enteredBy=worker)', async () => {
+  it('SUPERVISOR request has NO cap and NO backdate window (₹50,000, 30 days back → PENDING)', async () => {
     const id = uuidv7();
-    await approvals.submitRequest(WORKER(), { id, type: 'EXPENSE_ADD', payload: expensePayload({ category: 'FOOD' }) });
-    const decided = await approvals.decideRequest(TH(), id, { approve: true, categoryOverride: 'SUPPLIES' });
+    const req = await approvals.submitRequest(SUP1(), {
+      id,
+      type: 'EXPENSE_ADD',
+      payload: expensePayload({ amountPaise: 5_000_000, businessDate: addDays(TODAY, -30), siteId: siteA }),
+    });
+    expect(req.status).toBe('PENDING');
+  });
+
+  // ---- decider map ----
+  it('SUPERVISOR decides NOTHING — his crew worker’s request is FORBIDDEN to him', async () => {
+    const id = uuidv7();
+    await approvals.submitRequest(WORKER1(), { id, type: 'EXPENSE_ADD', payload: expensePayload() });
+    await expect(approvals.decideRequest(SUP1(), id, { approve: true })).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    // cleanup noise: accountant rejects it with a reason
+    await approvals.decideRequest(ACC_A(), id, { approve: false, comment: 'test cleanup' });
+  });
+
+  it('ACCOUNTANT of another site cannot decide (per-site sealing)', async () => {
+    const id = uuidv7();
+    await approvals.submitRequest(WORKER1(), { id, type: 'EXPENSE_ADD', payload: expensePayload() });
+    await expect(approvals.decideRequest(ACC_B(), id, { approve: true })).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await approvals.decideRequest(ACC_A(), id, { approve: false, comment: 'test cleanup' });
+  });
+
+  it('ACCOUNTANT approval = approve + verify in ONE act; category override wins; enteredBy = spender', async () => {
+    const id = uuidv7();
+    await approvals.submitRequest(WORKER1(), { id, type: 'EXPENSE_ADD', payload: expensePayload({ category: 'FOOD' }) });
+    const decided = await approvals.decideRequest(ACC_A(), id, { approve: true, categoryOverride: 'SUPPLIES' });
     expect(decided.status).toBe('APPROVED');
+    expect(decided.verifiedAt).not.toBeNull();
+    expect(decided.verifiedBy).toBe(accAId);
 
-    const [row] = await dbs.runInTenant(orgId, (tx) =>
-      tx.select().from(schema.expenses).where(eq(schema.expenses.id, id)),
-    );
+    const row = await getExpense(id);
     expect(row).toBeDefined();
-    expect(row!.category).toBe('SUPPLIES'); // decider's choice wins
-    expect(row!.enteredBy).toBe(workerId); // the spender, not the decider
-    expect(row!.paidVia).toBe('CASH');
-    expect(row!.siteId).toBe(siteA);
+    expect(row!.category).toBe('SUPPLIES');
+    expect(row!.enteredBy).toBe(worker1Id);
+    expect(row!.verifiedAt).not.toBeNull();
   });
 
-  it('rejecting an expense request without a reason fails; with a reason → REJECTED and NOT booked', async () => {
+  it('rejecting without a reason fails; with a reason → REJECTED, nothing booked', async () => {
     const id = uuidv7();
-    await approvals.submitRequest(WORKER(), { id, type: 'EXPENSE_ADD', payload: expensePayload() });
-    await expect(approvals.decideRequest(TH(), id, { approve: false })).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
-    const rejected = await approvals.decideRequest(TH(), id, { approve: false, comment: 'no bill photo' });
+    await approvals.submitRequest(WORKER1(), { id, type: 'EXPENSE_ADD', payload: expensePayload() });
+    await expect(approvals.decideRequest(ACC_A(), id, { approve: false })).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+    const rejected = await approvals.decideRequest(ACC_A(), id, { approve: false, comment: 'no bill photo' });
     expect(rejected.status).toBe('REJECTED');
-    const [row] = await dbs.runInTenant(orgId, (tx) => tx.select().from(schema.expenses).where(eq(schema.expenses.id, id)));
-    expect(row).toBeUndefined();
+    expect(await getExpense(id)).toBeUndefined();
   });
 
-  // ---- routing: drivers are site-level → SM, never TH ----
-  it('DRIVER request routes past the TH (FORBIDDEN) to the SM (approves fine)', async () => {
+  // ---- two-tick: SM approval waits for the accountant ----
+  it('SM approval books the expense UNVERIFIED; accountant verify makes it permanent (no edit/void, even Owner)', async () => {
     const id = uuidv7();
-    const req = await approvals.submitRequest(DRIVER(), { id, type: 'EXPENSE_ADD', payload: expensePayload({ category: 'REPAIR' }) });
-    expect((req.payload as { siteId?: string }).siteId).toBe(siteA); // derived from his vehicle's site
-    await expect(approvals.decideRequest(TH(), id, { approve: true })).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await approvals.submitRequest(DRIVER(), { id, type: 'EXPENSE_ADD', payload: expensePayload({ category: 'REPAIR' }) });
     const decided = await approvals.decideRequest(SM_A(), id, { approve: true });
     expect(decided.status).toBe('APPROVED');
+    expect(decided.verifiedAt).toBeNull(); // approved but NOT yet real money
+
+    let row = await getExpense(id);
+    expect(row!.verifiedAt).toBeNull();
+
+    // wrong accountant can't verify
+    await expect(approvals.verifyRequest(ACC_B(), id, { ok: true })).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    // the site's accountant can
+    const verified = await approvals.verifyRequest(ACC_A(), id, { ok: true });
+    expect(verified.verifiedAt).not.toBeNull();
+    row = await getExpense(id);
+    expect(row!.verifiedAt).not.toBeNull();
+
+    // permanent: nobody edits/voids — not even the Owner
+    await expect(records.updateRecord(OWNER(), 'expense', id, { amountPaise: 1 })).rejects.toMatchObject({ code: 'CONFLICT' });
+    await expect(records.voidRecord(OWNER(), 'expense', id)).rejects.toMatchObject({ code: 'CONFLICT' });
+    // re-verify → CONFLICT
+    await expect(approvals.verifyRequest(ACC_A(), id, { ok: true })).rejects.toMatchObject({ code: 'CONFLICT' });
   });
 
-  // ---- SM > ₹1L → only the Owner can decide (by construction) ----
-  it('SM over-limit request: SM cannot self-decide, SM(B) is out of scope, OWNER approves → booked', async () => {
+  it('verify(ok=false) flags the request + expense and notifies SM + Owners (MONEY_FLAGGED)', async () => {
     const id = uuidv7();
-    await approvals.submitRequest(SM_A(), { id, type: 'EXPENSE_ADD', payload: expensePayload({ amountPaise: 12_000_000 }) });
-    await expect(approvals.decideRequest(SM_A(), id, { approve: true })).rejects.toMatchObject({ code: 'FORBIDDEN' });
-    await expect(approvals.decideRequest(SM_B(), id, { approve: true })).rejects.toMatchObject({ code: 'FORBIDDEN' });
-    const decided = await approvals.decideRequest(OWNER(), id, { approve: true });
-    expect(decided.status).toBe('APPROVED');
-    const [row] = await dbs.runInTenant(orgId, (tx) => tx.select().from(schema.expenses).where(eq(schema.expenses.id, id)));
-    expect(row?.amountPaise).toBe(12_000_000);
-    expect(row?.enteredBy).toBe(smAId);
+    await approvals.submitRequest(WORKER1(), { id, type: 'EXPENSE_ADD', payload: expensePayload() });
+    await approvals.decideRequest(SM_A(), id, { approve: true });
+    await expect(approvals.verifyRequest(ACC_A(), id, { ok: false })).rejects.toMatchObject({ code: 'VALIDATION_FAILED' }); // note required
+    await approvals.verifyRequest(ACC_A(), id, { ok: false, flagNote: 'no such purchase in my book' });
+
+    const req = await getRequest(id);
+    expect(req!.flagged).toBe(true);
+    expect(req!.verifiedAt).toBeNull();
+    const row = await getExpense(id);
+    expect(row!.flagged).toBe(true);
+
+    const notes = await dbs.runInTenant(orgId, (tx) =>
+      tx.select().from(schema.notifications).where(eq(schema.notifications.type, 'MONEY_FLAGGED')),
+    );
+    const targets = notes.map((n) => n.userId);
+    expect(targets).toContain(smAId);
+    expect(targets).toContain(ownerId);
   });
 
-  // ---- direct-entry per-entry limits ----
-  it('TH direct entry over ₹25,000 is refused with OVER_DIRECT_LIMIT', async () => {
+  it('a PENDING request cannot be verified (nothing moved yet)', async () => {
+    const id = uuidv7();
+    await approvals.submitRequest(WORKER1(), { id, type: 'EXPENSE_ADD', payload: expensePayload() });
+    await expect(approvals.verifyRequest(ACC_A(), id, { ok: true })).rejects.toMatchObject({ code: 'CONFLICT' });
+    await approvals.decideRequest(ACC_A(), id, { approve: false, comment: 'test cleanup' });
+  });
+
+  // ---- direct entries ----
+  it('SUPERVISOR direct expense is ₹0 — always refused with OVER_DIRECT_LIMIT', async () => {
     await expect(
-      records.createExpense(TH(), { id: uuidv7(), siteId: siteA, category: 'MISC', amountPaise: 2_600_000, businessDate: TODAY }),
+      records.createExpense(SUP1(), { id: uuidv7(), siteId: siteA, category: 'MISC', amountPaise: 5_000, businessDate: TODAY }),
     ).rejects.toMatchObject({ code: 'VALIDATION_FAILED', fields: { amountPaise: 'OVER_DIRECT_LIMIT' } });
   });
 
-  it('SM direct entry over ₹1,00,000 is refused; under it books instantly', async () => {
-    await expect(
-      records.createExpense(SM_A(), { id: uuidv7(), siteId: siteA, category: 'MISC', amountPaise: 10_000_001, businessDate: TODAY }),
-    ).rejects.toMatchObject({ code: 'VALIDATION_FAILED', fields: { amountPaise: 'OVER_DIRECT_LIMIT' } });
-    const ok = await records.createExpense(SM_A(), { id: uuidv7(), siteId: siteA, category: 'MISC', amountPaise: 5_000_000, businessDate: TODAY });
-    expect(ok.amountPaise).toBe(5_000_000);
+  it('SM direct entry has NO ladder (₹5,00,000 books instantly, unverified); accountant verifies the expense', async () => {
+    const id = uuidv7();
+    const ok = await records.createExpense(SM_A(), { id, siteId: siteA, category: 'MISC', amountPaise: 50_000_000, businessDate: TODAY });
+    expect(ok.amountPaise).toBe(50_000_000);
+    expect(ok.verifiedAt).toBeNull();
+
+    const verified = await records.verifyExpense(ACC_A(), id, { ok: true });
+    expect(verified.verifiedAt).not.toBeNull();
+    await expect(records.verifyExpense(ACC_A(), id, { ok: true })).rejects.toMatchObject({ code: 'CONFLICT' });
   });
 
-  it('TH direct entry 5 days back now works (window widened 2d → 7d)', async () => {
-    const ok = await records.createExpense(TH(), { id: uuidv7(), siteId: siteA, category: 'FOOD', amountPaise: 50_000, businessDate: addDays(TODAY, -5) });
-    expect(ok.businessDate).toBe(addDays(TODAY, -5));
+  // ---- cash: tags, three-giver, supervisor not a node ----
+  it('WORK cash never touches a SUPERVISOR (neither direction)', async () => {
+    await expect(
+      cash.create(SM_A(), { id: uuidv7(), toUserId: sup1Id, amountPaise: 10_000, kind: 'GIVE', businessDate: TODAY }),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(
+      cash.create(SUP1(), { id: uuidv7(), toUserId: worker1Id, amountPaise: 10_000, kind: 'GIVE', businessDate: TODAY }),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+
+  it('three-giver rule: a WORKER cannot give SALARY; the SM can — and it lands UNVERIFIED', async () => {
+    await expect(
+      cash.create(WORKER1(), { id: uuidv7(), toUserId: worker2Id, amountPaise: 5_000, kind: 'GIVE', tag: 'SALARY', businessDate: TODAY }),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    const id = uuidv7();
+    const t = await cash.create(SM_A(), { id, toUserId: worker1Id, amountPaise: 300_000, kind: 'GIVE', tag: 'SALARY', businessDate: TODAY, note: 'going home' });
+    expect(t.tag).toBe('SALARY');
+    expect(t.verifiedAt).toBeNull();
+
+    // unverified → NOT yet on the worker's "money I've taken" page
+    let mine = await cash.myMoney(WORKER1());
+    expect(mine.entries.find((e) => e.id === id)).toBeUndefined();
+
+    // the accountant's tick makes it real
+    await cash.verifyTransfer(ACC_A(), id, { ok: true });
+    mine = await cash.myMoney(WORKER1());
+    const entry = mine.entries.find((e) => e.id === id);
+    expect(entry).toBeDefined();
+    expect(entry!.tag).toBe('SALARY');
+    expect(entry!.amountPaise).toBe(300_000);
+  });
+
+  it('SALARY/PERSONAL draws do NOT move the WORK khata; accountant’s own WORK give is auto-verified', async () => {
+    const before = await cash.myBalance(WORKER1());
+    // accountant gives WORK cash — auto-verified (he IS the verifier), balance moves
+    const workId = uuidv7();
+    const w = await cash.create(ACC_A(), { id: workId, toUserId: worker1Id, amountPaise: 50_000, kind: 'GIVE', businessDate: TODAY });
+    expect(w.verifiedAt).not.toBeNull();
+    const after = await cash.myBalance(WORKER1());
+    expect(after.receivedPaise - before.receivedPaise).toBe(50_000);
+    // the earlier ₹3,000 SALARY draw is absent from the khata numbers (tag-filtered)
+    const salarySum = await dbs.runInTenant(orgId, (tx) =>
+      tx
+        .select()
+        .from(schema.cashTransfers)
+        .where(and(eq(schema.cashTransfers.toUserId, worker1Id), eq(schema.cashTransfers.tag, 'SALARY'))),
+    );
+    expect(salarySum.length).toBeGreaterThan(0); // draws exist…
+    expect(after.receivedPaise - before.receivedPaise).toBe(50_000); // …but only WORK moved the khata
+  });
+
+  // ---- crew-scoped supervisor visibility ----
+  it('a SUPERVISOR sees ONLY his own crew’s requests', async () => {
+    const otherCrewReq = uuidv7();
+    await approvals.submitRequest(WORKER2(), { id: otherCrewReq, type: 'EXPENSE_ADD', payload: expensePayload() });
+
+    const sup1Sees = await approvals.listRequests(SUP1());
+    expect(sup1Sees.find((r) => r.id === otherCrewReq)).toBeUndefined();
+    const sup2Sees = await approvals.listRequests(SUP2());
+    expect(sup2Sees.find((r) => r.id === otherCrewReq)).toBeDefined();
+    // the driver is IN crew A1 → his requests are visible to SUP1
+    const driverReq = uuidv7();
+    await approvals.submitRequest(DRIVER(), { id: driverReq, type: 'EXPENSE_ADD', payload: expensePayload() });
+    const sup1Again = await approvals.listRequests(SUP1());
+    expect(sup1Again.find((r) => r.id === driverReq)).toBeDefined();
+    // cleanup noise
+    await approvals.decideRequest(ACC_A(), otherCrewReq, { approve: false, comment: 'test cleanup' });
+    await approvals.decideRequest(ACC_A(), driverReq, { approve: false, comment: 'test cleanup' });
   });
 });

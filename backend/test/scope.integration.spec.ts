@@ -45,7 +45,7 @@ const principal = (userId: string, role: Principal['role']): Principal => ({ use
 const OWNER = () => principal(ownerId, 'OWNER');
 const SM_A = () => principal(smAId, 'SITE_MANAGER');
 const SM_B = () => principal(smBId, 'SITE_MANAGER');
-const TH = () => principal(thId, 'TEAM_HEAD');
+const TH = () => principal(thId, 'SUPERVISOR');
 const DRIVER = () => principal(driverId, 'DRIVER');
 const WORKER = () => principal(workerId, 'WORKER');
 
@@ -73,7 +73,7 @@ describe.skipIf(!HAS_DB)('scope enforcement acceptance (live DB, RLS app role)',
     const config = parseOrgConfig({
       brand: { name: 'ScopeTest Co', primaryColor: '#111111' },
       locale: {},
-      roles: { enabled: ['OWNER', 'SITE_MANAGER', 'TEAM_HEAD', 'DRIVER', 'WORKER'] },
+      roles: { enabled: ['OWNER', 'SITE_MANAGER', 'SUPERVISOR', 'DRIVER', 'WORKER'] },
       records: { enabled: ['progress', 'expense', 'fuel', 'attendance'] },
       features: {},
       vehicleTypes: [{ key: 'truck', labelHi: 'ट्रक', labelEn: 'Truck', trackingMode: 'KM', extraFields: [] }],
@@ -94,7 +94,7 @@ describe.skipIf(!HAS_DB)('scope enforcement acceptance (live DB, RLS app role)',
         { id: pD, orgId, name: 'Driver Person', skill: 'DRIVER', defaultWagePaise: 60_000, active: true, ...audit(ownerId) },
         { id: pOutside, orgId, name: 'Outside Person', skill: 'UNSKILLED', defaultWagePaise: 50_000, active: true, ...audit(ownerId) },
       ]);
-      await tx.insert(schema.crews).values({ id: crewA1, orgId, siteId: siteA, teamHeadUserId: thId, name: 'Crew A1', ...audit(ownerId) });
+      await tx.insert(schema.crews).values({ id: crewA1, orgId, siteId: siteA, supervisorUserId: thId, name: 'Crew A1', ...audit(ownerId) });
       await tx.insert(schema.crewMembers).values([
         { orgId, crewId: crewA1, personId: pW1 },
         { orgId, crewId: crewA1, personId: pW2 },
@@ -103,7 +103,7 @@ describe.skipIf(!HAS_DB)('scope enforcement acceptance (live DB, RLS app role)',
         { id: ownerId, orgId, name: 'Owner', username: `o-${ownerId.slice(-8)}`, role: 'OWNER', passwordHash: 'x', mustChangePassword: false, active: true, ...audit(ownerId) },
         { id: smAId, orgId, name: 'SM A', username: `sma-${smAId.slice(-8)}`, role: 'SITE_MANAGER', assignedSiteId: siteA, passwordHash: 'x', mustChangePassword: false, active: true, ...audit(ownerId) },
         { id: smBId, orgId, name: 'SM B', username: `smb-${smBId.slice(-8)}`, role: 'SITE_MANAGER', assignedSiteId: siteB, passwordHash: 'x', mustChangePassword: false, active: true, ...audit(ownerId) },
-        { id: thId, orgId, name: 'TH', username: `th-${thId.slice(-8)}`, role: 'TEAM_HEAD', assignedSiteId: siteA, crewId: crewA1, passwordHash: 'x', mustChangePassword: false, active: true, ...audit(ownerId) },
+        { id: thId, orgId, name: 'TH', username: `th-${thId.slice(-8)}`, role: 'SUPERVISOR', assignedSiteId: siteA, crewId: crewA1, passwordHash: 'x', mustChangePassword: false, active: true, ...audit(ownerId) },
         { id: driverId, orgId, name: 'Driver', username: `d-${driverId.slice(-8)}`, role: 'DRIVER', personId: pD, passwordHash: 'x', mustChangePassword: false, active: true, ...audit(ownerId) },
         { id: workerId, orgId, name: 'Worker', username: `w-${workerId.slice(-8)}`, role: 'WORKER', personId: pW1, assignedSiteId: siteA, passwordHash: 'x', mustChangePassword: false, active: true, ...audit(ownerId) },
       ]);
@@ -188,28 +188,28 @@ describe.skipIf(!HAS_DB)('scope enforcement acceptance (live DB, RLS app role)',
     expect(dash.completeness.every((c) => c.scopeId === siteA)).toBe(true);
   });
 
-  // ---- Hole 3: TEAM_HEAD attendance for anyone/anywhere ----
-  it('TH cannot mark attendance for a person outside their crew', async () => {
+  // ---- Round 2: attendance is OUT of the app for the SUPERVISOR (matrix dropped attendance.mark) ----
+  it('SUPERVISOR cannot mark attendance at all (Round 2 — attendance removed for the role)', async () => {
     await expect(
-      attendance.mark(TH(), { siteId: siteA, crewId: crewA1, businessDate: TODAY, rows: [{ id: uuidv7(), personId: pOutside, status: 'PRESENT' }] }),
+      attendance.mark(TH(), { siteId: siteA, crewId: crewA1, businessDate: TODAY, rows: [{ id: uuidv7(), personId: pW2, status: 'PRESENT' }] }),
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 
-  it('TH cannot mark attendance at another site', async () => {
+  it('SM still cannot mark attendance at another site (dormant module keeps its scope)', async () => {
     await expect(
-      attendance.mark(TH(), { siteId: siteB, businessDate: TODAY, rows: [{ id: uuidv7(), personId: pW1, status: 'PRESENT' }] }),
+      attendance.mark(SM_A(), { siteId: siteB, businessDate: TODAY, rows: [{ id: uuidv7(), personId: pW1, status: 'PRESENT' }] }),
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 
-  it('TH marks own-crew attendance at own site successfully', async () => {
-    const out = await attendance.mark(TH(), {
+  it('SM marks own-site attendance successfully (module dormant in UI, intact in API)', async () => {
+    const out = await attendance.mark(SM_A(), {
       siteId: siteA,
       crewId: crewA1,
       businessDate: TODAY,
       rows: [{ id: uuidv7(), personId: pW2, status: 'PRESENT' }],
     });
     expect(out).toHaveLength(1);
-    expect(out[0]!.markedBy).toBe(thId);
+    expect(out[0]!.markedBy).toBe(smAId);
   });
 
   // ---- Hole 4 (WP-2): self-approval + decide scope ----
@@ -276,13 +276,11 @@ describe.skipIf(!HAS_DB)('scope enforcement acceptance (live DB, RLS app role)',
     await expect(records.updateRecord(OWNER(), 'expense', staleId, { amountPaise: 3_500 })).resolves.toBeUndefined();
   });
 
-  // ---- WP-4: attendance backdating windows ----
-  it('TH: yesterday OK, 3 days back rejected · SM: 3 days OK, 10 days rejected · Owner: 10 days OK · future rejected', async () => {
+  // ---- WP-4: attendance backdating windows (Round 2: supervisor can't mark at all) ----
+  it('SM: 3 days OK, 10 days rejected · Owner: 10 days OK · future rejected', async () => {
     const mark = (p: Principal, businessDate: string) =>
       attendance.mark(p, { siteId: siteA, crewId: crewA1, businessDate, rows: [{ id: uuidv7(), personId: pW1, status: 'PRESENT' }] });
 
-    await expect(mark(TH(), addDays(TODAY, -1))).resolves.toBeDefined();
-    await expect(mark(TH(), addDays(TODAY, -3))).rejects.toMatchObject({ code: 'FORBIDDEN' });
     await expect(mark(SM_A(), addDays(TODAY, -3))).resolves.toBeDefined();
     await expect(mark(SM_A(), addDays(TODAY, -10))).rejects.toMatchObject({ code: 'FORBIDDEN' });
     await expect(mark(OWNER(), addDays(TODAY, -10))).resolves.toBeDefined();
@@ -298,14 +296,16 @@ describe.skipIf(!HAS_DB)('scope enforcement acceptance (live DB, RLS app role)',
     expect(corrected[0]!.status).toBe('HALF_DAY');
   });
 
-  // ---- Phase 4: record-CREATION backdating windows (gap found by web Phase 3A) ----
-  // Client-plan v1 (T-2): TH window widened 2d → 7d; beyond it routes as an EXPENSE_ADD request.
-  it('record creation obeys role windows: TH ≤7d, SM ≤7d, DRIVER ≤2d, future rejected', async () => {
+  // ---- Phase 4: record-CREATION backdating windows ----
+  // Round 2: SUPERVISOR direct expense is ₹0 (always converts to a request); SM keeps his window.
+  it('record creation obeys Round-2 rules: SUPERVISOR blocked, SM ≤7d, future rejected', async () => {
     const mkExpense = (p: Principal, businessDate: string) =>
       records.createExpense(p, { id: uuidv7(), siteId: siteA, category: 'MISC', amountPaise: 500, businessDate });
 
-    await expect(mkExpense(TH(), addDays(TODAY, -5))).resolves.toBeDefined();
-    await expect(mkExpense(TH(), addDays(TODAY, -8))).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(mkExpense(TH(), addDays(TODAY, -1))).rejects.toMatchObject({
+      code: 'VALIDATION_FAILED',
+      fields: { amountPaise: 'OVER_DIRECT_LIMIT' },
+    });
     await expect(mkExpense(SM_A(), addDays(TODAY, -5))).resolves.toBeDefined();
     await expect(mkExpense(SM_A(), addDays(TODAY, -10))).rejects.toMatchObject({ code: 'FORBIDDEN' });
     await expect(mkExpense(SM_A(), addDays(TODAY, 1))).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
@@ -323,16 +323,27 @@ describe.skipIf(!HAS_DB)('scope enforcement acceptance (live DB, RLS app role)',
     await expect(mkFuel(addDays(TODAY, -3))).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 
-  it('sync CREATE events obey the same record window', async () => {
-    const results = await sync.pushBatch(TH(), [
+  it('sync CREATE events obey the same record rules (SM window; supervisor expense blocked outright)', async () => {
+    const results = await sync.pushBatch(SM_A(), [
       {
         outboxId: 'ob-p4',
         entityType: 'expense',
         op: 'CREATE',
-        payload: { id: uuidv7(), siteId: siteA, category: 'MISC', amountPaise: 100, businessDate: addDays(TODAY, -8), void: false },
+        payload: { id: uuidv7(), siteId: siteA, category: 'MISC', amountPaise: 100, businessDate: addDays(TODAY, -10), void: false },
       },
     ]);
     expect(results[0]).toMatchObject({ ok: false, errorCode: 'FORBIDDEN' });
+
+    // Round 2: a supervisor can't smuggle a direct expense through the sync path either.
+    const supResults = await sync.pushBatch(TH(), [
+      {
+        outboxId: 'ob-p4b',
+        entityType: 'expense',
+        op: 'CREATE',
+        payload: { id: uuidv7(), siteId: siteA, category: 'MISC', amountPaise: 100, businessDate: TODAY, void: false },
+      },
+    ]);
+    expect(supResults[0]).toMatchObject({ ok: false, errorCode: 'VALIDATION_FAILED' });
   });
 
   // ---- Sync bypass closed ----
@@ -344,7 +355,8 @@ describe.skipIf(!HAS_DB)('scope enforcement acceptance (live DB, RLS app role)',
     expect(results[0]).toMatchObject({ ok: false, errorCode: 'NOT_FOUND' }); // site not in the outbox registry anymore
     expect(results[1]).toMatchObject({ ok: false, errorCode: 'FORBIDDEN' }); // worker lacks record.enter
 
-    const good = await sync.pushBatch(TH(), [
+    // Round 2: the supervisor lost attendance.mark — the SM is the remaining (dormant) writer.
+    const good = await sync.pushBatch(SM_A(), [
       {
         outboxId: 'ob-3',
         entityType: 'attendance',

@@ -7,13 +7,16 @@ import type {
   ExpenseCategory,
   LedgerRollupRow,
   MyBalance,
+  MyMoney,
   Role,
+  VerifyInput,
 } from '@techbuilder/contracts';
 import { DbService, type Tx } from '../db/db.service';
 import { ApiException } from '../common/api-exception';
 import type { Principal } from '../common/current-user.decorator';
 import { forbidScope, inSet, loadScope } from '../common/scope.util';
 import { assertBackdateWindow } from '../common/backdate.util';
+import { assertCanVerify, assertNotVerified, notifyMoneyFlagged, verificationSet } from '../common/verification.util';
 import { ROLE_RANK, chainAllows, computeBalance } from './balance-calc';
 
 /** Raw user attributes needed for chain + scope checks (fresh from DB, not the JWT). */
@@ -79,6 +82,23 @@ export class CashTransfersService {
       // Business date: never the future (no back-limit for the ledger — reuse the shared assert with no window).
       await assertBackdateWindow(tx, me.role, input.businessDate, {});
 
+      const tag = input.tag ?? 'WORK';
+      if (tag === 'WORK') {
+        // Round 2: the SUPERVISOR is NOT a cash node — he neither holds nor hands out work-cash.
+        if (me.role === 'SUPERVISOR' || recipient.role === 'SUPERVISOR') {
+          forbidScope('Supervisors are outside the work-cash chain (Round 2) — money requests only');
+        }
+      } else {
+        // SALARY / PERSONAL draw: the three-giver rule — only Owner / SM / Accountant hand
+        // personal money, always downward (GIVE); the accountant verifies every claim.
+        if (input.kind !== 'GIVE') {
+          throw new ApiException('VALIDATION_FAILED', 'Personal/salary draws are always a GIVE', { kind: 'GIVE only' });
+        }
+        if (me.role !== 'OWNER' && me.role !== 'SITE_MANAGER' && me.role !== 'ACCOUNTANT') {
+          forbidScope('Only the Owner, a Site Manager or the Accountant can give salary/personal money');
+        }
+      }
+
       // Chain (rank): GIVE down, RETURN up. `from` is the caller — with ONE field-reality
       // exception: a RETURN recorded by the SENIOR party ("the worker handed his balance back
       // to me") is stored as recipient→caller, so both parties may record a return and the
@@ -98,6 +118,10 @@ export class CashTransfersService {
       const [higher, lower] = input.kind === 'GIVE' ? [me, recipient] : [toParty, fromParty];
       await assertSupervises(tx, higher, lower);
 
+      // Round 2 two-tick: the accountant recording his own move IS the verification (one act,
+      // recorded distinctly). Everyone else's claim waits for the accountant's tick.
+      const verifyStamp = me.role === 'ACCOUNTANT' ? { verifiedBy: p.userId, verifiedAt: new Date() } : {};
+
       const [row] = await tx
         .insert(schema.cashTransfers)
         .values({
@@ -107,10 +131,12 @@ export class CashTransfersService {
           toUserId: toParty.id,
           amountPaise: input.amountPaise,
           kind: input.kind,
+          tag,
           businessDate: input.businessDate,
           note: input.note ?? null,
           createdBy: p.userId,
           updatedBy: p.userId,
+          ...verifyStamp,
         })
         .onConflictDoNothing() // idempotent on client UUIDv7
         .returning();
@@ -184,6 +210,84 @@ export class CashTransfersService {
   }
 
   /**
+   * Round 2 (C10) — "money I've taken": the caller's own VERIFIED SALARY/PERSONAL draws,
+   * date-wise with the tag. Only accountant-verified entries appear (the claim isn't money
+   * until the tick). Self-scoped: every role sees exactly his own list.
+   */
+  async myMoney(p: Principal): Promise<MyMoney> {
+    return this.dbs.runInTenant(p.orgId, async (tx) => {
+      const rows = await tx
+        .select({
+          id: schema.cashTransfers.id,
+          businessDate: schema.cashTransfers.businessDate,
+          amountPaise: schema.cashTransfers.amountPaise,
+          tag: schema.cashTransfers.tag,
+          fromUserId: schema.cashTransfers.fromUserId,
+          fromName: schema.users.name,
+          note: schema.cashTransfers.note,
+          verifiedAt: schema.cashTransfers.verifiedAt,
+        })
+        .from(schema.cashTransfers)
+        .leftJoin(schema.users, eq(schema.users.id, schema.cashTransfers.fromUserId))
+        .where(
+          and(
+            isNull(schema.cashTransfers.deletedAt),
+            eq(schema.cashTransfers.toUserId, p.userId),
+            sql`${schema.cashTransfers.tag} <> 'WORK'`,
+            sql`${schema.cashTransfers.verifiedAt} IS NOT NULL`,
+          ),
+        )
+        .orderBy(desc(schema.cashTransfers.businessDate));
+      const entries = rows.map((r) => ({
+        id: r.id,
+        businessDate: r.businessDate,
+        amountPaise: r.amountPaise,
+        tag: r.tag,
+        fromUserId: r.fromUserId,
+        fromName: r.fromName ?? '—',
+        note: r.note ?? null,
+        verifiedAt: (r.verifiedAt as Date).toISOString(),
+      }));
+      return { entries, totalPaise: entries.reduce((s, e) => s + e.amountPaise, 0) };
+    });
+  }
+
+  /**
+   * Round 2 two-tick: the accountant's verdict on a cash-transfer claim. Scope: the accountant
+   * may verify a transfer when either party belongs to his site(s); the Owner may always.
+   * ok=false → 🚩 flagged + MONEY_FLAGGED to the site SM + Owners.
+   */
+  async verifyTransfer(p: Principal, id: string, input: VerifyInput): Promise<CashTransfer> {
+    return this.dbs.runInTenant(p.orgId, async (tx) => {
+      const ctx = await loadScope(tx, p);
+      const [row] = await tx.select().from(schema.cashTransfers).where(eq(schema.cashTransfers.id, id));
+      assertNotVerified(row, 'Cash transfer');
+      const t = row!;
+      // Derive a site for the scope check from either party (receiver first — the money landed there).
+      const siteId =
+        (await partySiteIn(tx, t.toUserId, ctx.siteIds)) ?? (await partySiteIn(tx, t.fromUserId, ctx.siteIds));
+      assertCanVerify(ctx, siteId);
+
+      const set = verificationSet(ctx, input);
+      const [updated] = await tx.update(schema.cashTransfers).set(set).where(eq(schema.cashTransfers.id, id)).returning();
+      if (!updated) throw new ApiException('NOT_FOUND', 'Cash transfer not found');
+
+      if (!input.ok) {
+        await notifyMoneyFlagged(tx, t.orgId, siteId, {
+          kind: 'cash-transfer',
+          transferId: t.id,
+          flagNote: input.flagNote,
+          fromUserId: t.fromUserId,
+          toUserId: t.toUserId,
+          amountPaise: t.amountPaise,
+          tag: t.tag,
+        });
+      }
+      return mapCashTransfer(updated);
+    });
+  }
+
+  /**
    * Ledger rollup. OWNER = every org user with any ledger/expense activity; SITE_MANAGER = the
    * users at his site(s) + himself; everyone else FORBIDDEN. Aggregated with SQL group-bys (no N+1).
    */
@@ -248,8 +352,9 @@ export class CashTransfersService {
 // ---- scope: does `higher` supervise `lower`? (rank already proven by chainAllows) ----
 async function assertSupervises(tx: Tx, higher: LedgerUser, lower: LedgerUser): Promise<void> {
   if (higher.role === 'OWNER') return; // org scope — anyone
-  if (higher.role === 'SITE_MANAGER') {
-    const siteIds = await supervisorSiteIds(tx, higher.id, higher.assignedSiteId);
+  if (higher.role === 'SITE_MANAGER' || higher.role === 'ACCOUNTANT') {
+    // Round 2: the per-site ACCOUNTANT's cash reach mirrors the SM pattern (sites.accountant_id).
+    const siteIds = await seniorSiteIds(tx, higher.id, higher.role, higher.assignedSiteId);
     if (lower.assignedSiteId && siteIds.includes(lower.assignedSiteId)) return;
     // Drivers carry no assignedSiteId — their site comes from their vehicle assignment.
     if (lower.personId) {
@@ -261,40 +366,49 @@ async function assertSupervises(tx: Tx, higher: LedgerUser, lower: LedgerUser): 
     }
     forbidScope('The other party is outside your site scope');
   }
-  if (higher.role === 'TEAM_HEAD') {
-    const crewIds = await supervisorCrewIds(tx, higher.id, higher.crewId);
-    // A Team Head's cash reach is his crew's WORKERs only (drivers are site-level, not in a crew).
-    if (lower.role === 'WORKER' && lower.crewId && crewIds.includes(lower.crewId)) return;
-    forbidScope('A Team Head can only transfer cash with workers in their own crew');
-  }
-  // DRIVER / WORKER can never be the higher party (rank 1) — chainAllows would have rejected.
+  // Round 2: SUPERVISOR is no longer a cash node (WORK is blocked upstream; rank 2 also can't
+  // out-rank anyone who matters here). DRIVER / WORKER can never be the higher party (rank 1).
   forbidScope('Transfer is not permitted by the chain');
 }
 
-/** SM's site reach: assigned site + every site they manage. */
-async function supervisorSiteIds(tx: Tx, userId: string, assignedSiteId: string | null): Promise<string[]> {
+/** The first of a user's sites (assigned or vehicle-derived) that falls inside `siteIds` —
+ *  or their first site at all when `siteIds` is empty (Owner case). Used by verifyTransfer. */
+async function partySiteIn(tx: Tx, userId: string, siteIds: string[]): Promise<string | null> {
+  const [u] = await tx
+    .select({ assignedSiteId: schema.users.assignedSiteId, personId: schema.users.personId })
+    .from(schema.users)
+    .where(eq(schema.users.id, userId));
+  if (!u) return null;
+  const candidates: string[] = u.assignedSiteId ? [u.assignedSiteId] : [];
+  if (u.personId) {
+    const vs = await tx
+      .select({ siteId: schema.vehicles.assignedSiteId })
+      .from(schema.vehicles)
+      .where(and(isNull(schema.vehicles.deletedAt), eq(schema.vehicles.assignedDriverPersonId, u.personId)));
+    vs.forEach((v) => v.siteId && candidates.push(v.siteId));
+  }
+  if (!candidates.length) return null;
+  return candidates.find((s) => siteIds.includes(s)) ?? candidates[0] ?? null;
+}
+
+/** A senior's site reach: assigned site + every site they manage (SM) / keep the books for (accountant). */
+async function seniorSiteIds(tx: Tx, userId: string, role: Role, assignedSiteId: string | null): Promise<string[]> {
+  const col = role === 'ACCOUNTANT' ? schema.sites.accountantId : schema.sites.siteManagerId;
   const managed = await tx
     .select({ id: schema.sites.id })
     .from(schema.sites)
-    .where(and(isNull(schema.sites.deletedAt), eq(schema.sites.siteManagerId, userId)));
+    .where(and(isNull(schema.sites.deletedAt), eq(col, userId)));
   return [...new Set([assignedSiteId, ...managed.map((s) => s.id)].filter((x): x is string => !!x))];
 }
 
-/** TH's crew reach: own crew + every crew they lead. */
-async function supervisorCrewIds(tx: Tx, userId: string, crewId: string | null): Promise<string[]> {
-  const led = await tx
-    .select({ id: schema.crews.id })
-    .from(schema.crews)
-    .where(and(isNull(schema.crews.deletedAt), eq(schema.crews.teamHeadUserId, userId)));
-  return [...new Set([crewId, ...led.map((c) => c.id)].filter((x): x is string => !!x))];
-}
-
 // ---- SQL sum helpers (bigint sums come back as numeric strings → Number()) ----
+// Round 2: the khata is WORK-cash only — SALARY/PERSONAL draws live on the "money I've taken"
+// page and never move a work balance.
 async function sumTransfers(tx: Tx, where: SQL): Promise<number> {
   const [r] = await tx
     .select({ total: sql<string>`coalesce(sum(${schema.cashTransfers.amountPaise}), 0)` })
     .from(schema.cashTransfers)
-    .where(and(isNull(schema.cashTransfers.deletedAt), where));
+    .where(and(isNull(schema.cashTransfers.deletedAt), eq(schema.cashTransfers.tag, 'WORK'), where));
   return Number(r?.total ?? 0);
 }
 
@@ -321,7 +435,7 @@ async function groupTransfers(
   const rows = await tx
     .select({ userId: groupCol, total: sql<string>`coalesce(sum(${schema.cashTransfers.amountPaise}), 0)` })
     .from(schema.cashTransfers)
-    .where(isNull(schema.cashTransfers.deletedAt))
+    .where(and(isNull(schema.cashTransfers.deletedAt), eq(schema.cashTransfers.tag, 'WORK')))
     .groupBy(groupCol);
   return new Map(rows.map((r) => [r.userId, Number(r.total)]));
 }
@@ -368,6 +482,9 @@ function mapCashTransfer(t: typeof schema.cashTransfers.$inferSelect): CashTrans
     toUserId: t.toUserId,
     amountPaise: t.amountPaise,
     kind: t.kind,
+    // frozen.8 (Round-2 SALARY/PERSONAL khata) — passthrough; every transfer this WO creates is
+    // still 'WORK' (the personal-draw UI/logic is a later WO, matches the DB column default).
+    tag: t.tag,
     businessDate: t.businessDate,
     note: t.note ?? null,
     createdAt: t.createdAt.toISOString(),
@@ -376,5 +493,10 @@ function mapCashTransfer(t: typeof schema.cashTransfers.$inferSelect): CashTrans
     updatedBy: t.updatedBy ?? t.id,
     deletedAt: t.deletedAt ? t.deletedAt.toISOString() : null,
     version: t.version,
+    // frozen.8 (Round-2 two-tick rule) — plain passthrough; no verification workflow wired yet.
+    verifiedBy: t.verifiedBy ?? null,
+    verifiedAt: t.verifiedAt ? t.verifiedAt.toISOString() : null,
+    flagged: t.flagged,
+    flagNote: t.flagNote ?? null,
   };
 }

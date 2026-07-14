@@ -51,6 +51,19 @@ export const DEFAULT_EXPENSE_CATEGORIES: ExpenseCategoryConfig[] = [
   { key: 'MISC', labelHi: 'अन्य', labelEn: 'Other', enabled: true },
 ];
 
+/** Round 2 (frozen.8): per-material-type entry rules stored in materials.config (jsonb).
+ *  The SM sets these when creating a type; forms and validation follow them.
+ *  Supervisor entries are always the FINAL record; driver picks are data-only inputs. */
+export const MaterialTypeConfigSchema = z.object({
+  /** Supervisor logs IN/CONSUME for this type (the accountable, final entry). */
+  supervisorLogs: z.boolean().default(true),
+  /** Drivers pick this type on trips (data-only; matched against the supervisor's entry). */
+  driverPicks: z.boolean().default(false),
+  /** Drivers may see this type's numbers but never enter them. */
+  driverViewOnly: z.boolean().default(false),
+});
+export type MaterialTypeConfig = z.infer<typeof MaterialTypeConfigSchema>;
+
 export const EmergencyContactSchema = z.object({
   kind: z.enum(EMERGENCY_CONTACT_KINDS),
   label: z.string().min(1),
@@ -61,11 +74,11 @@ export type EmergencyContact = z.infer<typeof EmergencyContactSchema>;
 /** Per-site overrides stored in sites.expense_form_config (jsonb). Everything optional — org defaults apply.
  *  Limit-editing rule: each threshold is edited by the role ONE level above the one it binds. */
 export const SiteExpenseFormConfigSchema = z.object({
-  /** Worker/driver expense-request cap (paise). */
+  /** Worker/driver expense-request cap (paise). Round 2: supervisor requests have NO cap. */
   requestCapPaise: z.number().int().nonnegative().optional(),
-  /** Team-Head direct-entry per-entry limit (paise) — above it routes as a request to the SM. */
+  /** @deprecated Round 2 (frozen.8): supervisor direct entry is ₹0 — key kept so stored configs parse; not read. */
   thDirectLimitPaise: z.number().int().nonnegative().optional(),
-  /** SM direct-entry per-entry limit (paise) — above it routes as a request to the Owner. Owner-edited. */
+  /** @deprecated Round 2 (frozen.8): SM books any amount (accountant-verified) — key kept so stored configs parse; not read. */
   smDirectLimitPaise: z.number().int().nonnegative().optional(),
   /** Site category subset/labels; falls back to org expense.categories. */
   categories: z.array(ExpenseCategoryConfigSchema).optional(),
@@ -120,8 +133,8 @@ export const OrgConfigSchema = z.object({
   expense: z
     .object({
       requestCapPaise: z.number().int().nonnegative().default(200_000), // ₹2,000 worker/driver request cap
-      thDirectLimitPaise: z.number().int().nonnegative().default(2_500_000), // ₹25,000 TH per-entry
-      smDirectLimitPaise: z.number().int().nonnegative().default(10_000_000), // ₹1,00,000 SM per-entry
+      thDirectLimitPaise: z.number().int().nonnegative().default(2_500_000), // @deprecated frozen.8 — unread (supervisor direct = ₹0)
+      smDirectLimitPaise: z.number().int().nonnegative().default(10_000_000), // @deprecated frozen.8 — unread (SM direct unlimited, accountant-verified)
       requestBackdateDays: z.number().int().min(0).default(2), // worker/driver: today + 2 days back
       thBackdateDays: z.number().int().min(0).default(7),
       categories: z.array(ExpenseCategoryConfigSchema).default(DEFAULT_EXPENSE_CATEGORIES),

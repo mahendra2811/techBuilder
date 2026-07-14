@@ -14,7 +14,7 @@ import type { Tx } from '../db/db.service';
 
 /** WP-4: how many days back each role may (re)mark attendance. */
 export const ATTENDANCE_BACKDATE_LIMIT_DAYS: Partial<Record<Role, number>> = {
-  TEAM_HEAD: 2, // ≤48h
+  SUPERVISOR: 2, // ≤48h
   SITE_MANAGER: 7,
   // OWNER: unlimited (audited override)
 };
@@ -25,7 +25,7 @@ export const ATTENDANCE_BACKDATE_LIMIT_DAYS: Partial<Record<Role, number>> = {
  * Closes the gap found in web Phase 3A: creates previously accepted ANY past date.
  */
 export const RECORD_CREATE_BACKDATE_LIMIT_DAYS: Partial<Record<Role, number>> = {
-  TEAM_HEAD: 7, // client-plan v1 (T-2): TH direct entry ≤7 days; older routes as an EXPENSE_ADD request
+  SUPERVISOR: 7, // client-plan v1 (T-2): TH direct entry ≤7 days; older routes as an EXPENSE_ADD request
   SITE_MANAGER: 7,
   DRIVER: 2,
 };

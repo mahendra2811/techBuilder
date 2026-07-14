@@ -15,11 +15,13 @@ import { can } from '@techbuilder/contracts';
 import type { LucideIcon } from 'lucide-react';
 import {
   BadgeCheck,
+  Boxes,
   FileSpreadsheet,
   Fuel,
   IndianRupee,
   LayoutDashboard,
   MapPinned,
+  MessageSquareWarning,
   NotebookPen,
   Send,
   Settings,
@@ -58,21 +60,36 @@ const NAV_DEFS: NavDef[] = [
   { action: 'vehicleLog.enter', labelKey: 'vehicleFuel', path: '/vehicle', icon: Fuel },
   { action: 'request.submit', labelKey: 'requests', path: '/requests', icon: Send },
   { action: 'request.decide', labelKey: 'approvals', path: '/approvals', icon: BadgeCheck },
+  // Round 2: the SUPERVISOR lost request.decide but keeps READ-ONLY visibility of his own
+  // crew's requests (client: worker/driver → their supervisor → SM + accountant).
+  { action: 'view.all', labelKey: 'approvals', path: '/approvals', icon: BadgeCheck, roles: ['SUPERVISOR'], testId: 'nav-approvals-supervisor' },
   { action: 'user.create', labelKey: 'people', path: '/people', icon: Users },
   { action: 'site.manage', labelKey: 'sites', path: '/sites', icon: MapPinned },
   { action: 'vehicle.manage', labelKey: 'fleet', path: '/fleet', icon: Truck },
   // { action: 'wage.view', labelKey: 'wages', path: '/wages', icon: Wallet },
-  { action: 'report.export', labelKey: 'reports', path: '/reports', icon: FileSpreadsheet },
+  // Round 2: the ACCOUNTANT holds report.export (financial sections) but has no reports screen
+  // variant yet — role-filtered to keep his nav honest until that lands (known follow-up).
+  { action: 'report.export', labelKey: 'reports', path: '/reports', icon: FileSpreadsheet, roles: ['OWNER', 'SITE_MANAGER'] },
   { action: 'config.manage', labelKey: 'settings', path: '/settings', icon: Settings },
   // WO-13: date-wise insights — "pick a day, see everything" (S-1/T-1/O-1). Service-gated scopes.
-  { action: 'view.all', labelKey: 'insights', path: '/insights', icon: FileSpreadsheet, roles: ['OWNER', 'SITE_MANAGER', 'TEAM_HEAD'], testId: 'nav-insights' },
-  // WO-9: money ledger (khata) — give/receive-back cash + rollup. Service-gated; recorded by seniors.
-  { action: 'view.all', labelKey: 'ledger', path: '/ledger', icon: Wallet, roles: ['OWNER', 'SITE_MANAGER', 'TEAM_HEAD'], testId: 'nav-ledger' },
-  // WO-10: shops / udhaar khata — SM manages his site's vendor list + payments (service-gated).
-  { action: 'view.all', labelKey: 'vendors', path: '/vendors', icon: Store, roles: ['SITE_MANAGER'], testId: 'nav-vendors' },
+  { action: 'view.all', labelKey: 'insights', path: '/insights', icon: FileSpreadsheet, roles: ['OWNER', 'SITE_MANAGER'], testId: 'nav-insights' },
+  // WO-9: money ledger (khata) — give/receive-back cash + rollup. Round 2: the ACCOUNTANT is the
+  // cash desk — his ledger page mounts the same screen (rollup stays SM/Owner server-side).
+  { action: 'view.all', labelKey: 'ledger', path: '/ledger', icon: Wallet, roles: ['OWNER', 'SITE_MANAGER', 'ACCOUNTANT'], testId: 'nav-ledger' },
+  // WO-10: shops / udhaar khata. Round 2: the ACCOUNTANT records vendor payments + money-IN too.
+  { action: 'view.all', labelKey: 'vendors', path: '/vendors', icon: Store, roles: ['SITE_MANAGER', 'ACCOUNTANT'], testId: 'nav-vendors' },
   // WO-8: SM site settings (limits · categories · form fields · emergency contacts). The SM holds
   // no config.manage — the PATCH is service-gated to his own site, so the nav entry is role-filtered.
   { action: 'view.all', labelKey: 'settings', path: '/settings', icon: Settings, roles: ['SITE_MANAGER'], testId: 'nav-settings-sm' },
+  // ---- Round 2 (frozen.8) ----
+  // C11 materials: SM/Owner manage the catalog; the SUPERVISOR files final IN/CONSUME entries.
+  { action: 'view.all', labelKey: 'materials', path: '/materials', icon: Boxes, roles: ['OWNER', 'SITE_MANAGER'], testId: 'nav-materials' },
+  { action: 'record.enter', labelKey: 'materials', path: '/materials', icon: Boxes, roles: ['SUPERVISOR'], testId: 'nav-materials-supervisor' },
+  // C7 diesel: the supervisor's bulk-stock + per-vehicle issuance forms (his side of the match).
+  { action: 'record.enter', labelKey: 'diesel', path: '/diesel', icon: Fuel, roles: ['SUPERVISOR'], testId: 'nav-diesel' },
+  // Complaint box: four roles raise; SM/Owner read the inbox (OWNER-target rows never reach an SM).
+  { action: 'view.all', labelKey: 'complaints', path: '/complaints', icon: MessageSquareWarning, roles: ['WORKER', 'DRIVER', 'SUPERVISOR', 'ACCOUNTANT'], testId: 'nav-complaints' },
+  { action: 'view.all', labelKey: 'complaints', path: '/complaints', icon: MessageSquareWarning, roles: ['SITE_MANAGER', 'OWNER'], testId: 'nav-complaints-inbox' },
 ];
 
 export interface NavItem {

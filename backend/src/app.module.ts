@@ -22,6 +22,12 @@ import { InsightsModule } from './insights/insights.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { MediaModule } from './media/media.module';
 import { ExportsModule } from './exports/exports.module';
+// Round 2 (frozen.8):
+import { MaterialsModule } from './materials/materials.module';
+import { FuelStockModule } from './fuel-stock/fuel-stock.module';
+import { AccountantModule } from './accountant/accountant.module';
+import { VehicleDocsModule } from './vehicle-docs/vehicle-docs.module';
+import { ComplaintsModule } from './complaints/complaints.module';
 import { AllExceptionsFilter } from './common/all-exceptions.filter';
 import { TransformInterceptor } from './common/transform.interceptor';
 import { HealthController } from './health.controller';
@@ -51,6 +57,12 @@ import { HealthController } from './health.controller';
     ReconciliationModule,
     SyncModule,
     ExportsModule,
+    // Round 2 (frozen.8):
+    MaterialsModule,
+    FuelStockModule,
+    AccountantModule,
+    VehicleDocsModule,
+    ComplaintsModule,
   ],
   providers: [
     Reflector,

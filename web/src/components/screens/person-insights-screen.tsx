@@ -10,29 +10,66 @@
  * progress" flag) and expands on tap — the full progress/expense/request lists
  * render only for the expanded day(s), and only the first DAY_PAGE_SIZE days
  * render at all until "show more days" is tapped. Also mounts the WO-9
- * reset-password action for Owner/SM (never Team Head, never yourself).
+ * reset-password action for Owner/SM (never Supervisor, never yourself).
  */
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, ChevronDown } from 'lucide-react';
-import type { PersonInsights, User, UUID } from '@techbuilder/contracts';
-import { api, me } from '@/lib/api-client';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ArrowLeft, ChevronDown, Pencil } from 'lucide-react';
+import type { Person, PersonInsights, UpdatePersonInput, User, UUID } from '@techbuilder/contracts';
+import { ApiClientError, api, me } from '@/lib/api-client';
 import { CREATABLE_ROLES } from '@/lib/cascade';
 import { formatBusinessDate, todayKolkata } from '@/lib/business-date';
-import { useMessages } from '@/lib/i18n/locale-context';
+import { apiErrorMessage } from '@/lib/i18n/messages';
+import { useLocale, useMessages } from '@/lib/i18n/locale-context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { ShowMore } from '@/components/ui/show-more';
-import { LoadingState, EmptyState, ErrorState } from '@/components/entry/states';
+import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
 import { DatePresets, type DateRange } from '@/components/insights/date-presets';
 import { ProgressList, ExpenseList, RequestList } from '@/components/insights/record-lists';
 import { PeriodSummary } from '@/components/insights/period-summary';
 import { ResetPasswordAction } from '@/components/people/reset-password-action';
 import { cn } from '@/lib/utils';
 
-type PeopleRole = 'OWNER' | 'SITE_MANAGER' | 'TEAM_HEAD';
+type PeopleRole = 'OWNER' | 'SITE_MANAGER' | 'SUPERVISOR';
 const DAY_PAGE_SIZE = 7;
+
+// Round 2 (CW-4): ID-card details on the person profile — OWNER/SITE_MANAGER may edit;
+// the server enforces the same narrow rule (see backend/src/people/people.service.ts).
+const ID_CARD_UI = {
+  en: {
+    title: 'ID card',
+    mobile: 'Mobile',
+    guardianName: 'Guardian name',
+    guardianPhone: 'Guardian mobile',
+    edit: 'Edit ID card',
+    cancel: 'Cancel',
+    save: 'Save',
+    saving: 'Saving…',
+    saved: 'ID card updated',
+    none: 'Not set',
+  },
+  hi: {
+    title: 'ID कार्ड',
+    mobile: 'मोबाइल',
+    guardianName: 'अभिभावक का नाम',
+    guardianPhone: 'अभिभावक का मोबाइल',
+    edit: 'ID कार्ड संपादित करें',
+    cancel: 'रद्द करें',
+    save: 'सहेजें',
+    saving: 'सहेजा जा रहा है…',
+    saved: 'ID कार्ड अपडेट हो गया',
+    none: 'सेट नहीं है',
+  },
+} as const;
+// Widened (plain `string` fields): `ID_CARD_UI[locale]` (locale: 'en' | 'hi') resolves to
+// the UNION of both branches' literal-object types, which isn't assignable to either
+// branch alone — components receiving it as a prop need this wider, non-literal shape.
+type IdCardUi = { [K in keyof (typeof ID_CARD_UI)['en']]: string };
 
 export function PersonInsightsScreen({ userId, backHref, role }: { userId: UUID; backHref: string; role: PeopleRole }) {
   const m = useMessages();
@@ -47,6 +84,7 @@ export function PersonInsightsScreen({ userId, backHref, role }: { userId: UUID;
   });
   const meQ = useQuery({ queryKey: ['me'], queryFn: me });
   const usersQ = useQuery({ queryKey: ['users'], queryFn: () => api<User[]>('GET', '/users') });
+  const peopleQ = useQuery({ queryKey: ['people'], queryFn: () => api<Person[]>('GET', '/people') });
 
   // The target's own name resolves everything they entered/requested; other actors
   // (e.g. who decided a request) fall back to a generic label — insights/person has
@@ -54,10 +92,17 @@ export function PersonInsightsScreen({ userId, backHref, role }: { userId: UUID;
   const userName = (id: UUID) => (id === userId ? (insightsQ.data?.name ?? i.unknownUser) : i.unknownUser);
 
   const targetUser = usersQ.data?.find((u) => u.id === userId);
+  // Round 2 (CW-4): the ID-card fields live on the labour-master Person row, linked via
+  // the target user's personId (users without a linked person — e.g. Owner/SM logins —
+  // simply have no ID card to show).
+  const targetPerson = peopleQ.data?.find((p) => p.id === targetUser?.personId);
   // Mirrors people-screen's canResetPassword: Owner any, SM only roles they may
-  // create, never Team Head, never yourself.
+  // create, never Supervisor, never yourself.
   const canResetPassword =
-    role !== 'TEAM_HEAD' && userId !== meQ.data?.user.id && !!targetUser && (role === 'OWNER' || CREATABLE_ROLES[role].includes(targetUser.role));
+    role !== 'SUPERVISOR' && userId !== meQ.data?.user.id && !!targetUser && (role === 'OWNER' || CREATABLE_ROLES[role].includes(targetUser.role));
+  // Round 2 (CW-4): ID-card edit gated to OWNER/SITE_MANAGER only (server enforces the
+  // narrower SM-in-reach rule).
+  const canEditIdCard = (role === 'OWNER' || role === 'SITE_MANAGER') && !!targetPerson;
 
   const toggleDay = (date: string) =>
     setExpandedDates((prev) => {
@@ -101,6 +146,8 @@ export function PersonInsightsScreen({ userId, backHref, role }: { userId: UUID;
           {canResetPassword && <ResetPasswordAction userId={userId} testIdPrefix="person-insights-reset-password" />}
         </CardContent>
       </Card>
+
+      {targetPerson && <PersonIdCardSection person={targetPerson} canEdit={canEditIdCard} />}
 
       {insightsQ.data && (
         <>
@@ -182,5 +229,139 @@ export function PersonInsightsScreen({ userId, backHref, role }: { userId: UUID;
         </>
       )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ID card section (Round 2 / CW-4) — read for everyone allowed on this profile,
+// edit form for OWNER/SITE_MANAGER only (server re-checks scope on save).
+// ---------------------------------------------------------------------------
+
+function PersonIdCardSection({ person, canEdit }: { person: Person; canEdit: boolean }) {
+  const locale = useLocale();
+  const ui = ID_CARD_UI[locale];
+  const [editing, setEditing] = useState(false);
+
+  return (
+    <Card data-testid="person-insights-id-card">
+      <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
+        <CardTitle>{ui.title}</CardTitle>
+        {canEdit && !editing && (
+          <Button type="button" size="sm" variant="outline" data-testid="person-insights-id-card-edit-toggle" onClick={() => setEditing(true)}>
+            <Pencil className="mr-1 size-3.5" aria-hidden="true" />
+            {ui.edit}
+          </Button>
+        )}
+      </CardHeader>
+      <CardContent className="grid gap-2">
+        {!editing ? (
+          <>
+            <p className="text-sm" data-testid="person-insights-id-card-mobile">
+              {ui.mobile}: {person.phone ?? ui.none}
+            </p>
+            <p className="text-sm" data-testid="person-insights-id-card-guardian-name">
+              {ui.guardianName}: {person.guardianName ?? ui.none}
+            </p>
+            <p className="text-sm" data-testid="person-insights-id-card-guardian-phone">
+              {ui.guardianPhone}: {person.guardianPhone ?? ui.none}
+            </p>
+          </>
+        ) : (
+          <PersonIdCardEditForm person={person} ui={ui} onDone={() => setEditing(false)} />
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function PersonIdCardEditForm({
+  person,
+  ui,
+  onDone,
+}: {
+  person: Person;
+  ui: IdCardUi;
+  onDone: () => void;
+}) {
+  const m = useMessages();
+  const queryClient = useQueryClient();
+  const [phone, setPhone] = useState(person.phone ?? '');
+  const [guardianName, setGuardianName] = useState(person.guardianName ?? '');
+  const [guardianPhone, setGuardianPhone] = useState(person.guardianPhone ?? '');
+  const [saved, setSaved] = useState(false);
+
+  const save = useMutation({
+    mutationFn: (input: UpdatePersonInput) => api<Person>('PATCH', `/people/${person.id}`, input),
+    onSuccess: () => {
+      setSaved(true);
+      void queryClient.invalidateQueries({ queryKey: ['people'] });
+    },
+  });
+
+  const serverError =
+    save.error instanceof ApiClientError ? apiErrorMessage(m, save.error.code) : save.error ? apiErrorMessage(m) : null;
+
+  const onSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaved(false);
+    save.mutate({
+      phone: phone.trim(),
+      guardianName: guardianName.trim(),
+      guardianPhone: guardianPhone.trim(),
+    });
+  };
+
+  return (
+    <form className="grid gap-3" noValidate onSubmit={onSubmit} data-testid="person-insights-id-card-form">
+      <div className="grid gap-2">
+        <Label htmlFor="person-insights-id-card-phone">{ui.mobile}</Label>
+        <Input
+          id="person-insights-id-card-phone"
+          type="tel"
+          inputMode="tel"
+          data-testid="person-insights-id-card-phone-input"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+        />
+      </div>
+      <div className="grid gap-2">
+        <Label htmlFor="person-insights-id-card-guardian-name">{ui.guardianName}</Label>
+        <Input
+          id="person-insights-id-card-guardian-name"
+          data-testid="person-insights-id-card-guardian-name-input"
+          value={guardianName}
+          onChange={(e) => setGuardianName(e.target.value)}
+        />
+      </div>
+      <div className="grid gap-2">
+        <Label htmlFor="person-insights-id-card-guardian-phone">{ui.guardianPhone}</Label>
+        <Input
+          id="person-insights-id-card-guardian-phone"
+          type="tel"
+          inputMode="tel"
+          data-testid="person-insights-id-card-guardian-phone-input"
+          value={guardianPhone}
+          onChange={(e) => setGuardianPhone(e.target.value)}
+        />
+      </div>
+      {serverError && (
+        <Notice tone="error" testId="person-insights-id-card-error">
+          {serverError}
+        </Notice>
+      )}
+      {saved && (
+        <Notice tone="success" testId="person-insights-id-card-success">
+          {ui.saved}
+        </Notice>
+      )}
+      <div className="flex gap-2">
+        <Button type="submit" size="sm" data-testid="person-insights-id-card-save" disabled={save.isPending}>
+          {save.isPending ? ui.saving : ui.save}
+        </Button>
+        <Button type="button" size="sm" variant="outline" data-testid="person-insights-id-card-cancel" onClick={onDone}>
+          {ui.cancel}
+        </Button>
+      </div>
+    </form>
   );
 }

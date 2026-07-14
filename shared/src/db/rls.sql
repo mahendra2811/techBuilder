@@ -24,7 +24,9 @@ BEGIN
     'vehicle_types','vehicles','driver_allowed_types','attendance','leaves','wage_rates',
     'advances','progress_notes','vendors','expenses','cash_transfers','vendor_payments','fuel_logs','vehicle_logs','trips',
     'materials','material_balances','material_txns','issues','media','approval_requests',
-    'notifications','audit_logs','completeness'
+    'notifications','audit_logs','completeness',
+    -- Round 2 (frozen.8):
+    'fuel_stock_purchases','fuel_issuances','complaints','vehicle_documents','vehicle_reminders'
   ]
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY;', t);

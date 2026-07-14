@@ -44,14 +44,17 @@ function assertSiteIdParam(v: string | undefined): asserts v is string {
   if (!v) throw new ApiException('VALIDATION_FAILED', 'siteId is required', { siteId: 'required' });
 }
 
-/** Insights are a supervisory surface — field roles (WORKER/DRIVER) have no use for them. */
+/** Round 2 (CW-9) lockdown: insights/analytics are a SITE_MANAGER + OWNER-only surface.
+ *  SUPERVISOR (was TEAM_HEAD), ACCOUNTANT, DRIVER, WORKER get nothing aggregated — no
+ *  exceptions, regardless of site/crew scope. */
 function assertInsightsRole(ctx: ScopeContext): void {
-  if (ctx.role === 'WORKER' || ctx.role === 'DRIVER') {
-    forbidScope('Insights are not available for this role');
+  if (ctx.role !== 'SITE_MANAGER' && ctx.role !== 'OWNER') {
+    forbidScope('Insights are only available to Site Managers and the Owner');
   }
 }
 
-/** Day/period insights are requested for ONE site; OWNER = any, SM/TH = their own site(s). */
+/** Day/period insights are requested for ONE site; OWNER = any, SM = their own site(s)
+ *  (unreachable by any other role — assertInsightsRole gates entry first). */
 function assertSiteAccessible(ctx: ScopeContext, siteId: string): void {
   if (ctx.role === 'OWNER') return;
   if (ctx.siteIds.includes(siteId)) return;
@@ -69,7 +72,7 @@ export class InsightsService {
       const ctx = await loadScope(tx, p);
       assertInsightsRole(ctx);
       assertSiteAccessible(ctx, siteId);
-      const rows = await fetchSiteRows(tx, ctx, siteId, date, date);
+      const rows = await fetchSiteRows(tx, siteId, date, date);
       return buildDayInsights(date, rows.progress, rows.expenses, rows.requests);
     });
   }
@@ -87,7 +90,7 @@ export class InsightsService {
       const ctx = await loadScope(tx, p);
       assertInsightsRole(ctx);
       assertSiteAccessible(ctx, siteId);
-      const rows = await fetchSiteRows(tx, ctx, siteId, from, to);
+      const rows = await fetchSiteRows(tx, siteId, from, to);
       return buildPeriod(from, to, rows.progress, rows.expenses, rows.requests);
     });
   }
@@ -149,7 +152,9 @@ async function loadTargetUser(tx: Tx, userId: string): Promise<TargetUser> {
 }
 
 /** Mirrors approvals.assertDecideScope's site-membership check (assignedSiteId / crew's site /
- *  driver's vehicle site), generalized to "any of the caller's sites" instead of one request's site. */
+ *  driver's vehicle site), generalized to "any of the caller's sites" instead of one request's site.
+ *  Round 2 (CW-9) lockdown: only OWNER/SITE_MANAGER ever reach here — assertInsightsRole has
+ *  already rejected every other role (including SUPERVISOR) before this runs. */
 async function assertPersonAccessible(tx: Tx, ctx: ScopeContext, target: TargetUser): Promise<void> {
   if (ctx.role === 'OWNER') return;
   if (ctx.role === 'SITE_MANAGER') {
@@ -169,10 +174,6 @@ async function assertPersonAccessible(tx: Tx, ctx: ScopeContext, target: TargetU
       if (vs.some((v) => v.siteId && ctx.siteIds.includes(v.siteId))) return;
     }
     forbidScope('Person is outside your site scope');
-  }
-  if (ctx.role === 'TEAM_HEAD') {
-    if (target.crewId && ctx.crewIds.includes(target.crewId)) return;
-    forbidScope('You may only view insights for your own crew');
   }
   forbidScope(`Role ${ctx.role} cannot view person insights`);
 }
@@ -214,16 +215,6 @@ async function usersAtSite(tx: Tx, siteId: string): Promise<string[]> {
   return [...ids];
 }
 
-/** TH's crew slice: his crew's users (logins only — phone-less workers can't "enter" anything) + himself. */
-async function crewUserIds(tx: Tx, ctx: ScopeContext): Promise<string[]> {
-  if (!ctx.crewIds.length) return [ctx.userId];
-  const rows = await tx
-    .select({ id: schema.users.id })
-    .from(schema.users)
-    .where(and(isNull(schema.users.deletedAt), inSet(schema.users.crewId, ctx.crewIds)));
-  return [...new Set([ctx.userId, ...rows.map((r) => r.id)])];
-}
-
 // ---------------------------------------------------------------------------
 // Row fetch (one query per record family for the whole window — no per-day queries)
 // ---------------------------------------------------------------------------
@@ -234,10 +225,11 @@ interface RawRows {
   requests: ApprovalRequest[];
 }
 
-async function fetchSiteRows(tx: Tx, ctx: ScopeContext, siteId: string, from: string, to: string): Promise<RawRows> {
-  // TH sees only his own crew's slice of the site; OWNER/SM see everything at the site.
-  const enteredByFilter = ctx.role === 'TEAM_HEAD' ? await crewUserIds(tx, ctx) : undefined;
-
+async function fetchSiteRows(tx: Tx, siteId: string, from: string, to: string): Promise<RawRows> {
+  // Round 2 (CW-9) lockdown: only OWNER/SITE_MANAGER ever reach here (assertInsightsRole gates
+  // entry) — always the full site slice, never a crew-narrowed one. SM site-scoping is enforced
+  // by the caller passing a siteId already checked via assertSiteAccessible; Owner org behavior
+  // is unchanged (site here is just whichever site the Owner asked to see).
   const progressRows = await tx
     .select()
     .from(schema.progressNotes)
@@ -247,7 +239,6 @@ async function fetchSiteRows(tx: Tx, ctx: ScopeContext, siteId: string, from: st
         eq(schema.progressNotes.siteId, siteId),
         gte(schema.progressNotes.businessDate, from),
         lte(schema.progressNotes.businessDate, to),
-        enteredByFilter ? inSet(schema.progressNotes.enteredBy, enteredByFilter) : undefined,
       ),
     );
 
@@ -261,16 +252,13 @@ async function fetchSiteRows(tx: Tx, ctx: ScopeContext, siteId: string, from: st
         eq(schema.expenses.siteId, siteId),
         gte(schema.expenses.businessDate, from),
         lte(schema.expenses.businessDate, to),
-        enteredByFilter ? inSet(schema.expenses.enteredBy, enteredByFilter) : undefined,
       ),
     );
 
-  const requestScope: SQL = enteredByFilter
-    ? inSet(schema.approvalRequests.requestedBy, enteredByFilter)
-    : (or(
-        inSet(schema.approvalRequests.requestedBy, await usersAtSite(tx, siteId)),
-        and(eq(schema.approvalRequests.type, 'EXPENSE_ADD'), sql`${schema.approvalRequests.payload} ->> 'siteId' = ${siteId}`),
-      ) as SQL);
+  const requestScope: SQL = or(
+    inSet(schema.approvalRequests.requestedBy, await usersAtSite(tx, siteId)),
+    and(eq(schema.approvalRequests.type, 'EXPENSE_ADD'), sql`${schema.approvalRequests.payload} ->> 'siteId' = ${siteId}`),
+  ) as SQL;
 
   const requestRows = await fetchRequestsInWindow(tx, requestScope, from, to);
 
@@ -435,6 +423,11 @@ function mapExpense(r: typeof schema.expenses.$inferSelect): Expense {
     updatedBy: r.updatedBy ?? r.id,
     deletedAt: r.deletedAt ? r.deletedAt.toISOString() : null,
     version: r.version,
+    // frozen.8 (Round-2 two-tick rule) — plain passthrough, no verification workflow wired yet.
+    verifiedBy: r.verifiedBy ?? null,
+    verifiedAt: r.verifiedAt ? r.verifiedAt.toISOString() : null,
+    flagged: r.flagged,
+    flagNote: r.flagNote ?? null,
   };
 }
 
@@ -455,5 +448,10 @@ function mapApprovalRequest(r: typeof schema.approvalRequests.$inferSelect): App
     updatedBy: r.updatedBy ?? r.id,
     deletedAt: r.deletedAt ? r.deletedAt.toISOString() : null,
     version: r.version,
+    // frozen.8 (Round-2 two-tick rule) — plain passthrough, no verification workflow wired yet.
+    verifiedBy: r.verifiedBy ?? null,
+    verifiedAt: r.verifiedAt ? r.verifiedAt.toISOString() : null,
+    flagged: r.flagged,
+    flagNote: r.flagNote ?? null,
   };
 }

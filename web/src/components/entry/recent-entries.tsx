@@ -2,6 +2,7 @@
 
 /** Read-only "last 7 days" context list rendered under each entry form. */
 import { useMessages } from '@/lib/i18n/locale-context';
+import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ShowMore } from '@/components/ui/show-more';
 import { LoadingState, EmptyState, ErrorState } from './states';
@@ -14,6 +15,8 @@ export interface RecentRow {
   secondary?: string;
   /** Muted second line — e.g. date / note snippet. */
   tertiary?: string;
+  /** Round 2 (CW-5): optional small status pill under `secondary` (e.g. diesel match state). */
+  badge?: { label: string; tone: 'success' | 'warning' | 'error' };
 }
 
 export function RecentEntries({
@@ -55,7 +58,23 @@ export function RecentEntries({
                   <p className="truncate text-sm font-medium">{r.primary}</p>
                   {r.tertiary && <p className="truncate text-xs text-muted-foreground">{r.tertiary}</p>}
                 </div>
-                {r.secondary && <span className="shrink-0 text-sm tabular-nums">{r.secondary}</span>}
+                {(r.secondary || r.badge) && (
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    {r.secondary && <span className="text-sm tabular-nums">{r.secondary}</span>}
+                    {r.badge && (
+                      <span
+                        className={cn(
+                          'rounded px-1.5 py-0.5 text-[11px] font-medium',
+                          r.badge.tone === 'success' && 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+                          r.badge.tone === 'warning' && 'bg-amber-500/10 text-amber-800 dark:text-amber-400',
+                          r.badge.tone === 'error' && 'bg-destructive/10 text-destructive',
+                        )}
+                      >
+                        {r.badge.label}
+                      </span>
+                    )}
+                  </div>
+                )}
               </li>
             )}
           />

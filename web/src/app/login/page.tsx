@@ -34,11 +34,13 @@ type LoginForm = z.infer<ReturnType<typeof makeLoginFormSchema>>;
  * below) before any pilot/production build. Matches backend/merchants/dev/.
  */
 const DEV_PASSWORD = 'changeme123';
+/** Round 2: every role is represented (incl. the new ACCOUNTANT); one shared dev password. */
 const DEV_LOGINS: Array<{ username: string; label: string }> = [
   { username: 'owner', label: 'Owner' },
   { username: 'sm1', label: 'Site Manager' },
-  { username: 'th1', label: 'Team Head (GF)' },
-  { username: 'th2', label: 'Team Head (ST)' },
+  { username: 'acct1', label: 'Accountant' },
+  { username: 'th1', label: 'Supervisor (GF)' },
+  { username: 'th2', label: 'Supervisor (ST)' },
   { username: 'driver1', label: 'Driver (GF)' },
   { username: 'driver3', label: 'Driver (ST)' },
   { username: 'worker1', label: 'Worker' },

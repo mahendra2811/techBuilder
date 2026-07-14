@@ -7,6 +7,7 @@ import type {
   Site,
   SiteExpenseFormConfig,
   UpdateSiteConfigInput,
+  UpdateSiteInput,
 } from '@techbuilder/contracts';
 import { DbService } from '../db/db.service';
 import { ApiException } from '../common/api-exception';
@@ -35,6 +36,7 @@ export class SitesService {
           expectedEndDate: input.expectedEndDate ?? null,
           budgetPaise: input.budgetPaise ?? null,
           siteManagerId: input.siteManagerId ?? null,
+          accountantId: input.accountantId ?? null, // Round 2: per-site accountant
           createdBy: p.userId,
           updatedBy: p.userId,
         })
@@ -127,6 +129,50 @@ export class SitesService {
       return mapSite(row);
     });
   }
+
+  /**
+   * Round 2 (frozen.8) — Owner-only role assignments: the site's SM and its per-site
+   * ACCOUNTANT. Validates the target user exists, is active and carries the right role.
+   * Explicit null clears an assignment.
+   */
+  async update(p: Principal, id: string, input: UpdateSiteInput): Promise<Site> {
+    return this.dbs.runInTenant(p.orgId, async (tx) => {
+      const ctx = await loadScope(tx, p);
+      if (ctx.role !== 'OWNER') forbidScope('Only the Owner assigns site roles');
+
+      const set: Record<string, unknown> = {
+        updatedBy: p.userId,
+        updatedAt: new Date(),
+        version: sql`${schema.sites.version} + 1`,
+      };
+      const assertRole = async (userId: string, role: 'SITE_MANAGER' | 'ACCOUNTANT') => {
+        const [u] = await tx
+          .select({ role: schema.users.role, active: schema.users.active, deletedAt: schema.users.deletedAt })
+          .from(schema.users)
+          .where(eq(schema.users.id, userId));
+        if (!u || u.deletedAt || !u.active) throw new ApiException('NOT_FOUND', 'User not found or inactive');
+        if (u.role !== role) {
+          throw new ApiException('VALIDATION_FAILED', `User is not a ${role}`, { userId: 'wrong role' });
+        }
+      };
+      if (input.siteManagerId !== undefined) {
+        if (input.siteManagerId) await assertRole(input.siteManagerId, 'SITE_MANAGER');
+        set.siteManagerId = input.siteManagerId;
+      }
+      if (input.accountantId !== undefined) {
+        if (input.accountantId) await assertRole(input.accountantId, 'ACCOUNTANT');
+        set.accountantId = input.accountantId;
+      }
+
+      const [row] = await tx
+        .update(schema.sites)
+        .set(set as never)
+        .where(and(eq(schema.sites.id, id), isNull(schema.sites.deletedAt)))
+        .returning();
+      if (!row) throw new ApiException('NOT_FOUND', 'Site not found');
+      return mapSite(row);
+    });
+  }
 }
 
 function mapSite(s: typeof schema.sites.$inferSelect): Site {
@@ -143,6 +189,9 @@ function mapSite(s: typeof schema.sites.$inferSelect): Site {
     expectedEndDate: s.expectedEndDate,
     budgetPaise: s.budgetPaise,
     siteManagerId: s.siteManagerId,
+    // frozen.8 (Round-2 accountant per-site assignment) — plain passthrough; no assignment
+    // UI/endpoint wired yet (that's the accountant WO, CW-2).
+    accountantId: s.accountantId ?? null,
     emergencyContacts: (s.emergencyContacts as EmergencyContact[] | null) ?? [],
     expenseFormConfig: (s.expenseFormConfig as SiteExpenseFormConfig | null) ?? null,
     createdAt: s.createdAt.toISOString(),
