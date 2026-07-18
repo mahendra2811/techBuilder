@@ -6,8 +6,8 @@
 # Despite the filename (kept to match the requested deliverable list), this deploys EITHER
 # workspace via --app:
 #
-#   ./scripts/deploy-backend.sh --app backend --host ubuntu@<ec2-host-or-ip>
-#   ./scripts/deploy-backend.sh --app web     --host ubuntu@<ec2-host-or-ip>   # Phase 2 only
+#   ./scripts/deploy-backend.sh --app backend --host ec2-user@<ec2-host-or-ip>
+#   ./scripts/deploy-backend.sh --app web     --host ec2-user@<ec2-host-or-ip>   # Phase 2 only
 #
 # Assumes: passwordless SSH (key-based) to --host, the target systemd unit
 # (techbuilder-backend.service / techbuilder-web.service) already installed (see

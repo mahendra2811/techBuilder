@@ -6,14 +6,16 @@
 
 ## Build strategy — why builds happen OFF the box
 
-The EC2 instance is `t4g.micro` (1GB RAM, Phase 1) — sized to the smallest viable option (see
-`ARCHITECTURE.md`). Running any build (`tsc`, let alone `next build`/Turbopack, which is heavier)
-directly on a 1GB box risks an OOM kill mid-deploy — exactly the failure mode the user's brief
-warned against, and even more likely here than it would be on a larger box. Chosen approach:
-**build locally (or in CI), transfer only the build artifacts.** This matters just as much once
-Phase 2 resizes to `t4g.small` (2GB) and runs two processes side by side.
+The EC2 instance is a small burstable box (originally planned as `t4g.micro`/1GB; the actual
+standing instance as of 2026-07-15 is Amazon Linux 2023, x86_64, ~2GB RAM — see
+`EC2_INITIAL_CONNECT_AND_SETUP.md` for how to confirm your own instance's real specs) — sized to
+the smallest viable option (see `ARCHITECTURE.md`). Running any build (`tsc`, let alone
+`next build`/Turbopack, which is heavier) directly on a small box risks an OOM kill mid-deploy —
+exactly the failure mode the user's brief warned against. Chosen approach: **build locally (or in
+CI), transfer only the build artifacts.** This matters just as much once Phase 2 runs two
+processes side by side.
 
-- Backend: `tsc` output (`backend/dist/`) + `node_modules` (pure JS, no native rebuild needed on ARM — see `ARCHITECTURE.md`) is small; ship the whole built package.
+- Backend: `tsc` output (`backend/dist/`) + `node_modules` (pure JS, no native rebuild needed — confirmed zero native addons anywhere in the dependency tree, see `ARCHITECTURE.md` — so a `node_modules` built on your own machine is binary-compatible with the server regardless of CPU architecture; this would NOT hold if a native addon were ever added, since those compile per-architecture) is small; ship the whole built package.
 - Frontend (Phase 2 only): build with `NEXT_OUTPUT_STANDALONE=1` (wired into `web/next.config.ts` in this pass) — produces `.next/standalone/` containing a minimal `server.js` + only the traced `node_modules` subset, small enough to `scp` without installing anything on the box.
 
 `scripts/deploy-backend.sh` (this repo, added in this pass) implements the release-dir + symlink-swap
@@ -21,10 +23,13 @@ pattern below and can build either `backend` or `web` — see its `--app` flag.
 
 ## One-time server setup
 
+> Assumes you've already connected to a fresh instance and done the OS-level groundwork (updates, swap file, basic hardening) in `EC2_INITIAL_CONNECT_AND_SETUP.md`. If you haven't, do that first — the commands below assume a patched box on **Amazon Linux 2023** (`dnf`, `ec2-user`). If you're on an Ubuntu box instead, see that doc's closing note for the `apt`-based equivalents (an older, superseded draft of this section used those — Cloudsmith's Debian Caddy repo + `deb.nodesource.com`).
+
 ```bash
-# Node 22 (matches root package.json's engines.node pin) via NodeSource, ARM64-safe (no native compiles):
-curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-sudo apt-get install -y nodejs
+# Node 22 (matches root package.json's engines.node pin) via NodeSource's RPM setup script:
+curl -fsSL https://rpm.nodesource.com/setup_22.x | sudo bash -
+sudo dnf install -y nodejs
+node -v   # confirm v22.x
 
 # Dedicated, unprivileged service user — the app never runs as root or as your login user:
 sudo useradd --system --create-home --shell /usr/sbin/nologin techbuilder
@@ -33,11 +38,53 @@ sudo useradd --system --create-home --shell /usr/sbin/nologin techbuilder
 sudo mkdir -p /opt/techbuilder/{backend,web}/releases
 sudo chown -R techbuilder:techbuilder /opt/techbuilder
 
-# Caddy (see deploy/Caddyfile in this repo for the full config):
-sudo apt-get install -y debian-keyring debian-archive-keyring apt-transport-https curl
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
-sudo apt-get update && sudo apt-get install -y caddy
+# Caddy: Amazon Linux 2023 has no first-party Caddy package repo, so install the official static
+# binary instead (works identically regardless of distro/package manager) — architecture-detected:
+ARCH=$(uname -m); case "$ARCH" in x86_64) CADDY_ARCH=amd64 ;; aarch64) CADDY_ARCH=arm64 ;; *) echo "unsupported arch: $ARCH" >&2; exit 1 ;; esac
+CADDY_VERSION=$(curl -fsSL https://api.github.com/repos/caddyserver/caddy/releases/latest | grep -m1 '"tag_name"' | cut -d'"' -f4 | sed 's/^v//')
+curl -fsSL -o /tmp/caddy.tar.gz "https://github.com/caddyserver/caddy/releases/download/v${CADDY_VERSION}/caddy_${CADDY_VERSION}_linux_${CADDY_ARCH}.tar.gz"
+sudo tar -xzf /tmp/caddy.tar.gz -C /usr/bin caddy
+sudo chmod +x /usr/bin/caddy
+caddy version   # confirm it runs
+
+# Caddy needs its own unprivileged user + config/log directories (the Debian package would have
+# created these automatically — doing it by hand here since we installed the bare binary):
+sudo useradd --system --no-create-home --shell /usr/sbin/nologin caddy
+sudo mkdir -p /etc/caddy /var/log/caddy
+sudo chown caddy:caddy /var/log/caddy
+
+# Caddy's official systemd unit (from caddyserver/dist — same content regardless of install method):
+cat <<'EOF' | sudo tee /etc/systemd/system/caddy.service
+[Unit]
+Description=Caddy
+Documentation=https://caddyserver.com/docs/
+After=network.target network-online.target
+Requires=network-online.target
+
+[Service]
+Type=notify
+User=caddy
+Group=caddy
+ExecStart=/usr/bin/caddy run --environ --config /etc/caddy/Caddyfile
+ExecReload=/usr/bin/caddy reload --config /etc/caddy/Caddyfile --force
+TimeoutStopSec=5s
+LimitNOFILE=1048576
+LimitNPROC=512
+PrivateTmp=true
+ProtectSystem=full
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+
+[Install]
+WantedBy=multi-user.target
+EOF
+sudo systemctl daemon-reload
+```
+
+Copy this repo's `deploy/Caddyfile` to `/etc/caddy/Caddyfile` (edit the two domain placeholders first), then:
+
+```bash
+sudo systemctl enable --now caddy
+sudo systemctl status caddy --no-pager
 ```
 
 ### Secrets — root-owned env file, `chmod 600`
@@ -108,9 +155,26 @@ EOF
 sudo systemctl restart systemd-journald
 ```
 
-Caddy's own access logs (if enabled in the Caddyfile) rotate via `logrotate` — Ubuntu 24.04 ships
-`logrotate` by default; Caddy's Debian package drops a working `/etc/logrotate.d/caddy` config
-automatically.
+Caddy's own access logs (if enabled in the Caddyfile) rotate via `logrotate` — Amazon Linux 2023
+ships `logrotate` by default, but since Caddy was installed as a bare binary (no package), its
+rotation config needs creating by hand (the Debian package would have done this automatically):
+
+```bash
+cat <<'EOF' | sudo tee /etc/logrotate.d/caddy
+/var/log/caddy/*.log {
+    daily
+    rotate 7
+    missingok
+    notifempty
+    compress
+    delaycompress
+    sharedscripts
+    postrotate
+        systemctl reload caddy > /dev/null 2>/dev/null || true
+    endscript
+}
+EOF
+```
 
 ### Disk-space and basic resource monitoring
 

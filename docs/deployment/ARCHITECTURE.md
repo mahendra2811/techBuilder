@@ -7,6 +7,15 @@
 > and `docs/perf/techBuilder-AWS-Onboarding-Steps.md` (public RDS, start/stop usage, written 2026-07-09
 > to fix local-dev latency only) — those docs are marked superseded, not deleted, since their SQL
 > role-bootstrap sequence and cost-model math are still correct and reused here.
+>
+> **2026-07-15 update:** the actual standing EC2 instance is **Amazon Linux 2023, x86_64** (~2GB RAM),
+> not the Ubuntu 24.04 ARM64 `t4g.micro` this doc originally specced below. The core reasoning
+> (small single box, no Docker, systemd+Caddy, build-off-box) is unaffected either way — this app has
+> zero native Node dependencies (confirmed below), so it's equally correct on ARM or x86, and on
+> Ubuntu or Amazon Linux; only the OS-level commands differ (see
+> `EC2_INITIAL_CONNECT_AND_SETUP.md` and `PRODUCTION_DEPLOYMENT.md`, both updated for Amazon Linux).
+> The Graviton/ARM64 cost argument in the table below (~20% cheaper) still holds if you later choose
+> to relaunch on `t4g` — it just isn't what's actually running today.
 
 ## Why this shape
 

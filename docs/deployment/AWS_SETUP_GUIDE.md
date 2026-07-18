@@ -48,15 +48,15 @@ Region: **Asia Pacific (Mumbai) `ap-south-1`** — check the region dropdown (to
 
 1. EC2 console → Launch instance.
 2. Name: `techbuilder-backend`.
-3. AMI: **Ubuntu Server 24.04 LTS**, Architecture: **64-bit (Arm)**.
-4. Instance type: **t4g.micro**.
-5. Key pair: Create new key pair → name it `techbuilder-key` → download the `.pem` file → keep it safe.
+3. AMI: **Amazon Linux 2023** (2026-07-15 — supersedes the original Ubuntu 24.04 plan; see `ARCHITECTURE.md`'s note on why). Architecture: **64-bit (Arm)** if you want the cheaper Graviton pricing this plan originally assumed (t4g family); **64-bit (x86)** works identically for this app (confirmed zero native Node addons — see `ARCHITECTURE.md` — so architecture choice is a pure cost/availability decision, not a compatibility one) and is what the actual standing instance uses today.
+4. Instance type: **t4g.micro** (Arm) or **t3.micro** (x86) — match whichever architecture you picked above. Size up to `.small` if you want headroom without resizing later (see `ARCHITECTURE.md`'s sizing table).
+5. Key pair: Create new key pair → name it something identifiable (e.g. `<project>-keyPair`) → download the `.pem` file → keep it safe.
 6. Network settings → Edit:
    - VPC: the one from step 3.
    - Subnet: any.
    - Auto-assign public IP: **Enable**.
    - Security group: Select existing → `techbuilder-ec2-sg`.
-7. Configure storage: **20 GiB**, type **gp3**.
+7. Configure storage: **20 GiB**, type **gp3** (the standing instance was launched with 8 GiB — works fine at this app's current scale, but 20 GiB gives more headroom for release history + logs; resize later via Modify Volume if needed, no downtime).
 8. Advanced details → IAM instance profile → select `techbuilder-ec2-role`.
 9. Launch instance.
 10. Wait until instance state = "Running" and status checks = "2/2 checks passed".
@@ -109,6 +109,8 @@ Region: **Asia Pacific (Mumbai) `ap-south-1`** — check the region dropdown (to
 1. EC2 → Instances → select `techbuilder-backend` → Connect → Session Manager tab → Connect.
    (If Session Manager isn't available yet, wait 2–3 minutes after launch and retry — the SSM agent needs to register.)
 
+> **First time connecting to this instance?** See `EC2_INITIAL_CONNECT_AND_SETUP.md` for both connection methods (SSM + SSH/`.pem`) in detail, plus the initial OS-level setup (updates, swap file, basic hardening) to do before anything else. Steps 10–11 below can be done via either connection method.
+
 ## 11. Verify RDS is reachable from EC2 only
 
 Run inside the Session Manager terminal (from step 10):
@@ -123,4 +125,4 @@ Then, on your own laptop (not the EC2 box), run the same command. Expect it to *
 
 ---
 
-Next doc: `docs/deployment/DATABASE_MIGRATION.md`.
+Next: `EC2_INITIAL_CONNECT_AND_SETUP.md` (connect + initial OS setup on the instance you just launched), then `docs/deployment/DATABASE_MIGRATION.md`.

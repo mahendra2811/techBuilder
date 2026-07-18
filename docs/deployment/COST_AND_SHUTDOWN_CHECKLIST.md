@@ -12,6 +12,12 @@
 
 ### Always-on, this plan's architecture (EC2 `t4g.micro` + RDS `db.t4g.micro`, 24/7) — updated 2026-07-11 for smallest/cheapest sizing
 
+> ⚠️ **2026-07-15:** the actual standing EC2 instance is Amazon Linux 2023 on x86_64, not the
+> `t4g.micro` (ARM/Graviton) this table prices below — check EC2 console → Instances → your
+> instance → Instance type, then re-price it in the AWS Pricing Calculator (x86 `t3`/`t2` family
+> pricing differs from the `t4g` numbers here, and is typically ~20% higher for the same RAM/vCPU).
+> Everything else in this table (RDS, EBS, data transfer) is unaffected by the EC2 architecture choice.
+
 | Item | Rough monthly cost |
 |---|---|
 | EC2 `t4g.micro` compute (730 hrs) | ~$7–8 (roughly half of `t4g.small`, which this plan used before this pass — the two sizes differ only in RAM, 1GB vs 2GB, and price scales with it) |

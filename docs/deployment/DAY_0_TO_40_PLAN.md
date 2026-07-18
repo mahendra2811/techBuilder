@@ -9,6 +9,7 @@ duplicate of their content.
 - [ ] AWS billing safeguards (`AWS_SETUP_GUIDE.md` Part A) — budgets, IAM user + MFA, tags.
 - [ ] VPC/SG/EC2/RDS creation (`AWS_SETUP_GUIDE.md` Parts B–D).
 - [ ] Reachability verification (`AWS_SETUP_GUIDE.md` Part E) — RDS reachable from EC2 only.
+- [ ] First connect + OS-level setup on the new instance (`EC2_INITIAL_CONNECT_AND_SETUP.md` — SSM/SSH, updates, swap file, basic hardening).
 - [ ] Backend deployed to EC2 (`PRODUCTION_DEPLOYMENT.md`'s one-time setup + first `scripts/deploy-backend.sh --app backend` run) — **pointed at Neon still**, just proving the EC2/Caddy/systemd path works end-to-end before touching the database.
 
 ## Day 4–7 — Database migration + Vercel testing deployment + domain/HTTPS + auth/CORS testing
