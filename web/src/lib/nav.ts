@@ -59,7 +59,10 @@ const NAV_DEFS: NavDef[] = [
   // Phase-scoping 2026-07: attendance & wages are manual for now (see docs/techBuilder-Build-WorkOrders.md WO-1)
   // { action: 'attendance.mark', labelKey: 'attendance', path: '/attendance', icon: ClipboardCheck },
   // WO-6/WO-14: the Records split — Expense + Progress are separate sections now.
-  { action: 'record.enter', labelKey: 'expense', path: '/expense', icon: IndianRupee, testId: 'nav-expense' },
+  // SUPERVISOR restructure: his direct-entry "Expense" (record.enter) page is replaced by
+  // the request-only form below (request.submit, same shape as driver/worker) — SM keeps
+  // the direct-entry screen untouched.
+  { action: 'record.enter', labelKey: 'expense', path: '/expense', icon: IndianRupee, roles: ['SITE_MANAGER'], testId: 'nav-expense' },
   { action: 'record.enter', labelKey: 'progress', path: '/progress', icon: NotebookPen, testId: 'nav-progress' },
   // The old combined Records screen stays routable at /records but is out of the menu.
   // { action: 'record.enter', labelKey: 'records', path: '/records', icon: NotebookPen },
@@ -78,17 +81,22 @@ const NAV_DEFS: NavDef[] = [
   // frozen.10 (DRV-2 nav restructure): the generic "Requests" entry (vehicle-change +
   // expense-request forms combined) no longer applies to DRIVER — his expense-request
   // form moved to its own page (see driver/expense/page.tsx) and vehicle-change requests
-  // moved onto /driver/vehicle. SM/SUPERVISOR keep this entry exactly as before.
-  // WORKER restructure (below): his expense-request form moved to its own page too.
-  { action: 'request.submit', labelKey: 'requests', path: '/requests', icon: Send, roles: ['SITE_MANAGER', 'SUPERVISOR'] },
+  // moved onto /driver/vehicle. SM keeps this entry exactly as before.
+  // WORKER/SUPERVISOR restructure (below): their expense-request forms moved to their own
+  // pages too — SUPERVISOR never actually used the VEHICLE_SWITCH-only form here (he
+  // doesn't drive a vehicle himself; his crew-vehicle re-allotment is direct, no request).
+  { action: 'request.submit', labelKey: 'requests', path: '/requests', icon: Send, roles: ['SITE_MANAGER'] },
   // DRIVER-only replacement: expense-request form + history at /driver/expense.
   { action: 'request.submit', labelKey: 'expense', path: '/expense', icon: IndianRupee, roles: ['DRIVER'], testId: 'nav-expense-driver' },
   // WORKER restructure: expense-request form + history at /worker/expense (was /worker/requests).
   { action: 'request.submit', labelKey: 'expense', path: '/expense', icon: IndianRupee, roles: ['WORKER'], testId: 'nav-expense-worker' },
+  // SUPERVISOR restructure: expense-request form + history at /supervisor/expense (was the
+  // direct-entry ExpenseScreen) — same shape as worker/driver, NO cap (service already
+  // never enforced requestCapPaise/backdate window on a SUPERVISOR's EXPENSE_ADD request).
+  { action: 'request.submit', labelKey: 'expense', path: '/expense', icon: IndianRupee, roles: ['SUPERVISOR'], testId: 'nav-expense-supervisor' },
+  // request.decide already reaches SUPERVISOR (his crew's VEHICLE_SWITCH only, service-narrowed)
+  // — a second SUPERVISOR-only view.all entry used to duplicate this "Approvals" link; removed.
   { action: 'request.decide', labelKey: 'approvals', path: '/approvals', icon: BadgeCheck },
-  // Round 2: the SUPERVISOR lost request.decide but keeps READ-ONLY visibility of his own
-  // crew's requests (client: worker/driver → their supervisor → SM + accountant).
-  { action: 'view.all', labelKey: 'approvals', path: '/approvals', icon: BadgeCheck, roles: ['SUPERVISOR'], testId: 'nav-approvals-supervisor' },
   { action: 'user.create', labelKey: 'people', path: '/people', icon: Users },
   { action: 'site.manage', labelKey: 'sites', path: '/sites', icon: MapPinned },
   { action: 'vehicle.manage', labelKey: 'fleet', path: '/fleet', icon: Truck },
@@ -107,6 +115,12 @@ const NAV_DEFS: NavDef[] = [
   // WO-8: SM site settings (limits · categories · form fields · emergency contacts). The SM holds
   // no config.manage — the PATCH is service-gated to his own site, so the nav entry is role-filtered.
   { action: 'view.all', labelKey: 'settings', path: '/settings', icon: Settings, roles: ['SITE_MANAGER'], testId: 'nav-settings-sm' },
+  // SUPERVISOR restructure: crew vehicles (list + re-allot) and damage-reporting split out
+  // of the dashboard's "crew vehicles" card into their own pages, mirroring the driver's
+  // vehicle/damage split. `view.all` gates the vehicle list + POST /vehicles/:id/assign-driver
+  // (log-only re-allot, no request/approval); `record.enter` gates POST /records/issue.
+  { action: 'view.all', labelKey: 'vehicle', path: '/vehicle', icon: Truck, roles: ['SUPERVISOR'], testId: 'nav-vehicle-supervisor' },
+  { action: 'record.enter', labelKey: 'damage', path: '/damage', icon: Wrench, roles: ['SUPERVISOR'], testId: 'nav-damage-supervisor' },
   // ---- Round 2 (frozen.8) ----
   // C11 materials: SM/Owner manage the catalog; the SUPERVISOR files final IN/CONSUME entries.
   { action: 'view.all', labelKey: 'materials', path: '/materials', icon: Boxes, roles: ['OWNER', 'SITE_MANAGER'], testId: 'nav-materials' },

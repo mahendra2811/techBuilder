@@ -1,13 +1,15 @@
 'use client';
 
 /**
- * frozen.10 (SUP-7/D5) — supervisor "on behalf of his drivers" dashboard card:
- * (1) crew vehicles + who's driving them, with a direct "Allot to…" action
- *     (`POST /vehicles/:id/assign-driver` — log-only, auto-approved, no
- *     request; the backend notifies the SM + both affected drivers) and
- * (2) a compact damage-report shortcut for a crew vehicle
- *     (`POST /records/issue` — the same endpoint the driver's own damage form
- *     uses; scope already allows supervisors via `record.enter`).
+ * frozen.10 (SUP-7/D5), SUPERVISOR restructure — crew vehicles + who's driving them,
+ * with a direct "Allot to…" action (`POST /vehicles/:id/assign-driver` — log-only,
+ * auto-approved, no request; the backend notifies the SM + both affected drivers).
+ *
+ * Moved OFF the dashboard onto its own page (/supervisor/vehicle) per client feedback —
+ * the dashboard should only link out, not host full functionality. The damage-report
+ * shortcut that used to sit below this card on the dashboard is now its own richer page
+ * (see supervisor-damage-screen.tsx, /supervisor/damage — same inputs as the driver's
+ * damage form: severity/description/photos/voice + a history timeline).
  *
  * `GET /vehicles` and `GET /users` are already server-scoped to the
  * supervisor's own crew/site (frozen.10 single-site + crew scope) — this card
@@ -19,18 +21,13 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Truck } from 'lucide-react';
-import { ISSUE_SEVERITIES } from '@techbuilder/contracts';
-import type { AssignDriverInput, CreateIssueInput, Issue, IssueSeverity, User, UUID, Vehicle } from '@techbuilder/contracts';
-import { uuidv7 } from 'uuidv7';
+import type { AssignDriverInput, User, UUID, Vehicle } from '@techbuilder/contracts';
 import { ApiClientError, api } from '@/lib/api-client';
-import { todayKolkata } from '@/lib/business-date';
 import { apiErrorMessage } from '@/lib/i18n/messages';
 import { useLocale, useMessages } from '@/lib/i18n/locale-context';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
-import { Textarea } from '@/components/ui/textarea';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
 
 const UI = {
@@ -46,18 +43,6 @@ const UI = {
     confirm: 'Allot',
     allotting: 'Saving…',
     allotted: 'Allotted.',
-    damageTitle: 'Report damage',
-    damageSubtitle: 'Raise a damage report for a crew vehicle',
-    vehicleLabel: 'Vehicle',
-    severityLabel: 'Severity',
-    descriptionLabel: 'What happened?',
-    descriptionRequired: 'Describe the damage',
-    submit: 'Submit',
-    submitting: 'Saving…',
-    saved: 'Damage report saved.',
-    severityLow: 'Low',
-    severityMedium: 'Medium',
-    severityHigh: 'High',
   },
   hi: {
     vehiclesTitle: 'क्रू के वाहन',
@@ -71,18 +56,6 @@ const UI = {
     confirm: 'दें',
     allotting: 'सहेजा जा रहा है…',
     allotted: 'दे दिया गया।',
-    damageTitle: 'नुक़सान बताएँ',
-    damageSubtitle: 'क्रू के किसी वाहन का नुक़सान दर्ज करें',
-    vehicleLabel: 'वाहन',
-    severityLabel: 'गंभीरता',
-    descriptionLabel: 'क्या हुआ?',
-    descriptionRequired: 'नुक़सान के बारे में बताएँ',
-    submit: 'भेजें',
-    submitting: 'सहेजा जा रहा है…',
-    saved: 'नुक़सान की रिपोर्ट सहेज ली गई।',
-    severityLow: 'कम',
-    severityMedium: 'मध्यम',
-    severityHigh: 'ज़्यादा',
   },
 } as const;
 
@@ -105,40 +78,36 @@ export function SupervisorCrewVehiclesCard() {
   const invalidateVehicles = () => void qc.invalidateQueries({ queryKey: ['vehicles'] });
 
   return (
-    <div className="grid gap-4">
-      <Card data-testid="supervisor-crew-vehicles-card">
-        <CardHeader>
-          <CardTitle>{ui.vehiclesTitle}</CardTitle>
-          <CardDescription>{ui.vehiclesSubtitle}</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-3">
-          {vehiclesQ.isPending || usersQ.isPending ? (
-            <LoadingState />
-          ) : vehiclesQ.error ? (
-            <ErrorState error={vehiclesQ.error} onRetry={() => void vehiclesQ.refetch()} />
-          ) : usersQ.error ? (
-            <ErrorState error={usersQ.error} onRetry={() => void usersQ.refetch()} />
-          ) : vehicles.length === 0 ? (
-            <EmptyState label={ui.noVehicles} />
-          ) : (
-            <ul className="grid gap-3" data-testid="supervisor-crew-vehicles-list">
-              {vehicles.map((v) => (
-                <VehicleRow
-                  key={v.id}
-                  ui={ui}
-                  vehicle={v}
-                  drivers={drivers}
-                  currentDriverName={driverName(v.assignedDriverPersonId)}
-                  onAllotted={invalidateVehicles}
-                />
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
-
-      <DamageReportCard ui={ui} vehicles={vehicles} vehiclesLoading={vehiclesQ.isPending} vehiclesError={vehiclesQ.error} />
-    </div>
+    <Card data-testid="supervisor-crew-vehicles-card">
+      <CardHeader>
+        <CardTitle>{ui.vehiclesTitle}</CardTitle>
+        <CardDescription>{ui.vehiclesSubtitle}</CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-3">
+        {vehiclesQ.isPending || usersQ.isPending ? (
+          <LoadingState />
+        ) : vehiclesQ.error ? (
+          <ErrorState error={vehiclesQ.error} onRetry={() => void vehiclesQ.refetch()} />
+        ) : usersQ.error ? (
+          <ErrorState error={usersQ.error} onRetry={() => void usersQ.refetch()} />
+        ) : vehicles.length === 0 ? (
+          <EmptyState label={ui.noVehicles} />
+        ) : (
+          <ul className="grid gap-3" data-testid="supervisor-crew-vehicles-list">
+            {vehicles.map((v) => (
+              <VehicleRow
+                key={v.id}
+                ui={ui}
+                vehicle={v}
+                drivers={drivers}
+                currentDriverName={driverName(v.assignedDriverPersonId)}
+                onAllotted={invalidateVehicles}
+              />
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -229,149 +198,5 @@ function VehicleRow({
         </Notice>
       )}
     </li>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Compact damage-report shortcut
-// ---------------------------------------------------------------------------
-
-function DamageReportCard({
-  ui,
-  vehicles,
-  vehiclesLoading,
-  vehiclesError,
-}: {
-  ui: UiText;
-  vehicles: Vehicle[];
-  vehiclesLoading: boolean;
-  vehiclesError: unknown;
-}) {
-  const m = useMessages();
-  const [vehicleId, setVehicleId] = useState<UUID | ''>('');
-  const [severity, setSeverity] = useState<IssueSeverity>('LOW');
-  const [description, setDescription] = useState('');
-  const [descriptionError, setDescriptionError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
-
-  const severityLabel = (s: IssueSeverity): string =>
-    s === 'LOW' ? ui.severityLow : s === 'MEDIUM' ? ui.severityMedium : ui.severityHigh;
-
-  const effectiveVehicleId = vehicleId !== '' ? vehicleId : (vehicles[0]?.id ?? '');
-
-  const submit = useMutation({
-    mutationFn: (input: CreateIssueInput) => api<Issue>('POST', '/records/issue', input),
-    onSuccess: () => {
-      setSaved(true);
-      setDescription('');
-      setSeverity('LOW');
-    },
-    onError: () => setSaved(false),
-  });
-
-  const serverError =
-    submit.error instanceof ApiClientError ? apiErrorMessage(m, submit.error.code) : submit.error ? apiErrorMessage(m) : null;
-
-  const onSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaved(false);
-    if (!description.trim()) {
-      setDescriptionError(ui.descriptionRequired);
-      return;
-    }
-    if (!effectiveVehicleId) return;
-    setDescriptionError(null);
-    submit.mutate({
-      id: uuidv7(),
-      vehicleId: effectiveVehicleId,
-      severity,
-      description: description.trim(),
-      businessDate: todayKolkata(),
-    });
-  };
-
-  return (
-    <Card data-testid="supervisor-damage-card">
-      <CardHeader>
-        <CardTitle>{ui.damageTitle}</CardTitle>
-        <CardDescription>{ui.damageSubtitle}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        {vehiclesLoading ? (
-          <LoadingState />
-        ) : vehiclesError ? (
-          <ErrorState error={vehiclesError} />
-        ) : vehicles.length === 0 ? (
-          <EmptyState label={ui.noVehicles} />
-        ) : (
-          <form className="grid gap-4" noValidate onSubmit={onSubmit}>
-            <div className="grid gap-2">
-              <Label htmlFor="supervisor-damage-vehicle">{ui.vehicleLabel}</Label>
-              <NativeSelect
-                id="supervisor-damage-vehicle"
-                data-testid="supervisor-damage-vehicle"
-                value={effectiveVehicleId}
-                onChange={(e) => setVehicleId(e.target.value)}
-              >
-                {vehicles.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {vehicleLabel(v)}
-                  </option>
-                ))}
-              </NativeSelect>
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="supervisor-damage-severity">{ui.severityLabel}</Label>
-              <NativeSelect
-                id="supervisor-damage-severity"
-                data-testid="supervisor-damage-severity"
-                value={severity}
-                onChange={(e) => setSeverity(e.target.value as IssueSeverity)}
-              >
-                {ISSUE_SEVERITIES.map((s) => (
-                  <option key={s} value={s}>
-                    {severityLabel(s)}
-                  </option>
-                ))}
-              </NativeSelect>
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="supervisor-damage-description">{ui.descriptionLabel}</Label>
-              <Textarea
-                id="supervisor-damage-description"
-                data-testid="supervisor-damage-description"
-                value={description}
-                onChange={(e) => {
-                  setDescription(e.target.value);
-                  if (descriptionError) setDescriptionError(null);
-                }}
-              />
-              {descriptionError && (
-                <p className="text-sm text-destructive" role="alert">
-                  {descriptionError}
-                </p>
-              )}
-            </div>
-
-            {serverError && (
-              <Notice tone="error" testId="supervisor-damage-error">
-                {serverError}
-              </Notice>
-            )}
-            {saved && (
-              <Notice tone="success" testId="supervisor-damage-saved">
-                {ui.saved}
-              </Notice>
-            )}
-
-            <Button type="submit" data-testid="supervisor-damage-submit" disabled={submit.isPending || !effectiveVehicleId}>
-              {submit.isPending ? ui.submitting : ui.submit}
-            </Button>
-          </form>
-        )}
-      </CardContent>
-    </Card>
   );
 }

@@ -11,9 +11,14 @@
  *
  * Request types offered per role:
  *   - DRIVER: VEHICLE_SWITCH only (their day-to-day need),
- *   - SM / TH: LEAVE, MATERIAL, VEHICLE_SWITCH.
- * VEHICLE_SWITCH needs an in-scope vehicle; a TH has no fleet scope, so the
- * vehicle list is empty for them and that type stays disabled with a notice.
+ *   - SM: LEAVE, MATERIAL, VEHICLE_SWITCH.
+ * VEHICLE_SWITCH needs an in-scope vehicle.
+ *
+ * SUPERVISOR restructure: this screen no longer has a SUPERVISOR variant — he never
+ * drove a vehicle himself (VEHICLE_SWITCH was the only active type for him and made no
+ * product sense), so /supervisor/requests was removed. His crew-vehicle re-allotment is
+ * direct (see supervisor-crew-vehicles-card.tsx, no request/approval), and his own
+ * expense-request form moved to expense-request-screen.tsx (ExpenseRequestScreen).
  */
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -38,13 +43,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
 import { PayloadSummary, RequestStatusBadge } from '@/components/requests/request-bits';
 
-type SubmitRole = 'SITE_MANAGER' | 'SUPERVISOR' | 'DRIVER';
+type SubmitRole = 'SITE_MANAGER' | 'DRIVER';
 
 const TYPES_FOR: Record<SubmitRole, ApprovalType[]> = {
   DRIVER: ['VEHICLE_SWITCH'],
   // Phase-scoping 2026-07: LEAVE & MATERIAL are manual for now (see docs/techBuilder-Build-WorkOrders.md WO-1)
   SITE_MANAGER: ['VEHICLE_SWITCH'], // ['LEAVE', 'MATERIAL', 'VEHICLE_SWITCH'],
-  SUPERVISOR: ['VEHICLE_SWITCH'], // ['LEAVE', 'MATERIAL', 'VEHICLE_SWITCH'],
 };
 
 export function RequestsScreen({ role }: { role: SubmitRole }) {

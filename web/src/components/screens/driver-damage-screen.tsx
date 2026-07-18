@@ -12,7 +12,7 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { uuidv7 } from 'uuidv7';
 import { ISSUE_SEVERITIES } from '@techbuilder/contracts';
-import type { CloseIssueInput, CreateIssueInput, Issue, IssueSeverity, UUID, VehicleSnapshot } from '@techbuilder/contracts';
+import type { CreateIssueInput, Issue, IssueSeverity, UUID, VehicleSnapshot } from '@techbuilder/contracts';
 import { ApiClientError, api } from '@/lib/api-client';
 import { addDays, todayKolkata } from '@/lib/business-date';
 import { uploadPhotos, uploadVoice } from '@/lib/media-upload';
@@ -27,6 +27,7 @@ import { PhotoMultiField } from '@/components/entry/photo-multi-field';
 import { VoiceField } from '@/components/entry/voice-field';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
 import { DamageTimeline } from '@/components/vehicle/damage-timeline';
+import { CloseIssueInline } from '@/components/vehicle/close-issue-inline';
 
 export function DriverDamageScreen() {
   const m = useMessages();
@@ -97,6 +98,9 @@ export function DriverDamageScreen() {
     </div>
   );
 }
+
+// Note: CloseIssueInline (the closing-remark action on a RESOLVED issue) now lives at
+// `@/components/vehicle/close-issue-inline` — shared with `supervisor-damage-screen.tsx`.
 
 // ---------------------------------------------------------------------------
 // Damage report form

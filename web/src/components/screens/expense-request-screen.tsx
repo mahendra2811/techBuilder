@@ -1,10 +1,11 @@
 'use client';
 
 /**
- * Worker/Driver EXPENSE-ADD request form (WO-5). Field roles (`request.submit`
- * scope SELF/OWN_VEHICLE) cannot enter an expense directly — they ask, and a
- * TH/SM approves it (approvals.service materializes the booked expense on
- * APPROVE). Money is entered in RUPEES and sent as INTEGER PAISE.
+ * Worker/Driver/Supervisor EXPENSE-ADD request form (WO-5, extended for the
+ * SUPERVISOR restructure). Field roles (`request.submit` scope SELF/OWN_VEHICLE/
+ * OWN_CREW) cannot enter an expense directly — they ask, and the accountant/Owner
+ * decides it (approvals.service materializes the booked expense on APPROVE).
+ * Money is entered in RUPEES and sent as INTEGER PAISE.
  *
  * Config resolution mirrors the backend's `loadExpenseLimits` EXACTLY (see
  * backend/src/common/org-config.util.ts) so the client rarely bounces off a
@@ -12,7 +13,16 @@
  *   - cap        = site.expenseFormConfig.requestCapPaise ?? org.expense.requestCapPaise
  *   - categories = site.expenseFormConfig.categories ?? org.expense.categories (enabled only)
  *   - backdate   = org.expense.requestBackdateDays (site does NOT override this)
- * `siteId` is never sent — the server derives it for WORKER/DRIVER.
+ * `siteId` is never sent — the server derives it for WORKER/DRIVER (and falls back
+ * to the caller's own site for anyone else, which covers SUPERVISOR's single site).
+ *
+ * SUPERVISOR variant: `validateExpenseAddPayload` (backend/src/approvals/approvals.service.ts)
+ * only enforces `requestCapPaise`/`requestBackdateDays` `if (ctx.role === 'WORKER' ||
+ * ctx.role === 'DRIVER')` — a SUPERVISOR's request has NO server-side cap. The client-side
+ * cap check is skipped for him accordingly (never blocks a submit the server would accept);
+ * the date window still offers today/yesterday only, matching every other SUPERVISOR
+ * screen's `BACKDATE_LIMIT_DAYS.SUPERVISOR = 1` (business-date.ts) rather than the
+ * worker/driver org config value.
  *
  * Photos + the voice note are uploaded (best-effort, never throws) at submit
  * time and their media ids all land in the one `mediaIds` array on the
@@ -53,8 +63,10 @@ import { LoadingState, ErrorState, Notice } from '@/components/entry/states';
 import { ExpenseHistorySections } from '@/components/requests/my-requests';
 
 const MAX_PHOTOS = 3;
+/** Matches `BACKDATE_LIMIT_DAYS.SUPERVISOR` in lib/business-date.ts (today + yesterday). */
+const SUPERVISOR_BACKDATE_DAYS = 1;
 
-export function ExpenseRequestScreen({ variant }: { variant: 'worker' | 'driver' }) {
+export function ExpenseRequestScreen({ variant }: { variant: 'worker' | 'driver' | 'supervisor' }) {
   const m = useMessages();
 
   const meQ = useQuery({ queryKey: ['me'], queryFn: me });
@@ -85,7 +97,7 @@ export function ExpenseRequestScreen({ variant }: { variant: 'worker' | 'driver'
               {m.EXPENSE_REQUEST_UI.noSite}
             </Notice>
           ) : (
-            <ExpenseRequestForm site={site} orgConfig={org.config} vendors={vendorsQ.data ?? []} />
+            <ExpenseRequestForm site={site} orgConfig={org.config} vendors={vendorsQ.data ?? []} variant={variant} />
           )}
         </CardContent>
       </Card>
@@ -99,19 +111,33 @@ export function ExpenseRequestScreen({ variant }: { variant: 'worker' | 'driver'
 // Form
 // ---------------------------------------------------------------------------
 
-function ExpenseRequestForm({ site, orgConfig, vendors }: { site: Site; orgConfig: OrgConfig; vendors: Vendor[] }) {
+function ExpenseRequestForm({
+  site,
+  orgConfig,
+  vendors,
+  variant,
+}: {
+  site: Site;
+  orgConfig: OrgConfig;
+  vendors: Vendor[];
+  variant: 'worker' | 'driver' | 'supervisor';
+}) {
   const m = useMessages();
   const locale = useLocale();
   const queryClient = useQueryClient();
+  const isSupervisor = variant === 'supervisor';
 
   const today = useMemo(() => todayKolkata(), []);
-  const backdateDays = orgConfig.expense.requestBackdateDays;
+  // SUPERVISOR: today/yesterday only (matches every other supervisor screen), independent
+  // of the worker/driver org config value — see the file header note.
+  const backdateDays = isSupervisor ? SUPERVISOR_BACKDATE_DAYS : orgConfig.expense.requestBackdateDays;
   const allowedDates = useMemo<BusinessDate[]>(
     () => Array.from({ length: backdateDays + 1 }, (_, i) => addDays(today, -i)),
     [today, backdateDays],
   );
 
-  const capPaise = site.expenseFormConfig?.requestCapPaise ?? orgConfig.expense.requestCapPaise;
+  // SUPERVISOR: no cap — the backend never enforces requestCapPaise for him either.
+  const capPaise = isSupervisor ? undefined : (site.expenseFormConfig?.requestCapPaise ?? orgConfig.expense.requestCapPaise);
   const categories = (site.expenseFormConfig?.categories ?? orgConfig.expense.categories).filter((c) => c.enabled);
 
   const fieldToggles = site.expenseFormConfig?.fields;
@@ -191,7 +217,7 @@ function ExpenseRequestForm({ site, orgConfig, vendors }: { site: Site; orgConfi
     const amountPaise = rupeesToPaise(Number(amountRupees));
     if (!amountRupees || !Number.isFinite(amountPaise) || amountPaise <= 0) {
       errs.amount = m.EXPENSE_REQUEST_UI.amountInvalid;
-    } else if (amountPaise > capPaise) {
+    } else if (capPaise !== undefined && amountPaise > capPaise) {
       errs.amount = `${m.EXPENSE_REQUEST_UI.amountOverCapPrefix} ${formatPaise(capPaise)}${m.EXPENSE_REQUEST_UI.amountOverCapSuffix}`;
     }
     if (!category) errs.category = m.EXPENSE_REQUEST_UI.categoryRequired;
