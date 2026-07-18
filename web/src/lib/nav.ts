@@ -19,6 +19,7 @@ import {
   CircleUserRound,
   FileSpreadsheet,
   Fuel,
+  Gauge,
   IndianRupee,
   LayoutDashboard,
   MapPinned,
@@ -52,6 +53,9 @@ interface NavDef {
 /** Declaration order = display order: home first, day-to-day, then admin. */
 const NAV_DEFS: NavDef[] = [
   { action: 'view.all', labelKey: 'dashboard', path: '', icon: LayoutDashboard },
+  // DRV-1/DRV-5 (docs/role-page-map/driver/driver-role-updates.md, frozen.10):
+  // Start-of-day/End-of-day forms' own page — the dashboard's day-log chips link here.
+  { action: 'vehicleLog.enter', labelKey: 'meter', path: '/meter', icon: Gauge, roles: ['DRIVER'], testId: 'nav-meter' },
   // Phase-scoping 2026-07: attendance & wages are manual for now (see docs/techBuilder-Build-WorkOrders.md WO-1)
   // { action: 'attendance.mark', labelKey: 'attendance', path: '/attendance', icon: ClipboardCheck },
   // WO-6/WO-14: the Records split — Expense + Progress are separate sections now.
@@ -59,13 +63,28 @@ const NAV_DEFS: NavDef[] = [
   { action: 'record.enter', labelKey: 'progress', path: '/progress', icon: NotebookPen, testId: 'nav-progress' },
   // The old combined Records screen stays routable at /records but is out of the menu.
   // { action: 'record.enter', labelKey: 'records', path: '/records', icon: NotebookPen },
-  { action: 'vehicleLog.enter', labelKey: 'vehicleFuel', path: '/vehicle', icon: Fuel },
+  // The SM's /site-manager/vehicle entry keeps its original label+testid untouched.
+  { action: 'vehicleLog.enter', labelKey: 'vehicleFuel', path: '/vehicle', icon: Fuel, roles: ['SITE_MANAGER'], testId: 'nav-vehicleLog-enter' },
+  // frozen.10 (DRV-2 nav restructure): DRIVER's own /driver/vehicle entry, relabeled
+  // "Vehicle" (was shared "Vehicle/Fuel") now that the page also hosts the vehicle-change
+  // request form + history (see driver/vehicle/page.tsx). Distinct testId since it shares
+  // the `vehicleLog.enter` action with the SM entry above and the fuel/damage entries below.
+  { action: 'vehicleLog.enter', labelKey: 'vehicle', path: '/vehicle', icon: Fuel, roles: ['DRIVER'], testId: 'nav-vehicle-driver' },
   // DRV-2 (docs/role-page-map/driver/driver-role-updates.md, frozen.10): fuel + damage
   // split off the combined /vehicle page into their own DRIVER-only pages. Explicit
   // testIds since all three entries here share the `vehicleLog.enter` action.
   { action: 'vehicleLog.enter', labelKey: 'fuelEntry', path: '/fuel', icon: Fuel, roles: ['DRIVER'], testId: 'nav-fuel-entry' },
   { action: 'vehicleLog.enter', labelKey: 'damage', path: '/damage', icon: Wrench, roles: ['DRIVER'], testId: 'nav-damage' },
-  { action: 'request.submit', labelKey: 'requests', path: '/requests', icon: Send },
+  // frozen.10 (DRV-2 nav restructure): the generic "Requests" entry (vehicle-change +
+  // expense-request forms combined) no longer applies to DRIVER — his expense-request
+  // form moved to its own page (see driver/expense/page.tsx) and vehicle-change requests
+  // moved onto /driver/vehicle. SM/SUPERVISOR keep this entry exactly as before.
+  // WORKER restructure (below): his expense-request form moved to its own page too.
+  { action: 'request.submit', labelKey: 'requests', path: '/requests', icon: Send, roles: ['SITE_MANAGER', 'SUPERVISOR'] },
+  // DRIVER-only replacement: expense-request form + history at /driver/expense.
+  { action: 'request.submit', labelKey: 'expense', path: '/expense', icon: IndianRupee, roles: ['DRIVER'], testId: 'nav-expense-driver' },
+  // WORKER restructure: expense-request form + history at /worker/expense (was /worker/requests).
+  { action: 'request.submit', labelKey: 'expense', path: '/expense', icon: IndianRupee, roles: ['WORKER'], testId: 'nav-expense-worker' },
   { action: 'request.decide', labelKey: 'approvals', path: '/approvals', icon: BadgeCheck },
   // Round 2: the SUPERVISOR lost request.decide but keeps READ-ONLY visibility of his own
   // crew's requests (client: worker/driver → their supervisor → SM + accountant).

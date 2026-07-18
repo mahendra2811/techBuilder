@@ -59,7 +59,7 @@ export function WorkerDashboardScreen() {
         </CardContent>
       </Card>
 
-      <MyExpenseRequestsSummary href={`${roleHome('WORKER')}/requests`} />
+      <MyExpenseRequestsSummary href={`${roleHome('WORKER')}/expense`} />
 
       <KhataCard />
 

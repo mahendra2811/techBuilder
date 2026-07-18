@@ -9,9 +9,10 @@
  * entry moved to `driver-fuel-screen.tsx` (/driver/fuel); this page no longer stacks
  * either of them (see driver/vehicle/page.tsx).
  *
- * "Needs approval" vehicles deep-link to the existing VEHICLE_SWITCH request form on
- * /driver/requests (RequestsScreen — owned by another wave) via a same-page anchor;
- * that screen is not touched here.
+ * "Needs approval" vehicles deep-link to the existing VEHICLE_SWITCH request form
+ * (RequestsScreen — owned by another wave), which now stacks on this SAME page
+ * (see driver/vehicle/page.tsx, frozen.10 DRV-2 nav restructure) via an in-page
+ * anchor; that screen is not touched here.
  */
 import { useState } from 'react';
 import Link from 'next/link';
@@ -161,7 +162,7 @@ function SwitchVehicleRow({
           </Button>
         ) : (
           <Link
-            href="/driver/requests#request-vehicle"
+            href="#request-vehicle"
             data-testid={`switch-vehicle-${vehicle.id}-request`}
             className={buttonVariants({ variant: 'outline', size: 'sm' })}
           >

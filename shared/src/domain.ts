@@ -669,7 +669,8 @@ export interface MyMoneyEntry {
   fromUserId: UUID;
   fromName: string;
   note: string | null;
-  verifiedAt: Timestamp;
+  /** frozen.11: null for WORK-tag entries (`GET /me/money?tag=WORK` — khata credits show regardless of the tick). */
+  verifiedAt: Timestamp | null;
 }
 export interface MyMoney {
   entries: MyMoneyEntry[];

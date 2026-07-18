@@ -72,9 +72,10 @@ export class MyBalanceController {
   }
 
   // Round 2 (C10): "money I've taken" — the caller's own verified SALARY/PERSONAL draws.
+  // frozen.11: ?tag=WORK → his khata credits instead (worker/driver "money received" list).
   @Get('money')
-  myMoney(@CurrentUser() u: Principal) {
-    return this.cash.myMoney(u);
+  myMoney(@CurrentUser() u: Principal, @Query('tag') tag?: string) {
+    return this.cash.myMoney(u, tag);
   }
 }
 

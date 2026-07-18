@@ -1,5 +1,9 @@
 # DRIVER role — client review updates (round: role-by-role audit)
 
+> **✅ BUILT (frozen.10, 2026-07-18).** Post-audit additions (client requests, 2026-07-18 late evening, built separately on top of frozen.10 — all UI-only, no contracts change):
+> 1. **`/driver/meter` page** — Start-of-day + End-of-day forms moved off the dashboard; each section shows a green ✓ once filled; dashboard keeps the three status chips as a compact strip that links to `/driver/meter`; "Meter / मीटर" nav entry.
+> 2. **Requests page dissolved**: the vehicle-change request form + its history moved onto `/driver/vehicle` (nav renamed "Vehicle/Fuel" → **"Vehicle / वाहन"**, driver only — SM's label untouched); the expense request form + history became the new **`/driver/expense`** page (nav "Expense"); `/driver/requests` route deleted, deep-links re-pointed.
+
 > **Status: 📋 PENDING — DO NOT BUILD YET.**
 > This is the change log from the client's role-by-role review (2026-07-18, DRIVER role). The client is auditing every role one at a time; each role gets a file like this in `docs/role-page-map/<role>/`. **All roles' changes get implemented together in ONE build pass at the end** (client instruction — avoids rework).
 >

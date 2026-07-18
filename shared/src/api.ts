@@ -116,7 +116,9 @@ export const ENDPOINTS = {
   expenseVerify: { method: 'POST', path: '/records/expense/:id/verify' },
   cashTransferVerify: { method: 'POST', path: '/cash-transfers/:id/verify' },
   vendorPaymentVerify: { method: 'POST', path: '/vendors/payments/:id/verify' },
-  // "money I've taken" — verified SALARY/PERSONAL draws of the caller
+  // "money I've taken" — verified SALARY/PERSONAL draws of the caller.
+  // frozen.11: also accepts ?tag=WORK → the caller's WORK-cash credits (khata GIVEs to him,
+  // any verification state, with resolved giver names) — the worker/driver "money received" list.
   myMoney: { method: 'GET', path: '/me/money' },
 
   // ---- frozen.10 (5-role client-audit round) ----

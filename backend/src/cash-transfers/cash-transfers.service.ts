@@ -227,8 +227,11 @@ export class CashTransfersService {
    * date-wise with the tag. Only accountant-verified entries appear (the claim isn't money
    * until the tick). Self-scoped: every role sees exactly his own list.
    */
-  async myMoney(p: Principal): Promise<MyMoney> {
-    return this.dbs.runInTenant(p.orgId, (tx) => moneyTakenOf(tx, p.userId));
+  async myMoney(p: Principal, tag?: string): Promise<MyMoney> {
+    // frozen.11: ?tag=WORK flips the list to the caller's khata CREDITS (work cash handed to
+    // him, any verification state) — the worker/driver "money received" view. Default stays
+    // the verified SALARY/PERSONAL draws.
+    return this.dbs.runInTenant(p.orgId, (tx) => moneyTakenOf(tx, p.userId, tag === 'WORK' ? 'WORK' : 'PERSONAL_DRAWS'));
   }
 
   /**
@@ -371,9 +374,15 @@ async function assertSupervises(tx: Tx, higher: LedgerUser, lower: LedgerUser): 
   forbidScope('Transfer is not permitted by the chain');
 }
 
-/** A user's VERIFIED SALARY/PERSONAL draws, newest first + running total (the MyMoney shape).
- *  Shared by the self view (myMoney) and the upper-role view (userMoney). */
-async function moneyTakenOf(tx: Tx, userId: string): Promise<MyMoney> {
+/** A user's money-taken list, newest first + running total (the MyMoney shape), with resolved
+ *  giver names. Two modes: 'PERSONAL_DRAWS' (default — VERIFIED SALARY/PERSONAL only) and
+ *  'WORK' (frozen.11 — khata credits handed to him, any verification state). Shared by the
+ *  self view (myMoney) and the upper-role view (userMoney). */
+async function moneyTakenOf(tx: Tx, userId: string, mode: 'PERSONAL_DRAWS' | 'WORK' = 'PERSONAL_DRAWS'): Promise<MyMoney> {
+  const modeFilter =
+    mode === 'WORK'
+      ? [eq(schema.cashTransfers.tag, 'WORK' as const)]
+      : [sql`${schema.cashTransfers.tag} <> 'WORK'`, sql`${schema.cashTransfers.verifiedAt} IS NOT NULL`];
   const rows = await tx
     .select({
       id: schema.cashTransfers.id,
@@ -387,14 +396,7 @@ async function moneyTakenOf(tx: Tx, userId: string): Promise<MyMoney> {
     })
     .from(schema.cashTransfers)
     .leftJoin(schema.users, eq(schema.users.id, schema.cashTransfers.fromUserId))
-    .where(
-      and(
-        isNull(schema.cashTransfers.deletedAt),
-        eq(schema.cashTransfers.toUserId, userId),
-        sql`${schema.cashTransfers.tag} <> 'WORK'`,
-        sql`${schema.cashTransfers.verifiedAt} IS NOT NULL`,
-      ),
-    )
+    .where(and(isNull(schema.cashTransfers.deletedAt), eq(schema.cashTransfers.toUserId, userId), ...modeFilter))
     .orderBy(desc(schema.cashTransfers.businessDate));
   const entries = rows.map((r) => ({
     id: r.id,
@@ -404,7 +406,7 @@ async function moneyTakenOf(tx: Tx, userId: string): Promise<MyMoney> {
     fromUserId: r.fromUserId,
     fromName: r.fromName ?? '—',
     note: r.note ?? null,
-    verifiedAt: (r.verifiedAt as Date).toISOString(),
+    verifiedAt: r.verifiedAt ? r.verifiedAt.toISOString() : null,
   }));
   return { entries, totalPaise: entries.reduce((s, e) => s + e.amountPaise, 0) };
 }

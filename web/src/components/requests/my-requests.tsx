@@ -2,8 +2,10 @@
 
 /**
  * "My expense requests" — the requester's own EXPENSE_ADD requests, newest
- * first. Two renderings share one data hook:
- *   - `MyExpenseRequests`        full card list (requests screens).
+ * first. Renderings share one data hook:
+ *   - `ExpenseHistorySections`   worker/driver history hub — three tappable
+ *     sub-page cards (pending/rejected, approved, money received), used by
+ *     `expense-request-screen.tsx` below the request form.
  *   - `MyExpenseRequestsSummary` compact status-counts + last-3 dashboard card.
  *
  * Filtered to type === 'EXPENSE_ADD' on purpose: on the driver requests page
@@ -16,19 +18,25 @@
  * badge if the accountant's tick came back negative (`flagged`), so a requester
  * sees the full lifecycle, not just "Approved".
  *
- * Accordion (client feedback): the full-history list in `MyExpenseRequests`
- * collapses each row to amount/date/status(+tick) and expands on tap to the
- * rest of the payload — mirrors the single-open accordion pattern in
+ * Accordion (client feedback): each history sub-page collapses a row to
+ * amount/date/status(+tick) and expands on tap to the rest of the payload —
+ * mirrors the single-open accordion pattern in
  * `components/screens/approvals-screen.tsx`. `MyExpenseRequestsSummary` (the
  * dashboard card) is untouched — it already only ever shows a one-line digest.
+ *
+ * WORKER restructure (nav.ts): the old single flat `MyExpenseRequests` list
+ * was split into three sub-pages — `ExpenseHistorySections` is the new mount
+ * point. It also fetches `GET /cash-transfers?tag=WORK` (client-filtered to
+ * rows where the caller is the receiver) for the "money received" section —
+ * salary/personal money deliberately does NOT belong here (see Profile page).
  */
 import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronDown, ChevronUp } from 'lucide-react';
-import type { ApprovalRequest, ApprovalStatus, ExpenseCategory, Vendor } from '@techbuilder/contracts';
+import { ChevronDown, ChevronRight, ChevronUp } from 'lucide-react';
+import type { ApprovalRequest, ApprovalStatus, ExpenseCategory, MyMoney, Vendor } from '@techbuilder/contracts';
 import { api, me } from '@/lib/api-client';
-import { formatBusinessDateShort } from '@/lib/business-date';
+import { formatBusinessDate, formatBusinessDateShort } from '@/lib/business-date';
 import { formatPaise } from '@/lib/money';
 import { useLocale, useMessages } from '@/lib/i18n/locale-context';
 import type { Messages } from '@/lib/i18n/messages';
@@ -36,6 +44,34 @@ import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
 import { RequestStatusBadge } from '@/components/requests/request-bits';
+import { SubPageHeader, useSubPage } from '@/components/ui/sub-page';
+
+// Module-local — the frozen EXPENSE_REQUEST_UI catalog predates the three-section
+// history split (pending/rejected · approved · money received).
+const HISTORY_UI = {
+  en: {
+    pendingTitle: 'Pending / rejected requests',
+    pendingEmpty: 'No pending or rejected requests.',
+    approvedTitle: 'Approved expenses',
+    approvedEmpty: 'No approved expenses yet.',
+    approvedHint: 'These amounts are debited from your work khata.',
+    receivedTitle: 'Money received',
+    receivedEmpty: 'No money received yet.',
+    receivedHint: 'Work money credited to your khata — salary/personal money shows on your Profile page instead.',
+    fromLabel: 'From',
+  },
+  hi: {
+    pendingTitle: 'लंबित–अस्वीकृत अनुरोध',
+    pendingEmpty: 'कोई लंबित या अस्वीकृत अनुरोध नहीं।',
+    approvedTitle: 'स्वीकृत ख़र्च',
+    approvedEmpty: 'अभी तक कोई स्वीकृत ख़र्च नहीं।',
+    approvedHint: 'यह रकम आपके काम-खाते से काटी जाती है।',
+    receivedTitle: 'मिला पैसा',
+    receivedEmpty: 'अभी तक कोई पैसा नहीं मिला।',
+    receivedHint: 'काम का पैसा आपके खाते में जमा होता है — वेतन/निजी पैसा आपकी प्रोफ़ाइल पेज पर दिखेगा।',
+    fromLabel: 'किससे',
+  },
+} as const;
 
 // Module-local — the frozen EXPENSE_REQUEST_UI catalog predates the two-tick badges.
 const TICK_UI = {
@@ -107,33 +143,191 @@ function remarkFrom(payload: Record<string, unknown>): string | undefined {
   return typeof payload.remark === 'string' && payload.remark.trim() ? payload.remark : undefined;
 }
 
-export function MyExpenseRequests() {
-  const m = useMessages();
-  const { requests, isPending, error, refetch } = useMyExpenseRequests();
+/**
+ * The worker/driver history hub: three tappable section cards, each opening a
+ * `useSubPage` detail view (URL unchanged, back button via `SubPageHeader`).
+ * Section (a) and (b) share the accordion request-row rendering; (c) is a new
+ * money-received list built off `GET /cash-transfers?tag=WORK`.
+ */
+export function ExpenseHistorySections() {
+  const locale = useLocale();
+  const ui = HISTORY_UI[locale];
+
+  const { requests, isPending: requestsPending, error: requestsError, refetch: requestsRefetch } = useMyExpenseRequests();
   // Shop names for the expanded "paid via" line — same query the request form itself uses
   // (workers/drivers are permitted to call GET /vendors); fetched once here, not per-row.
   const vendorsQ = useQuery({ queryKey: ['vendors'], queryFn: () => api<Vendor[]>('GET', '/vendors') });
+  // frozen.11: the khata-credits view of GET /me/money — server-scoped to the caller AND the
+  // giver names come pre-resolved (workers/drivers can't read the user directory themselves).
+  const receivedQ = useQuery({
+    queryKey: ['my-money', 'WORK'],
+    queryFn: () => api<MyMoney>('GET', '/me/money?tag=WORK'),
+  });
+
+  // Pending first, then rejected — each group keeps the server's newest-first order.
+  const pendingRejected = [
+    ...requests.filter((r) => r.status === 'PENDING'),
+    ...requests.filter((r) => r.status === 'REJECTED'),
+  ];
+  const approved = requests.filter((r) => r.status === 'APPROVED');
+  const received = receivedQ.data?.entries ?? [];
+
+  const { current, open, close } = useSubPage<'pending' | 'approved' | 'received'>();
+
+  if (current === 'pending') {
+    return (
+      <div className="grid gap-4" data-testid="expense-sub-pending-page">
+        <SubPageHeader title={ui.pendingTitle} onBack={close} />
+        <ExpenseRequestListCard
+          requests={pendingRejected}
+          vendors={vendorsQ.data ?? []}
+          isPending={requestsPending}
+          error={requestsError}
+          onRetry={requestsRefetch}
+          emptyLabel={ui.pendingEmpty}
+        />
+      </div>
+    );
+  }
+
+  if (current === 'approved') {
+    return (
+      <div className="grid gap-4" data-testid="expense-sub-approved-page">
+        <SubPageHeader title={ui.approvedTitle} onBack={close} />
+        <p className="text-xs text-muted-foreground">{ui.approvedHint}</p>
+        <ExpenseRequestListCard
+          requests={approved}
+          vendors={vendorsQ.data ?? []}
+          isPending={requestsPending}
+          error={requestsError}
+          onRetry={requestsRefetch}
+          emptyLabel={ui.approvedEmpty}
+        />
+      </div>
+    );
+  }
+
+  if (current === 'received') {
+    return (
+      <div className="grid gap-4" data-testid="expense-sub-received-page">
+        <SubPageHeader title={ui.receivedTitle} onBack={close} />
+        <p className="text-xs text-muted-foreground">{ui.receivedHint}</p>
+        <Card>
+          <CardContent className="pt-4">
+            {receivedQ.isPending ? (
+              <LoadingState />
+            ) : receivedQ.error ? (
+              <ErrorState error={receivedQ.error} onRetry={() => void receivedQ.refetch()} />
+            ) : received.length === 0 ? (
+              <EmptyState label={ui.receivedEmpty} />
+            ) : (
+              <ul className="divide-y">
+                {received.map((t) => (
+                  <ReceivedMoneyRow key={t.id} entry={t} fromLabel={ui.fromLabel} />
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-3" data-testid="expense-history-sections">
+      <SectionCard
+        testId="expense-sub-pending"
+        title={ui.pendingTitle}
+        count={requestsPending ? undefined : pendingRejected.length}
+        onOpen={() => open('pending')}
+      />
+      <SectionCard
+        testId="expense-sub-approved"
+        title={ui.approvedTitle}
+        count={requestsPending ? undefined : approved.length}
+        onOpen={() => open('approved')}
+      />
+      <SectionCard
+        testId="expense-sub-received"
+        title={ui.receivedTitle}
+        count={receivedQ.isPending ? undefined : received.length}
+        onOpen={() => open('received')}
+      />
+    </div>
+  );
+}
+
+/** Tappable hub card — title + a count once its underlying query has loaded. */
+function SectionCard({
+  testId,
+  title,
+  count,
+  onOpen,
+}: {
+  testId: string;
+  title: string;
+  count?: number;
+  onOpen: () => void;
+}) {
+  return (
+    <Card data-testid={testId}>
+      <button
+        type="button"
+        className="flex w-full items-center justify-between gap-3 p-4 text-left"
+        data-testid={`${testId}-open`}
+        onClick={onOpen}
+      >
+        <span className="text-sm font-medium">{title}</span>
+        <span className="flex items-center gap-2">
+          {count !== undefined && (
+            <span
+              className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground"
+              data-testid={`${testId}-count`}
+            >
+              {count}
+            </span>
+          )}
+          <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+        </span>
+      </button>
+    </Card>
+  );
+}
+
+/** Shared accordion list for the pending/rejected + approved sub-pages. */
+function ExpenseRequestListCard({
+  requests,
+  vendors,
+  isPending,
+  error,
+  onRetry,
+  emptyLabel,
+}: {
+  requests: ApprovalRequest[];
+  vendors: Vendor[];
+  isPending: boolean;
+  error: unknown;
+  onRetry: () => void;
+  emptyLabel: string;
+}) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   return (
-    <Card data-testid="my-expense-requests">
-      <CardHeader>
-        <CardTitle>{m.EXPENSE_REQUEST_UI.myRequestsTitle}</CardTitle>
-      </CardHeader>
-      <CardContent>
+    <Card>
+      <CardContent className="pt-4">
         {isPending ? (
           <LoadingState />
         ) : error ? (
-          <ErrorState error={error} onRetry={refetch} />
+          <ErrorState error={error} onRetry={onRetry} />
         ) : requests.length === 0 ? (
-          <EmptyState label={m.EXPENSE_REQUEST_UI.myRequestsEmpty} />
+          <EmptyState label={emptyLabel} />
         ) : (
           <ul className="grid gap-3">
             {requests.map((r) => (
               <ExpenseRequestRow
                 key={r.id}
                 request={r}
-                vendors={vendorsQ.data ?? []}
+                vendors={vendors}
                 isExpanded={expandedId === r.id}
                 onToggle={() => setExpandedId((cur) => (cur === r.id ? null : r.id))}
               />
@@ -142,6 +336,22 @@ export function MyExpenseRequests() {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+/** One khata credit (frozen.11: `GET /me/money?tag=WORK` — giver name resolved server-side). */
+function ReceivedMoneyRow({ entry: t, fromLabel }: { entry: MyMoney['entries'][number]; fromLabel: string }) {
+  return (
+    <li className="grid gap-1 py-3 first:pt-0 last:pb-0" data-testid={`expense-received-row-${t.id}`}>
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="text-sm font-medium">{formatBusinessDate(t.businessDate)}</p>
+        <p className="shrink-0 text-sm font-semibold tabular-nums">{formatPaise(t.amountPaise)}</p>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        {fromLabel} {t.fromName}
+        {t.note && ` · ${t.note}`}
+      </p>
+    </li>
   );
 }
 

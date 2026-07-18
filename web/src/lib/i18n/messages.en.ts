@@ -128,6 +128,11 @@ export const en = {
     // frozen.10 (DRV-2): driver-only fuel + damage pages, split off /vehicle.
     fuelEntry: "Fuel",
     damage: "Damage",
+    // frozen.10 (DRV-1/DRV-5): driver-only Start-of-day/End-of-day forms page.
+    meter: "Meter",
+    // frozen.10 (DRV-2 nav restructure): driver-only label for /driver/vehicle — the
+    // SM keeps `vehicleFuel` ("Vehicle / Fuel") for /site-manager/vehicle unchanged.
+    vehicle: "Vehicle",
   },
 
   /** Attendance status labels (enum values come from the frozen contracts). */

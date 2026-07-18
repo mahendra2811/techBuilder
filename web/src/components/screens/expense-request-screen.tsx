@@ -50,7 +50,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { PhotoMultiField } from '@/components/entry/photo-multi-field';
 import { VoiceField } from '@/components/entry/voice-field';
 import { LoadingState, ErrorState, Notice } from '@/components/entry/states';
-import { MyExpenseRequests } from '@/components/requests/my-requests';
+import { ExpenseHistorySections } from '@/components/requests/my-requests';
 
 const MAX_PHOTOS = 3;
 
@@ -90,7 +90,7 @@ export function ExpenseRequestScreen({ variant }: { variant: 'worker' | 'driver'
         </CardContent>
       </Card>
 
-      <MyExpenseRequests />
+      <ExpenseHistorySections />
     </div>
   );
 }

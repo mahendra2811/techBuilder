@@ -102,6 +102,11 @@ export const hi: Messages = {
     // frozen.10 (DRV-2): driver-only fuel + damage pages, split off /vehicle.
     fuelEntry: "डीज़ल",
     damage: "नुक़सान",
+    // frozen.10 (DRV-1/DRV-5): driver-only Start-of-day/End-of-day forms page.
+    meter: "मीटर",
+    // frozen.10 (DRV-2 nav restructure): driver-only label for /driver/vehicle — the
+    // SM keeps `vehicleFuel` ("गाड़ी / तेल") for /site-manager/vehicle unchanged.
+    vehicle: "वाहन",
   },
 
   ATTENDANCE_STATUS_LABELS: {
