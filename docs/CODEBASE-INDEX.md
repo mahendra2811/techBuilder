@@ -17,7 +17,6 @@
 | `backend/` | NestJS 11 + Drizzle + Neon Postgres (RLS). 21 modules, port 4000. |
 | `web/` | Next.js 16 App Router portal (the CURRENT frontend). |
 | `app/` | FROZEN Expo/React-Native app — reference only, do not build on. |
-| `proj/` | OLD Next.js scaffold (pre-pivot) — not Phase-1, ignore. |
 
 ---
 

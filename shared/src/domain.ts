@@ -210,6 +210,8 @@ export interface Expense extends AuditFields, VerificationFields {
   orgId: UUID;
   siteId: UUID;
   category: ExpenseCategory;
+  /** frozen.10 (SM-2): SM-configured subcategory key under `category` (nullable). */
+  subcategory: string | null;
   amountPaise: Paise;
   vendorId: UUID | null;
   billNo: string | null;
@@ -225,7 +227,10 @@ export interface FuelLog extends AuditFields {
   id: UUID;
   orgId: UUID;
   vehicleId: UUID;
-  amountPaise: Paise;
+  /** frozen.10 (DRV-4): null when the diesel came from site stock / khata (no money paid). */
+  amountPaise: Paise | null;
+  /** frozen.10 (DRV-4): true only when the driver actually paid. */
+  paidByDriver: boolean;
   litres: number;
   reading: number; // odometer/hour-meter at fill
   receiptMediaId: UUID | null;
@@ -331,6 +336,8 @@ export interface MaterialTxn extends AuditFields {
   /** Round 2 (C11): SUPERVISOR entry = final; DRIVER pick = data-only input. */
   enteredRole: Role | null;
   finalized: boolean;
+  /** frozen.10 (SUP-4): free note — the UI requires it when the "Other" material is picked. */
+  remark: string | null;
 }
 
 export interface Issue extends AuditFields {
@@ -617,6 +624,8 @@ export interface DriverDetail {
 export interface Complaint extends AuditFields {
   id: UUID;
   orgId: UUID;
+  /** frozen.10 (SUP-1): per-org human number (#101, #102…) — the trackable ID. */
+  complaintNo: number;
   raisedBy: UUID;
   target: ComplaintTarget;
   siteId: UUID | null;

@@ -126,9 +126,10 @@ describe.skipIf(!HAS_DB)('WO-9 cash ledger (live DB, RLS app role)', () => {
   });
 
   // ② SM GIVEs ₹500 to a worker; worker's approved ₹300 CASH expense debits the worker's khata.
-  // (Round 2: the SUPERVISOR decides nothing — the SM approves here; khata debits on booking,
-  //  the accountant's verify tick is the audit mark, not the booking.)
-  it('② SM GIVEs ₹500 to worker; worker ₹300 CASH expense (SM-approved) → worker balance ₹200', async () => {
+  // (frozen.10: the SM is fully out of the money-decide loop now — every EXPENSE_ADD is decided
+  //  by the accountant or the Owner; this fixture seeds no accountant, so the Owner decides.
+  //  Khata debits on booking either way; approval and the verify tick land in the same act.)
+  it('② SM GIVEs ₹500 to worker; worker ₹300 CASH expense (Owner-approved) → worker balance ₹200', async () => {
     await cash.create(SM_A(), { id: uuidv7(), toUserId: workerId, amountPaise: 50_000, kind: 'GIVE', businessDate: TODAY });
 
     const reqId = uuidv7();
@@ -137,7 +138,9 @@ describe.skipIf(!HAS_DB)('WO-9 cash ledger (live DB, RLS app role)', () => {
       type: 'EXPENSE_ADD',
       payload: { category: 'FOOD', amountPaise: 30_000, businessDate: TODAY },
     });
-    const decided = await approvals.decideRequest(SM_A(), reqId, { approve: true });
+    // SM can no longer decide money requests (FORBIDDEN) — the Owner (or the site's accountant) does.
+    await expect(approvals.decideRequest(SM_A(), reqId, { approve: true })).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    const decided = await approvals.decideRequest(OWNER(), reqId, { approve: true });
     expect(decided.status).toBe('APPROVED');
 
     // the materialized expense is a CASH expense entered by the worker → debits HIS khata

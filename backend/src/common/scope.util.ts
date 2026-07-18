@@ -77,7 +77,9 @@ export async function loadScope(tx: Tx, p: Principal): Promise<ScopeContext> {
       .from(schema.crews)
       .where(and(isNull(schema.crews.deletedAt), eq(schema.crews.supervisorUserId, u.id)));
     ctx.crewIds = uniq([u.crewId, ...led.map((c) => c.id)]);
-    ctx.siteIds = uniq([u.assignedSiteId, ...led.map((c) => c.siteId)]);
+    // frozen.10 (SUP-2 single-site rule): the supervisor sees exactly HIS assigned site — his
+    // crews'/vehicles' sites no longer widen the reach (they leaked other sites' names/data).
+    ctx.siteIds = u.assignedSiteId ? [u.assignedSiteId] : [];
   } else if (u.role === 'ACCOUNTANT') {
     // Round 2: per-site money desk — mirrors the SM pattern on sites.accountantId.
     const managed = await tx
@@ -122,8 +124,9 @@ export async function loadScope(tx: Tx, p: Principal): Promise<ScopeContext> {
           .select({ id: schema.vehicles.id, siteId: schema.vehicles.assignedSiteId })
           .from(schema.vehicles)
           .where(and(isNull(schema.vehicles.deletedAt), inSet(schema.vehicles.assignedDriverPersonId, driverPersonIds)));
+        // frozen.10 (SUP-2): vehicle REACH stays (allotment/damage) but the vehicles' sites no
+        // longer widen ctx.siteIds — the single-site rule holds.
         ctx.vehicleIds = uniq([...ctx.vehicleIds, ...vs.map((v) => v.id)]);
-        ctx.siteIds = uniq([...ctx.siteIds, ...vs.map((v) => v.siteId)]);
       }
     }
   }

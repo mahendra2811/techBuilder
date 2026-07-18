@@ -394,7 +394,9 @@ export function buildMaterialSheet(txns: MaterialTxn[], sites: Site[], m: Messag
 export function buildFuelSheet(logs: FuelLog[], vehicles: Vehicle[], m: Messages): SheetSpec {
   const o = m.EXPORT_UI;
   const sorted = [...logs].sort((a, b) => a.businessDate.localeCompare(b.businessDate));
-  const total = sorted.reduce((sum, l) => sum + l.amountPaise, 0);
+  // frozen.10 (DRV-4): amountPaise is null when the diesel came from site stock/khata
+  // (no money paid) — excluded from the sum, rendered as a blank cell (not ₹0).
+  const total = sorted.reduce((sum, l) => sum + (l.amountPaise ?? 0), 0);
   return {
     name: o.sheetFuel,
     columns: [
@@ -408,7 +410,7 @@ export function buildFuelSheet(logs: FuelLog[], vehicles: Vehicle[], m: Messages
       date: l.businessDate,
       vehicle: nameOf(vehicles.map((v) => ({ id: v.id, name: v.regNo })), l.vehicleId),
       litres: l.litres,
-      amount: rupees(l.amountPaise),
+      amount: l.amountPaise != null ? rupees(l.amountPaise) : '',
       reading: l.reading,
     })),
     totals: { date: o.totalsLabel, amount: rupees(total) },
@@ -519,7 +521,7 @@ export function buildSiteSummarySheet(
   const rows = sites.map((s) => {
     const fuelPaise = fuel
       .filter((f) => vehicles.find((v) => v.id === f.vehicleId)?.assignedSiteId === s.id)
-      .reduce((sum, f) => sum + f.amountPaise, 0);
+      .reduce((sum, f) => sum + (f.amountPaise ?? 0), 0);
     return {
       site: s.name,
       marked: attendance.filter((a) => a.siteId === s.id).length,

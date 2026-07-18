@@ -33,6 +33,7 @@ import {
   type ExpenseCategory,
   type ExpenseCategoryConfig,
   type ExpenseRequestPayload,
+  type ExpenseSubcategoryConfig,
   type PaymentMode,
   type Site,
   type SubmitRequestInput,
@@ -41,7 +42,7 @@ import {
   type Vendor,
 } from '@techbuilder/contracts';
 import { ApiClientError, api, me } from '@/lib/api-client';
-import { addDays, todayKolkata } from '@/lib/business-date';
+import { addDays, minEntryDate, todayKolkata } from '@/lib/business-date';
 import { uploadPhotos, uploadVoice } from '@/lib/media-upload';
 import { apiErrorMessage } from '@/lib/i18n/messages';
 import { useLocale, useMessages } from '@/lib/i18n/locale-context';
@@ -58,17 +59,39 @@ import { PhotoMultiField } from '@/components/entry/photo-multi-field';
 import { VoiceField } from '@/components/entry/voice-field';
 import { RecentEntries } from '@/components/entry/recent-entries';
 import { SitePicker } from '@/components/entry/site-picker';
-import { Notice } from '@/components/entry/states';
+import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
 
 type EntryRole = 'SITE_MANAGER' | 'SUPERVISOR';
 const MAX_BILL_PHOTOS = 1;
 const MAX_EXTRA_PHOTOS = 2;
+/** MISC is the "Other" category — its remark becomes required+emphasized (frozen.10 SUP-9). */
+const OTHER_CATEGORY: ExpenseCategory = 'MISC';
+
+// Module-local additions on top of the frozen EXPENSE_UI/VENDOR_UI catalogs (frozen.10).
+const LOCAL_UI = {
+  en: {
+    site: 'Site',
+    noSites: 'No site assigned to you yet',
+    subcategoryLabel: 'Type',
+    remarkRequiredLabel: 'Remark (required)',
+    remarkRequiredError: 'Say what this expense is',
+  },
+  hi: {
+    site: 'साइट',
+    noSites: 'आपको अभी कोई साइट नहीं सौंपी गई',
+    subcategoryLabel: 'प्रकार',
+    remarkRequiredLabel: 'टिप्पणी (ज़रूरी)',
+    remarkRequiredError: 'बताएँ कि यह ख़र्च किस बारे में है',
+  },
+} as const;
 
 export function ExpenseScreen({ role }: { role: EntryRole }) {
   const m = useMessages();
   const locale = useLocale();
+  const local = LOCAL_UI[locale];
   const queryClient = useQueryClient();
   const today = useMemo(() => todayKolkata(), []);
+  const minDate = minEntryDate(role, today);
 
   const [pickedSiteId, setPickedSiteId] = useState<UUID | ''>('');
   const [date, setDate] = useState<BusinessDate>(today);
@@ -82,13 +105,15 @@ export function ExpenseScreen({ role }: { role: EntryRole }) {
   const userName = (id: UUID) => usersQ.data?.find((u) => u.id === id)?.name ?? m.EXPENSE_UI.unknownUser;
 
   const sites = sitesQ.data;
-  // Default to the first scoped site (TH has exactly one) — derived, no effect.
-  const siteId: UUID | '' = pickedSiteId !== '' ? pickedSiteId : (sites?.[0]?.id ?? '');
+  // frozen.10 (SUP-2): the SUPERVISOR has exactly one site — default to it, no picker at all.
+  // SM may still have a pickable set — unchanged for that role.
+  const siteId: UUID | '' = role === 'SUPERVISOR' ? (sites?.[0]?.id ?? '') : pickedSiteId !== '' ? pickedSiteId : (sites?.[0]?.id ?? '');
   const selectedSite = sites?.find((s) => s.id === siteId);
   const orgExpense = meQ.data?.org.config.expense;
   const voiceEnabled = meQ.data?.org.config.features.voiceNotes ?? false;
   // Org-wide shops + shops at the selected site only.
   const siteVendors = (vendorsQ.data ?? []).filter((v) => v.siteId === null || v.siteId === siteId);
+  // frozen.10: default ON unless the site explicitly turns it off (was accidentally default-off before).
   const vendorFieldEnabled = selectedSite?.expenseFormConfig?.fields?.vendor !== false;
 
   const categories: ExpenseCategoryConfig[] = (
@@ -96,10 +121,18 @@ export function ExpenseScreen({ role }: { role: EntryRole }) {
   ).filter((c) => c.enabled);
   const categoryLabel = (c: ExpenseCategoryConfig) => (locale === 'hi' ? c.labelHi : c.labelEn);
 
-  // Round 2: the SUPERVISOR has ZERO direct authority — his entry ALWAYS routes as a money
-  // request to the accountant (no cap on the request). The SM books any amount directly
-  // (the v1 ₹1L ladder is gone) — his entries await the accountant's verify tick instead.
-  const directLimitPaise = role === 'SUPERVISOR' ? 0 : undefined;
+  // frozen.10 (SM-2): SM-created subcategories, site override falling back to org defaults.
+  const subcategories: ExpenseSubcategoryConfig[] = (
+    selectedSite?.expenseFormConfig?.subcategories ?? orgExpense?.subcategories ?? []
+  ).filter((s) => s.enabled);
+  const subcategoryLabel = (s: ExpenseSubcategoryConfig) => (locale === 'hi' ? s.labelHi : s.labelEn);
+
+  // frozen.10 (SUP-9): the SUPERVISOR's per-entry DIRECT limit is UN-deprecated — site override,
+  // falling back to the org default (config.ts default ₹25,000 = 2_500_000 paise). Below it the
+  // entry books directly (still awaiting the accountant's verify tick); above it it routes as an
+  // EXPENSE_ADD request the ACCOUNTANT (or Owner) decides. The SM keeps booking any amount direct.
+  const directLimitPaise =
+    role === 'SUPERVISOR' ? (selectedSite?.expenseFormConfig?.thDirectLimitPaise ?? orgExpense?.thDirectLimitPaise) : undefined;
 
   const recentWindow = { from: addDays(today, -7), to: today };
   const recentQs = siteId
@@ -114,15 +147,36 @@ export function ExpenseScreen({ role }: { role: EntryRole }) {
           <CardDescription>{m.EXPENSE_UI.subtitle}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
-          <SitePicker
-            sites={sites}
-            isLoading={sitesQ.isPending}
-            value={siteId}
-            onChange={setPickedSiteId}
-            error={sitesQ.error}
-            onRetry={() => void sitesQ.refetch()}
-          />
-          <DateField id="expense-date" testId="expense-date" value={date} onChange={setDate} max={today} />
+          {role === 'SUPERVISOR' ? (
+            <div className="grid gap-2">
+              <Label htmlFor="expense-site">{local.site}</Label>
+              {sitesQ.isPending ? (
+                <LoadingState />
+              ) : sitesQ.error ? (
+                <ErrorState error={sitesQ.error} onRetry={() => void sitesQ.refetch()} />
+              ) : !selectedSite ? (
+                <EmptyState label={local.noSites} />
+              ) : (
+                <p
+                  id="expense-site"
+                  data-testid="expense-site-fixed"
+                  className="flex h-8 items-center rounded-lg border border-input bg-muted/40 px-2.5 text-sm"
+                >
+                  {selectedSite.name} ({selectedSite.code})
+                </p>
+              )}
+            </div>
+          ) : (
+            <SitePicker
+              sites={sites}
+              isLoading={sitesQ.isPending}
+              value={siteId}
+              onChange={setPickedSiteId}
+              error={sitesQ.error}
+              onRetry={() => void sitesQ.refetch()}
+            />
+          )}
+          <DateField id="expense-date" testId="expense-date" value={date} onChange={setDate} min={minDate} max={today} />
 
           <Separator />
 
@@ -131,6 +185,8 @@ export function ExpenseScreen({ role }: { role: EntryRole }) {
             date={date}
             categories={categories}
             categoryLabel={categoryLabel}
+            subcategories={subcategories}
+            subcategoryLabel={subcategoryLabel}
             directLimitPaise={directLimitPaise}
             limitsReady={!meQ.isPending}
             voiceEnabled={voiceEnabled}
@@ -159,6 +215,8 @@ function ExpenseForm({
   date,
   categories,
   categoryLabel,
+  subcategories,
+  subcategoryLabel,
   directLimitPaise,
   limitsReady,
   voiceEnabled,
@@ -170,6 +228,8 @@ function ExpenseForm({
   date: BusinessDate;
   categories: ExpenseCategoryConfig[];
   categoryLabel: (c: ExpenseCategoryConfig) => string;
+  subcategories: ExpenseSubcategoryConfig[];
+  subcategoryLabel: (s: ExpenseSubcategoryConfig) => string;
   directLimitPaise: number | undefined;
   limitsReady: boolean;
   voiceEnabled: boolean;
@@ -178,8 +238,11 @@ function ExpenseForm({
   onSaved: () => void;
 }) {
   const m = useMessages();
+  const locale = useLocale();
+  const local = LOCAL_UI[locale];
 
   const [category, setCategory] = useState<ExpenseCategory | undefined>(undefined);
+  const [subcategory, setSubcategory] = useState<string>('');
   const [amountRupees, setAmountRupees] = useState('');
   const [billPhotos, setBillPhotos] = useState<File[]>([]);
   const [extraPhotos, setExtraPhotos] = useState<File[]>([]);
@@ -188,12 +251,17 @@ function ExpenseForm({
   const [paidVia, setPaidVia] = useState<PaymentMode>('CASH');
   const [vendorId, setVendorId] = useState<UUID | ''>('');
 
-  const [fieldErrors, setFieldErrors] = useState<{ amount?: string; category?: string; vendor?: string }>({});
+  const [fieldErrors, setFieldErrors] = useState<{ amount?: string; category?: string; vendor?: string; remark?: string }>({});
   const [saved, setSaved] = useState<'direct' | 'request' | null>(null);
   const [photoWarning, setPhotoWarning] = useState(false);
 
   // Only offer the selector when the site allows it AND there's at least one shop to pick.
   const showPaidBySelector = showVendorField && vendors.length > 0;
+
+  // frozen.10 (SM-2): subcategories are scoped to whichever category is currently picked.
+  const subcategoryOptions = category ? subcategories.filter((s) => s.parent === category) : [];
+  // frozen.10 (SUP-9): MISC ("Other") requires a remark describing the expense.
+  const remarkRequired = category === OTHER_CATEGORY;
 
   const amountPaise = (() => {
     const n = Number(amountRupees);
@@ -203,6 +271,7 @@ function ExpenseForm({
 
   const resetFields = () => {
     setCategory(undefined);
+    setSubcategory('');
     setAmountRupees('');
     setBillPhotos([]);
     setExtraPhotos([]);
@@ -244,6 +313,7 @@ function ExpenseForm({
         id,
         siteId: siteId as UUID,
         category: category as ExpenseCategory,
+        subcategory: subcategory || undefined, // frozen.10 (SM-2)
         amountPaise,
         receiptMediaId: billIds[0] ?? extraIds[0],
         remark: remark.trim() ? remark.trim() : undefined, // frozen.4: persisted on direct entries too
@@ -268,9 +338,14 @@ function ExpenseForm({
       const id = uuidv7();
       const { billIds, extraIds, voiceId, failed } = await uploadAll(id, 'approval_request');
       const mediaIds: UUID[] = [...billIds, ...extraIds, ...(voiceId ? [voiceId] : [])];
-      const payload: ExpenseRequestPayload = {
+      // ExpenseRequestPayload has no `subcategory` field on the frozen contracts yet — carried
+      // as an extra property (best-effort; the accountant/Owner decide form doesn't read it back
+      // today, same documented gap as remark/mediaIds not round-tripping through the category-
+      // override UI). Never blocks the submit.
+      const payload: ExpenseRequestPayload & { subcategory?: string } = {
         siteId: siteId as UUID,
         category: category as ExpenseCategory,
+        subcategory: subcategory || undefined,
         amountPaise,
         businessDate: date,
         remark: remark.trim() ? remark.trim() : undefined,
@@ -293,10 +368,11 @@ function ExpenseForm({
   });
 
   const validate = (): boolean => {
-    const errs: { amount?: string; category?: string; vendor?: string } = {};
+    const errs: { amount?: string; category?: string; vendor?: string; remark?: string } = {};
     if (!(amountPaise > 0)) errs.amount = m.EXPENSE_UI.amountInvalid;
     if (!category) errs.category = m.EXPENSE_UI.categoryRequired;
     if (showPaidBySelector && paidVia === 'VENDOR_CREDIT' && !vendorId) errs.vendor = m.VENDOR_UI.shopRequired;
+    if (remarkRequired && !remark.trim()) errs.remark = local.remarkRequiredError;
     setFieldErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -347,7 +423,10 @@ function ExpenseForm({
               variant={category === c.key ? 'default' : 'outline'}
               aria-pressed={category === c.key}
               data-testid={`expense-category-${c.key}`}
-              onClick={() => setCategory(c.key)}
+              onClick={() => {
+                setCategory(c.key);
+                setSubcategory(''); // frozen.10 (SM-2): subcategories are scoped to the category
+              }}
             >
               {categoryLabel(c)}
             </Button>
@@ -359,6 +438,27 @@ function ExpenseForm({
           </p>
         )}
       </div>
+
+      {subcategoryOptions.length > 0 && (
+        <div className="grid gap-2">
+          <Label>{local.subcategoryLabel}</Label>
+          <div className="grid grid-cols-3 gap-1.5">
+            {subcategoryOptions.map((s) => (
+              <Button
+                key={s.key}
+                type="button"
+                size="sm"
+                variant={subcategory === s.key ? 'default' : 'outline'}
+                aria-pressed={subcategory === s.key}
+                data-testid={`expense-subcategory-${s.key}`}
+                onClick={() => setSubcategory((cur) => (cur === s.key ? '' : s.key))}
+              >
+                {subcategoryLabel(s)}
+              </Button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-2">
         <Label htmlFor="expense-amount">{m.EXPENSE_UI.amountRupees}</Label>
@@ -457,14 +557,22 @@ function ExpenseForm({
       />
 
       <div className="grid gap-2">
-        <Label htmlFor="expense-remark">{m.EXPENSE_UI.remark}</Label>
+        <Label htmlFor="expense-remark">{remarkRequired ? local.remarkRequiredLabel : m.EXPENSE_UI.remark}</Label>
         <Textarea
           id="expense-remark"
           data-testid="expense-remark"
           placeholder={m.EXPENSE_UI.remarkPlaceholder}
           value={remark}
-          onChange={(e) => setRemark(e.target.value)}
+          onChange={(e) => {
+            setRemark(e.target.value);
+            if (fieldErrors.remark) setFieldErrors((f) => ({ ...f, remark: undefined }));
+          }}
         />
+        {fieldErrors.remark && (
+          <p className="text-sm text-destructive" role="alert" data-testid="expense-remark-error">
+            {fieldErrors.remark}
+          </p>
+        )}
       </div>
 
       {voiceEnabled && <VoiceField value={voiceBlob} onChange={setVoiceBlob} testId="expense-voice" />}

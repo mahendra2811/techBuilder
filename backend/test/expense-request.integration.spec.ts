@@ -233,44 +233,44 @@ describe.skipIf(!HAS_DB)('Round-2 money engine (live DB, RLS app role)', () => {
     expect(await getExpense(id)).toBeUndefined();
   });
 
-  // ---- two-tick: SM approval waits for the accountant ----
-  it('SM approval books the expense UNVERIFIED; accountant verify makes it permanent (no edit/void, even Owner)', async () => {
+  // ---- two-tick: an ACCOUNTANT (or Owner) approval IS the tick — SM is fully out of the money loop ----
+  it('SM approval is FORBIDDEN; accountant approval books the expense ALREADY VERIFIED (no edit/void, even Owner)', async () => {
     const id = uuidv7();
     await approvals.submitRequest(DRIVER(), { id, type: 'EXPENSE_ADD', payload: expensePayload({ category: 'REPAIR' }) });
-    const decided = await approvals.decideRequest(SM_A(), id, { approve: true });
+    // frozen.10: the SM no longer decides money requests at all.
+    await expect(approvals.decideRequest(SM_A(), id, { approve: true })).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    // the site's accountant approves → approval AND verify tick land in the SAME act
+    const decided = await approvals.decideRequest(ACC_A(), id, { approve: true });
     expect(decided.status).toBe('APPROVED');
-    expect(decided.verifiedAt).toBeNull(); // approved but NOT yet real money
+    expect(decided.verifiedAt).not.toBeNull();
+    expect(decided.verifiedBy).toBe(accAId);
 
-    let row = await getExpense(id);
-    expect(row!.verifiedAt).toBeNull();
-
-    // wrong accountant can't verify
-    await expect(approvals.verifyRequest(ACC_B(), id, { ok: true })).rejects.toMatchObject({ code: 'FORBIDDEN' });
-    // the site's accountant can
-    const verified = await approvals.verifyRequest(ACC_A(), id, { ok: true });
-    expect(verified.verifiedAt).not.toBeNull();
-    row = await getExpense(id);
+    const row = await getExpense(id);
     expect(row!.verifiedAt).not.toBeNull();
 
     // permanent: nobody edits/voids — not even the Owner
     await expect(records.updateRecord(OWNER(), 'expense', id, { amountPaise: 1 })).rejects.toMatchObject({ code: 'CONFLICT' });
     await expect(records.voidRecord(OWNER(), 'expense', id)).rejects.toMatchObject({ code: 'CONFLICT' });
-    // re-verify → CONFLICT
+    // re-verify (the request-path tick) → CONFLICT, already verified
     await expect(approvals.verifyRequest(ACC_A(), id, { ok: true })).rejects.toMatchObject({ code: 'CONFLICT' });
   });
 
-  it('verify(ok=false) flags the request + expense and notifies SM + Owners (MONEY_FLAGGED)', async () => {
+  // frozen.10: since every EXPENSE_ADD approval (accountant or Owner) auto-verifies in the same
+  // act, an APPROVED-but-unverified request can no longer exist — the request-path verify(ok=false)
+  // flag is unreachable. The surviving flag surface is a DIRECT expense booking (SM/supervisor),
+  // which lands unverified and awaits the accountant's separate tick via RecordsService.verifyExpense.
+  it('verify(ok=false) flags a DIRECT SM expense and notifies SM + Owners (MONEY_FLAGGED)', async () => {
     const id = uuidv7();
-    await approvals.submitRequest(WORKER1(), { id, type: 'EXPENSE_ADD', payload: expensePayload() });
-    await approvals.decideRequest(SM_A(), id, { approve: true });
-    await expect(approvals.verifyRequest(ACC_A(), id, { ok: false })).rejects.toMatchObject({ code: 'VALIDATION_FAILED' }); // note required
-    await approvals.verifyRequest(ACC_A(), id, { ok: false, flagNote: 'no such purchase in my book' });
+    await records.createExpense(SM_A(), { id, siteId: siteA, category: 'MISC', amountPaise: 40_000, businessDate: TODAY });
+    expect((await getExpense(id))!.verifiedAt).toBeNull();
 
-    const req = await getRequest(id);
-    expect(req!.flagged).toBe(true);
-    expect(req!.verifiedAt).toBeNull();
+    await expect(records.verifyExpense(ACC_A(), id, { ok: false })).rejects.toMatchObject({ code: 'VALIDATION_FAILED' }); // note required
+    await records.verifyExpense(ACC_A(), id, { ok: false, flagNote: 'no such purchase in my book' });
+
     const row = await getExpense(id);
     expect(row!.flagged).toBe(true);
+    expect(row!.verifiedAt).toBeNull();
 
     const notes = await dbs.runInTenant(orgId, (tx) =>
       tx.select().from(schema.notifications).where(eq(schema.notifications.type, 'MONEY_FLAGGED')),
@@ -288,9 +288,16 @@ describe.skipIf(!HAS_DB)('Round-2 money engine (live DB, RLS app role)', () => {
   });
 
   // ---- direct entries ----
-  it('SUPERVISOR direct expense is ₹0 — always refused with OVER_DIRECT_LIMIT', async () => {
+  // frozen.10 (SUP-9): the supervisor books DIRECTLY up to his per-entry limit (org default ₹25k);
+  // above it the entry must route as an accountant-decided EXPENSE_ADD request.
+  it('SUPERVISOR direct expense: under-limit books (unverified); over-limit refused with OVER_DIRECT_LIMIT', async () => {
+    const ok = await records.createExpense(SUP1(), {
+      id: uuidv7(), siteId: siteA, category: 'MISC', amountPaise: 5_000, businessDate: TODAY,
+    });
+    expect(ok.amountPaise).toBe(5_000);
+    expect(ok.verifiedAt).toBeNull();
     await expect(
-      records.createExpense(SUP1(), { id: uuidv7(), siteId: siteA, category: 'MISC', amountPaise: 5_000, businessDate: TODAY }),
+      records.createExpense(SUP1(), { id: uuidv7(), siteId: siteA, category: 'MISC', amountPaise: 3_000_000, businessDate: TODAY }),
     ).rejects.toMatchObject({ code: 'VALIDATION_FAILED', fields: { amountPaise: 'OVER_DIRECT_LIMIT' } });
   });
 
@@ -358,21 +365,31 @@ describe.skipIf(!HAS_DB)('Round-2 money engine (live DB, RLS app role)', () => {
   });
 
   // ---- crew-scoped supervisor visibility ----
-  it('a SUPERVISOR sees ONLY his own crew’s requests', async () => {
-    const otherCrewReq = uuidv7();
-    await approvals.submitRequest(WORKER2(), { id: otherCrewReq, type: 'EXPENSE_ADD', payload: expensePayload() });
+  // frozen.10 (SUP-6): the supervisor's inbox = his own requests + his crew's VEHICLE_SWITCH
+  // ONLY. Money (EXPENSE_ADD) never reaches him — even from his own crew — and VEHICLE_SWITCH
+  // stays crew-scoped (another crew's switch request is still invisible to him).
+  it('a SUPERVISOR sees ONLY his own crew’s VEHICLE_SWITCH requests', async () => {
+    // his OWN crew's EXPENSE_ADD (driver, crew A1) — invisible: money never reaches a supervisor
+    const crewExpenseReq = uuidv7();
+    await approvals.submitRequest(DRIVER(), { id: crewExpenseReq, type: 'EXPENSE_ADD', payload: expensePayload() });
+    const sup1SeesExpense = await approvals.listRequests(SUP1());
+    expect(sup1SeesExpense.find((r) => r.id === crewExpenseReq)).toBeUndefined();
 
-    const sup1Sees = await approvals.listRequests(SUP1());
-    expect(sup1Sees.find((r) => r.id === otherCrewReq)).toBeUndefined();
-    const sup2Sees = await approvals.listRequests(SUP2());
-    expect(sup2Sees.find((r) => r.id === otherCrewReq)).toBeDefined();
-    // the driver is IN crew A1 → his requests are visible to SUP1
-    const driverReq = uuidv7();
-    await approvals.submitRequest(DRIVER(), { id: driverReq, type: 'EXPENSE_ADD', payload: expensePayload() });
-    const sup1Again = await approvals.listRequests(SUP1());
-    expect(sup1Again.find((r) => r.id === driverReq)).toBeDefined();
+    // his OWN crew's VEHICLE_SWITCH (driver, crew A1) — visible
+    const crewSwitchReq = uuidv7();
+    await approvals.submitRequest(DRIVER(), { id: crewSwitchReq, type: 'VEHICLE_SWITCH', payload: { vehicleId: vehicleV1 } });
+    const sup1SeesSwitch = await approvals.listRequests(SUP1());
+    expect(sup1SeesSwitch.find((r) => r.id === crewSwitchReq)).toBeDefined();
+
+    // an OUT-OF-CREW VEHICLE_SWITCH (sup2, crew A2) — invisible to SUP1
+    const otherCrewSwitchReq = uuidv7();
+    await approvals.submitRequest(SUP2(), { id: otherCrewSwitchReq, type: 'VEHICLE_SWITCH', payload: { vehicleId: vehicleV1 } });
+    const sup1Final = await approvals.listRequests(SUP1());
+    expect(sup1Final.find((r) => r.id === otherCrewSwitchReq)).toBeUndefined();
+
     // cleanup noise
-    await approvals.decideRequest(ACC_A(), otherCrewReq, { approve: false, comment: 'test cleanup' });
-    await approvals.decideRequest(ACC_A(), driverReq, { approve: false, comment: 'test cleanup' });
+    await approvals.decideRequest(ACC_A(), crewExpenseReq, { approve: false, comment: 'test cleanup' });
+    await approvals.decideRequest(OWNER(), crewSwitchReq, { approve: false, comment: 'test cleanup' });
+    await approvals.decideRequest(OWNER(), otherCrewSwitchReq, { approve: false, comment: 'test cleanup' });
   });
 });

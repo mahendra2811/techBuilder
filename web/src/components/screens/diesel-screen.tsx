@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * SUPERVISOR diesel double-check (CW-5) — /supervisor/diesel.
+ * SUPERVISOR diesel double-check (CW-5, restructured frozen.10 / SUP-3) — /supervisor/diesel.
  *
  * The client's model: the Supervisor buys diesel in bulk into SITE stock
  * (`POST /fuel-stock/purchases`), then issues it per vehicle
@@ -11,11 +11,17 @@
  * side never shows up (see fuel-flags-card.tsx, mounted on the SM/Owner
  * dashboards, and the accountant's own work queue elsewhere).
  *
- * `GET /sites` and `GET /vehicles` are already server-scoped to the
- * Supervisor's own sites/crew, so this screen never filters by site itself —
- * "in stock" is just purchased − issued, summed per site from the two lists.
+ * `GET /sites` and `GET /vehicles` are server-scoped to the Supervisor's ONE
+ * assigned site (frozen.10 SUP-2: single-site rule) — no site picker anywhere
+ * on this screen; the site renders as a fixed label.
+ *
+ * frozen.10 (SUP-3) restructure: two sub-page sections ("Buy stock" / "Issue
+ * to vehicle") behind `useSubPage`, each with its own lazy "recent" history
+ * (`LazyHistorySection` — collapsed by default, fetched only once revealed).
+ * Date fields on both forms are limited to today + yesterday
+ * (`minEntryDate('SUPERVISOR', today)` — see `lib/business-date.ts`).
  */
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Truck } from 'lucide-react';
 import { uuidv7 } from 'uuidv7';
@@ -31,7 +37,7 @@ import type {
   Vehicle,
 } from '@techbuilder/contracts';
 import { ApiClientError, api } from '@/lib/api-client';
-import { formatBusinessDateShort, todayKolkata } from '@/lib/business-date';
+import { formatBusinessDateShort, minEntryDate, todayKolkata } from '@/lib/business-date';
 import { apiErrorMessage } from '@/lib/i18n/messages';
 import { useLocale, useMessages } from '@/lib/i18n/locale-context';
 import { formatPaise, rupeesToPaise } from '@/lib/money';
@@ -41,29 +47,29 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
-import { ShowMore } from '@/components/ui/show-more';
 import { DateField } from '@/components/entry/date-field';
-import { SitePicker } from '@/components/entry/site-picker';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
+import { SubPageHeader, useSubPage } from '@/components/ui/sub-page';
+import { useLazySection, LazyHistorySection } from '@/components/ui/lazy-history';
 
 const UI = {
   en: {
     title: 'Diesel',
     subtitle: 'Buy bulk stock, then issue it per vehicle — this is your side of the diesel match.',
     stockTitle: 'Stock in hand',
-    stockSubtitle: 'Purchased − issued, per site',
-    noSites: 'No sites assigned to you yet',
+    stockSubtitle: 'Purchased − issued, at your site',
+    noSites: 'No site assigned to you yet',
     litresSuffix: 'L',
     buyTitle: 'Buy stock',
-    buySubtitle: 'Record a bulk diesel purchase for a site',
+    buySubtitle: 'Record a bulk diesel purchase for your site',
     issueTitle: 'Issue to vehicle',
-    issueSubtitle: 'Record diesel handed to a vehicle today',
+    issueSubtitle: 'Record diesel handed to a vehicle',
     siteRequired: 'No site available',
     litresLabel: 'Litres',
     amountLabel: 'Amount (₹, optional)',
     noteLabel: 'Note (optional)',
     vehicleLabel: 'Vehicle',
-    noVehicles: 'No vehicles on your sites yet',
+    noVehicles: 'No vehicles on your site yet',
     litresRequired: 'Enter litres greater than 0',
     submit: 'Save',
     saving: 'Saving…',
@@ -77,18 +83,22 @@ const UI = {
     statusConfirmed: 'confirmed',
     statusMismatch: 'mismatch',
     noteDash: '—',
+    goBuy: 'Buy stock',
+    goBuyHint: 'Record diesel arriving at your site',
+    goIssue: 'Issue to vehicle',
+    goIssueHint: 'Hand diesel out to a vehicle',
   },
   hi: {
     title: 'डीज़ल',
     subtitle: 'पहले साइट पर थोक डीज़ल खरीदें, फिर हर गाड़ी को दें — यह मिलान का आपका हिस्सा है।',
     stockTitle: 'स्टॉक में डीज़ल',
-    stockSubtitle: 'खरीदा − दिया, हर साइट के लिए',
+    stockSubtitle: 'खरीदा − दिया, आपकी साइट पर',
     noSites: 'आपको अभी कोई साइट नहीं सौंपी गई',
     litresSuffix: 'लीटर',
-    buyTitle: 'स्टॉक खरीदें',
-    buySubtitle: 'साइट के लिए थोक डीज़ल खरीद दर्ज करें',
-    issueTitle: 'गाड़ी को दें',
-    issueSubtitle: 'आज गाड़ी को दिया गया डीज़ल दर्ज करें',
+    buyTitle: 'स्टॉक ख़रीद',
+    buySubtitle: 'अपनी साइट के लिए थोक डीज़ल खरीद दर्ज करें',
+    issueTitle: 'वाहन को देना',
+    issueSubtitle: 'गाड़ी को दिया गया डीज़ल दर्ज करें',
     siteRequired: 'कोई साइट उपलब्ध नहीं',
     litresLabel: 'लीटर',
     amountLabel: 'राशि (₹, वैकल्पिक)',
@@ -108,6 +118,10 @@ const UI = {
     statusConfirmed: 'मिलान हो गया',
     statusMismatch: 'बेमेल',
     noteDash: '—',
+    goBuy: 'स्टॉक ख़रीद',
+    goBuyHint: 'साइट पर आया डीज़ल दर्ज करें',
+    goIssue: 'वाहन को देना',
+    goIssueHint: 'गाड़ी को डीज़ल दें',
   },
 } as const;
 
@@ -136,14 +150,20 @@ function StatusPill({ tone, children }: { tone: 'success' | 'warning' | 'error';
   );
 }
 
+type DieselSection = 'buy' | 'issue';
+
 export function DieselScreen() {
   const locale = useLocale();
   const ui = UI[locale];
   const qc = useQueryClient();
-  const today = useMemo(() => todayKolkata(), []);
+  const today = todayKolkata();
+  const { current, open, close } = useSubPage<DieselSection>();
 
   const sitesQ = useQuery({ queryKey: ['sites'], queryFn: () => api<Site[]>('GET', '/sites') });
   const vehiclesQ = useQuery({ queryKey: ['vehicles'], queryFn: () => api<Vehicle[]>('GET', '/vehicles') });
+  // Needed unconditionally for the stock-in-hand total (no lighter summary endpoint exists);
+  // the lazy "recent" sections below reuse the SAME query key so opening them never
+  // double-fetches — they just read whatever this eager call has already resolved.
   const purchasesQ = useQuery({
     queryKey: ['fuel-stock', 'purchases'],
     queryFn: () => api<FuelStockPurchase[]>('GET', '/fuel-stock/purchases'),
@@ -154,39 +174,20 @@ export function DieselScreen() {
   });
 
   const sites = sitesQ.data ?? [];
+  const site = sites[0]; // frozen.10 (SUP-2): supervisor has exactly one site — no picker.
   const vehicles = vehiclesQ.data ?? [];
 
-  const stockBySite = useMemo(() => {
-    const map = new Map<UUID, { purchased: number; issued: number }>();
-    for (const p of purchasesQ.data ?? []) {
-      const e = map.get(p.siteId) ?? { purchased: 0, issued: 0 };
-      e.purchased += p.litres;
-      map.set(p.siteId, e);
-    }
-    for (const i of issuancesQ.data ?? []) {
-      const e = map.get(i.siteId) ?? { purchased: 0, issued: 0 };
-      e.issued += i.litres;
-      map.set(i.siteId, e);
-    }
-    return map;
-  }, [purchasesQ.data, issuancesQ.data]);
+  const stock = (() => {
+    let purchased = 0;
+    let issued = 0;
+    for (const p of purchasesQ.data ?? []) purchased += p.litres;
+    for (const i of issuancesQ.data ?? []) issued += i.litres;
+    return purchased - issued;
+  })();
 
   const invalidateFuelStock = () => void qc.invalidateQueries({ queryKey: ['fuel-stock'] });
 
   const regNoOf = (id: UUID) => vehicles.find((v) => v.id === id)?.regNo ?? ui.noteDash;
-  const siteNameOf = (id: UUID) => {
-    const s = sites.find((x) => x.id === id);
-    return s ? `${s.name} (${s.code})` : ui.noteDash;
-  };
-
-  const sortedIssuances = useMemo(
-    () => [...(issuancesQ.data ?? [])].sort((a, b) => b.businessDate.localeCompare(a.businessDate)),
-    [issuancesQ.data],
-  );
-  const sortedPurchases = useMemo(
-    () => [...(purchasesQ.data ?? [])].sort((a, b) => b.businessDate.localeCompare(a.businessDate)),
-    [purchasesQ.data],
-  );
 
   return (
     <div className="grid gap-4" data-testid="diesel-screen">
@@ -209,154 +210,110 @@ export function DieselScreen() {
             <ErrorState error={purchasesQ.error} onRetry={() => void purchasesQ.refetch()} />
           ) : issuancesQ.error ? (
             <ErrorState error={issuancesQ.error} onRetry={() => void issuancesQ.refetch()} />
-          ) : sites.length === 0 ? (
+          ) : !site ? (
             <EmptyState label={ui.noSites} />
           ) : (
-            <ul className="divide-y" data-testid="diesel-stock-list">
-              {sites.map((s) => {
-                const e = stockBySite.get(s.id) ?? { purchased: 0, issued: 0 };
-                const remaining = e.purchased - e.issued;
-                return (
-                  <li
-                    key={s.id}
-                    className="flex items-baseline justify-between gap-3 py-2 first:pt-0 last:pb-0"
-                    data-testid={`diesel-stock-${s.id}`}
-                  >
-                    <span className="min-w-0 truncate text-sm">
-                      {s.name} <span className="text-muted-foreground">({s.code})</span>
-                    </span>
-                    <span className="shrink-0 text-sm font-medium tabular-nums">
-                      {remaining} {ui.litresSuffix}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
+            <div className="flex items-baseline justify-between gap-3" data-testid="diesel-stock-row">
+              <span className="min-w-0 truncate text-sm">
+                {site.name} <span className="text-muted-foreground">({site.code})</span>
+              </span>
+              <span className="shrink-0 text-sm font-medium tabular-nums">
+                {stock} {ui.litresSuffix}
+              </span>
+            </div>
           )}
         </CardContent>
       </Card>
 
-      <BuyStockForm
-        ui={ui}
-        sites={sitesQ.data}
-        sitesLoading={sitesQ.isPending}
-        sitesError={sitesQ.error}
-        onRetrySites={() => void sitesQ.refetch()}
-        today={today}
-        onSaved={invalidateFuelStock}
-      />
+      {current === null && (
+        <>
+          <NavCard
+            title={ui.goBuy}
+            subtitle={ui.goBuyHint}
+            testId="diesel-nav-buy"
+            onClick={() => open('buy')}
+          />
+          <NavCard
+            title={ui.goIssue}
+            subtitle={ui.goIssueHint}
+            testId="diesel-nav-issue"
+            onClick={() => open('issue')}
+          />
+        </>
+      )}
 
-      <IssueToVehicleForm
-        ui={ui}
-        vehicles={vehicles}
-        vehiclesLoading={vehiclesQ.isPending}
-        vehiclesError={vehiclesQ.error}
-        onRetryVehicles={() => void vehiclesQ.refetch()}
-        today={today}
-        onSaved={invalidateFuelStock}
-      />
+      {current === 'buy' && (
+        <div className="grid gap-4" data-testid="diesel-buy-page">
+          <SubPageHeader title={ui.buyTitle} onBack={close} />
+          <BuyStockForm
+            ui={ui}
+            site={site}
+            sitesLoading={sitesQ.isPending}
+            sitesError={sitesQ.error}
+            onRetrySites={() => void sitesQ.refetch()}
+            today={today}
+            onSaved={invalidateFuelStock}
+          />
+          <RecentPurchasesSection ui={ui} />
+        </div>
+      )}
 
-      <Card size="sm" data-testid="diesel-issuances-card">
-        <CardHeader>
-          <CardTitle>{ui.issuancesTitle}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {issuancesQ.isPending ? (
-            <LoadingState />
-          ) : issuancesQ.error ? (
-            <ErrorState error={issuancesQ.error} onRetry={() => void issuancesQ.refetch()} />
-          ) : sortedIssuances.length === 0 ? (
-            <EmptyState label={ui.issuancesEmpty} />
-          ) : (
-            <ShowMore
-              items={sortedIssuances}
-              initial={7}
-              as="ul"
-              className="divide-y"
-              testIdPrefix="diesel-issuances"
-              renderItem={(row) => {
-                const badge = statusBadge(row.status, ui);
-                return (
-                  <li
-                    key={row.id}
-                    className="flex items-baseline justify-between gap-3 py-2 first:pt-0 last:pb-0"
-                    data-testid={`diesel-issuance-${row.id}`}
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">
-                        {formatBusinessDateShort(row.businessDate)} · {regNoOf(row.vehicleId)}
-                      </p>
-                      {row.note && <p className="truncate text-xs text-muted-foreground">{row.note}</p>}
-                    </div>
-                    <div className="flex shrink-0 flex-col items-end gap-1">
-                      <span className="text-sm font-medium tabular-nums">
-                        {row.litres} {ui.litresSuffix}
-                      </span>
-                      <StatusPill tone={badge.tone}>{badge.label}</StatusPill>
-                    </div>
-                  </li>
-                );
-              }}
-            />
-          )}
-        </CardContent>
-      </Card>
-
-      <Card size="sm" data-testid="diesel-purchases-card">
-        <CardHeader>
-          <CardTitle>{ui.purchasesTitle}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {purchasesQ.isPending ? (
-            <LoadingState />
-          ) : purchasesQ.error ? (
-            <ErrorState error={purchasesQ.error} onRetry={() => void purchasesQ.refetch()} />
-          ) : sortedPurchases.length === 0 ? (
-            <EmptyState label={ui.purchasesEmpty} />
-          ) : (
-            <ShowMore
-              items={sortedPurchases}
-              initial={7}
-              as="ul"
-              className="divide-y"
-              testIdPrefix="diesel-purchases"
-              renderItem={(row) => (
-                <li
-                  key={row.id}
-                  className="flex items-baseline justify-between gap-3 py-2 first:pt-0 last:pb-0"
-                  data-testid={`diesel-purchase-${row.id}`}
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">
-                      {formatBusinessDateShort(row.businessDate)} · {siteNameOf(row.siteId)}
-                    </p>
-                    {row.note && <p className="truncate text-xs text-muted-foreground">{row.note}</p>}
-                  </div>
-                  <div className="flex shrink-0 flex-col items-end gap-1">
-                    <span className="text-sm font-medium tabular-nums">
-                      {row.litres} {ui.litresSuffix}
-                    </span>
-                    {row.amountPaise != null && (
-                      <span className="text-xs text-muted-foreground tabular-nums">{formatPaise(row.amountPaise)}</span>
-                    )}
-                  </div>
-                </li>
-              )}
-            />
-          )}
-        </CardContent>
-      </Card>
+      {current === 'issue' && (
+        <div className="grid gap-4" data-testid="diesel-issue-page">
+          <SubPageHeader title={ui.issueTitle} onBack={close} />
+          <IssueToVehicleForm
+            ui={ui}
+            vehicles={vehicles}
+            vehiclesLoading={vehiclesQ.isPending}
+            vehiclesError={vehiclesQ.error}
+            onRetryVehicles={() => void vehiclesQ.refetch()}
+            today={today}
+            onSaved={invalidateFuelStock}
+          />
+          <RecentIssuancesSection ui={ui} regNoOf={regNoOf} />
+        </div>
+      )}
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Buy stock form
+// Landing nav card (list → detail sub-page pattern)
+// ---------------------------------------------------------------------------
+
+function NavCard({
+  title,
+  subtitle,
+  testId,
+  onClick,
+}: {
+  title: string;
+  subtitle: string;
+  testId: string;
+  onClick: () => void;
+}) {
+  return (
+    <Card data-testid={testId}>
+      <CardContent>
+        <button type="button" className="flex w-full items-center gap-3 text-left" onClick={onClick}>
+          <Truck className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium">{title}</p>
+            <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
+          </div>
+        </button>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Buy stock form — site is auto (single-site, SUP-2): fixed label, no picker.
 // ---------------------------------------------------------------------------
 
 function BuyStockForm({
   ui,
-  sites,
+  site,
   sitesLoading,
   sitesError,
   onRetrySites,
@@ -364,7 +321,7 @@ function BuyStockForm({
   onSaved,
 }: {
   ui: UiText;
-  sites: Site[] | undefined;
+  site: Site | undefined;
   sitesLoading: boolean;
   sitesError: unknown;
   onRetrySites: () => void;
@@ -372,7 +329,6 @@ function BuyStockForm({
   onSaved: () => void;
 }) {
   const m = useMessages();
-  const [pickedSiteId, setPickedSiteId] = useState<UUID | ''>('');
   const [litresText, setLitresText] = useState('');
   const [amountText, setAmountText] = useState('');
   const [note, setNote] = useState('');
@@ -380,7 +336,8 @@ function BuyStockForm({
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  const siteId: UUID | '' = pickedSiteId !== '' ? pickedSiteId : (sites?.[0]?.id ?? '');
+  const siteId: UUID | '' = site?.id ?? '';
+  const minDate = minEntryDate('SUPERVISOR', today);
 
   const create = useMutation({
     mutationFn: (input: CreateFuelStockPurchaseInput) => api<FuelStockPurchase>('POST', '/fuel-stock/purchases', input),
@@ -430,14 +387,20 @@ function BuyStockForm({
         <CardDescription>{ui.buySubtitle}</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
-        <SitePicker
-          sites={sites}
-          isLoading={sitesLoading}
-          value={siteId}
-          onChange={setPickedSiteId}
-          error={sitesError}
-          onRetry={onRetrySites}
-        />
+        {sitesLoading ? (
+          <LoadingState />
+        ) : sitesError ? (
+          <ErrorState error={sitesError} onRetry={onRetrySites} />
+        ) : !site ? (
+          <EmptyState label={ui.noSites} />
+        ) : (
+          <p
+            data-testid="diesel-buy-site-fixed"
+            className="flex h-8 items-center rounded-lg border border-input bg-muted/40 px-2.5 text-sm"
+          >
+            {site.name} ({site.code})
+          </p>
+        )}
         <form className="grid gap-4" noValidate onSubmit={onSubmit}>
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-2">
@@ -473,7 +436,7 @@ function BuyStockForm({
             </p>
           )}
 
-          <DateField id="diesel-buy-date" testId="diesel-buy-date" value={date} onChange={setDate} max={today} />
+          <DateField id="diesel-buy-date" testId="diesel-buy-date" value={date} onChange={setDate} min={minDate} max={today} />
 
           <div className="grid gap-2">
             <Label htmlFor="diesel-buy-note">{ui.noteLabel}</Label>
@@ -531,6 +494,7 @@ function IssueToVehicleForm({
 
   const vehicleId: UUID | '' = pickedVehicleId !== '' ? pickedVehicleId : (vehicles[0]?.id ?? '');
   const vehicleLabel = (v: Vehicle) => (v.name ? `${v.regNo} · ${v.name}` : v.regNo);
+  const minDate = minEntryDate('SUPERVISOR', today);
 
   const create = useMutation({
     mutationFn: (input: CreateFuelIssuanceInput) => api<FuelIssuance>('POST', '/fuel-stock/issuances', input),
@@ -626,7 +590,7 @@ function IssueToVehicleForm({
             </p>
           )}
 
-          <DateField id="diesel-issue-date" testId="diesel-issue-date" value={date} onChange={setDate} max={today} />
+          <DateField id="diesel-issue-date" testId="diesel-issue-date" value={date} onChange={setDate} min={minDate} max={today} />
 
           <div className="grid gap-2">
             <Label htmlFor="diesel-issue-note">{ui.noteLabel}</Label>
@@ -648,6 +612,128 @@ function IssueToVehicleForm({
             {create.isPending ? ui.saving : ui.submit}
           </Button>
         </form>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Lazy "recent" history sections (SUP-3) — collapsed by default; the query is
+// gated on `shown` (same queryKey as the eager stock queries above, so opening
+// this after the stock card has already loaded is an instant cache hit, not a
+// second network round trip).
+// ---------------------------------------------------------------------------
+
+function RecentPurchasesSection({ ui }: { ui: UiText }) {
+  const { shown, show } = useLazySection();
+  const q = useQuery({
+    queryKey: ['fuel-stock', 'purchases'],
+    queryFn: () => api<FuelStockPurchase[]>('GET', '/fuel-stock/purchases'),
+    enabled: shown,
+  });
+  const sorted = [...(q.data ?? [])].sort((a, b) => b.businessDate.localeCompare(a.businessDate)).slice(0, 30);
+
+  return (
+    <Card size="sm" data-testid="diesel-purchases-card">
+      <CardContent>
+        <LazyHistorySection
+          title={ui.purchasesTitle}
+          shown={shown}
+          onFirstShow={show}
+          onRefresh={() => void q.refetch()}
+          refreshing={q.isFetching}
+          testId="diesel-purchases-history"
+        >
+          {q.isPending ? (
+            <LoadingState />
+          ) : q.error ? (
+            <ErrorState error={q.error} onRetry={() => void q.refetch()} />
+          ) : sorted.length === 0 ? (
+            <EmptyState label={ui.purchasesEmpty} />
+          ) : (
+            <ul className="divide-y" data-testid="diesel-purchases-list">
+              {sorted.map((row) => (
+                <li
+                  key={row.id}
+                  className="flex items-baseline justify-between gap-3 py-2 first:pt-0 last:pb-0"
+                  data-testid={`diesel-purchase-${row.id}`}
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{formatBusinessDateShort(row.businessDate)}</p>
+                    {row.note && <p className="truncate text-xs text-muted-foreground">{row.note}</p>}
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <span className="text-sm font-medium tabular-nums">
+                      {row.litres} {ui.litresSuffix}
+                    </span>
+                    {row.amountPaise != null && (
+                      <span className="text-xs text-muted-foreground tabular-nums">{formatPaise(row.amountPaise)}</span>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </LazyHistorySection>
+      </CardContent>
+    </Card>
+  );
+}
+
+function RecentIssuancesSection({ ui, regNoOf }: { ui: UiText; regNoOf: (id: UUID) => string }) {
+  const { shown, show } = useLazySection();
+  const q = useQuery({
+    queryKey: ['fuel-stock', 'issuances'],
+    queryFn: () => api<FuelIssuance[]>('GET', '/fuel-stock/issuances'),
+    enabled: shown,
+  });
+  const sorted = [...(q.data ?? [])].sort((a, b) => b.businessDate.localeCompare(a.businessDate)).slice(0, 30);
+
+  return (
+    <Card size="sm" data-testid="diesel-issuances-card">
+      <CardContent>
+        <LazyHistorySection
+          title={ui.issuancesTitle}
+          shown={shown}
+          onFirstShow={show}
+          onRefresh={() => void q.refetch()}
+          refreshing={q.isFetching}
+          testId="diesel-issuances-history"
+        >
+          {q.isPending ? (
+            <LoadingState />
+          ) : q.error ? (
+            <ErrorState error={q.error} onRetry={() => void q.refetch()} />
+          ) : sorted.length === 0 ? (
+            <EmptyState label={ui.issuancesEmpty} />
+          ) : (
+            <ul className="divide-y" data-testid="diesel-issuances-list">
+              {sorted.map((row) => {
+                const badge = statusBadge(row.status, ui);
+                return (
+                  <li
+                    key={row.id}
+                    className="flex items-baseline justify-between gap-3 py-2 first:pt-0 last:pb-0"
+                    data-testid={`diesel-issuance-${row.id}`}
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">
+                        {formatBusinessDateShort(row.businessDate)} · {regNoOf(row.vehicleId)}
+                      </p>
+                      {row.note && <p className="truncate text-xs text-muted-foreground">{row.note}</p>}
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      <span className="text-sm font-medium tabular-nums">
+                        {row.litres} {ui.litresSuffix}
+                      </span>
+                      <StatusPill tone={badge.tone}>{badge.label}</StatusPill>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </LazyHistorySection>
       </CardContent>
     </Card>
   );

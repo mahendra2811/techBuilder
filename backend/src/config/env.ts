@@ -14,6 +14,8 @@ const EnvSchema = z.object({
    * Unset in production = block all cross-origin (fail closed). Unset outside production =
    * default to localhost:3000 (the web dev server) so local dev needs no extra config. */
   CORS_ORIGINS: z.string().optional(),
+  /** Swagger UI at /api/docs. Always on outside production; in production only when '1'. */
+  SWAGGER_ENABLED: z.string().optional(),
   // Cloudflare R2 (presigned uploads)
   R2_ACCOUNT_ID: z.string().optional(),
   R2_ACCESS_KEY_ID: z.string().optional(),

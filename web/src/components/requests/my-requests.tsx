@@ -15,10 +15,18 @@
  * a ✓ "verified by accountant" badge once `verifiedAt` is set, or a 🚩 "flagged"
  * badge if the accountant's tick came back negative (`flagged`), so a requester
  * sees the full lifecycle, not just "Approved".
+ *
+ * Accordion (client feedback): the full-history list in `MyExpenseRequests`
+ * collapses each row to amount/date/status(+tick) and expands on tap to the
+ * rest of the payload — mirrors the single-open accordion pattern in
+ * `components/screens/approvals-screen.tsx`. `MyExpenseRequestsSummary` (the
+ * dashboard card) is untouched — it already only ever shows a one-line digest.
  */
+import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import type { ApprovalRequest, ApprovalStatus, ExpenseCategory } from '@techbuilder/contracts';
+import { ChevronDown, ChevronUp } from 'lucide-react';
+import type { ApprovalRequest, ApprovalStatus, ExpenseCategory, Vendor } from '@techbuilder/contracts';
 import { api, me } from '@/lib/api-client';
 import { formatBusinessDateShort } from '@/lib/business-date';
 import { formatPaise } from '@/lib/money';
@@ -33,6 +41,22 @@ import { RequestStatusBadge } from '@/components/requests/request-bits';
 const TICK_UI = {
   en: { verified: '✓ Verified by accountant', flagged: '🚩 Flagged — under review' },
   hi: { verified: '✓ अकाउंटेंट ने जाँच लिया', flagged: '🚩 जाँच में अटका' },
+} as const;
+
+// Module-local — the frozen EXPENSE_REQUEST_UI catalog predates the accordion's expanded details.
+const ROW_UI = {
+  en: {
+    expand: 'Show details',
+    collapse: 'Hide details',
+    attachmentsLabel: 'Attachments',
+    attachmentsCount: (n: number) => `${n} photo${n === 1 ? '' : 's'}`,
+  },
+  hi: {
+    expand: 'विवरण देखें',
+    collapse: 'विवरण छुपाएं',
+    attachmentsLabel: 'फ़ोटो',
+    attachmentsCount: (n: number) => `${n} फ़ोटो`,
+  },
 } as const;
 
 function useMyExpenseRequests() {
@@ -66,9 +90,30 @@ function dateFrom(payload: Record<string, unknown>): string | undefined {
   return typeof payload.businessDate === 'string' ? formatBusinessDateShort(payload.businessDate) : undefined;
 }
 
+/** payload.vendorId → the shop's name (resolved from the fetched vendor list), falling back to
+ * a shortened id (matches the `${id.slice(0, 8)}…` convention used elsewhere, e.g. ledger-screen). */
+function vendorNameFrom(payload: Record<string, unknown>, vendors: Vendor[]): string | undefined {
+  const vendorId = typeof payload.vendorId === 'string' ? payload.vendorId : undefined;
+  if (!vendorId) return undefined;
+  const vendor = vendors.find((v) => v.id === vendorId);
+  return vendor?.name ?? `${vendorId.slice(0, 8)}…`;
+}
+
+function mediaCountFrom(payload: Record<string, unknown>): number {
+  return Array.isArray(payload.mediaIds) ? payload.mediaIds.length : 0;
+}
+
+function remarkFrom(payload: Record<string, unknown>): string | undefined {
+  return typeof payload.remark === 'string' && payload.remark.trim() ? payload.remark : undefined;
+}
+
 export function MyExpenseRequests() {
   const m = useMessages();
   const { requests, isPending, error, refetch } = useMyExpenseRequests();
+  // Shop names for the expanded "paid via" line — same query the request form itself uses
+  // (workers/drivers are permitted to call GET /vendors); fetched once here, not per-row.
+  const vendorsQ = useQuery({ queryKey: ['vendors'], queryFn: () => api<Vendor[]>('GET', '/vendors') });
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   return (
     <Card data-testid="my-expense-requests">
@@ -85,7 +130,13 @@ export function MyExpenseRequests() {
         ) : (
           <ul className="grid gap-3">
             {requests.map((r) => (
-              <ExpenseRequestRow key={r.id} request={r} />
+              <ExpenseRequestRow
+                key={r.id}
+                request={r}
+                vendors={vendorsQ.data ?? []}
+                isExpanded={expandedId === r.id}
+                onToggle={() => setExpandedId((cur) => (cur === r.id ? null : r.id))}
+              />
             ))}
           </ul>
         )}
@@ -94,43 +145,103 @@ export function MyExpenseRequests() {
   );
 }
 
-function ExpenseRequestRow({ request: r }: { request: ApprovalRequest }) {
+function ExpenseRequestRow({
+  request: r,
+  vendors,
+  isExpanded,
+  onToggle,
+}: {
+  request: ApprovalRequest;
+  vendors: Vendor[];
+  isExpanded: boolean;
+  onToggle: () => void;
+}) {
   const m = useMessages();
   const locale = useLocale();
   const tickUi = TICK_UI[locale];
+  const rowUi = ROW_UI[locale];
   const amount = amountFrom(r.payload);
   const category = categoryFrom(m, r.payload);
   const date = dateFrom(r.payload);
   const showTick = r.status === 'APPROVED' && (!!r.verifiedAt || r.flagged);
 
+  const vendorName = vendorNameFrom(r.payload, vendors);
+  const paidViaCredit = r.payload.paidVia === 'VENDOR_CREDIT';
+  const mediaCount = mediaCountFrom(r.payload);
+  const remark = remarkFrom(r.payload);
+
   return (
-    <li className="grid gap-1.5 rounded-lg border border-input p-3" data-testid={`my-expense-request-${r.id}`}>
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-medium">{m.APPROVAL_TYPE_LABELS[r.type]}</p>
-        <RequestStatusBadge status={r.status} />
-      </div>
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-sm text-muted-foreground">
-        {amount && <span className="font-medium text-foreground">{amount}</span>}
-        {category && <span>{category}</span>}
-        {date && <span>{date}</span>}
-      </div>
-      {showTick && (
-        <span
-          data-testid={`my-expense-request-${r.id}-tick`}
-          className={cn(
-            'inline-block w-fit rounded px-1.5 py-0.5 text-[11px] font-medium',
-            r.flagged
-              ? 'bg-destructive/10 text-destructive'
-              : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
+    <li className="rounded-lg border border-input" data-testid={`my-expense-request-${r.id}`}>
+      <button
+        type="button"
+        className="flex w-full items-start justify-between gap-2 p-3 text-left"
+        data-testid={`my-expense-request-toggle-${r.id}`}
+        aria-expanded={isExpanded}
+        aria-label={isExpanded ? rowUi.collapse : rowUi.expand}
+        onClick={onToggle}
+      >
+        <div className="grid min-w-0 flex-1 gap-1">
+          <div className="flex flex-wrap items-center gap-2">
+            {amount && <span className="text-sm font-medium">{amount}</span>}
+            <RequestStatusBadge status={r.status} />
+            {showTick && (
+              <span
+                data-testid={`my-expense-request-${r.id}-tick`}
+                className={cn(
+                  'inline-block w-fit shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium',
+                  r.flagged
+                    ? 'bg-destructive/10 text-destructive'
+                    : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
+                )}
+              >
+                {r.flagged ? tickUi.flagged : tickUi.verified}
+              </span>
+            )}
+          </div>
+          {date && <p className="text-xs text-muted-foreground">{date}</p>}
+        </div>
+        {isExpanded ? (
+          <ChevronUp className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+        ) : (
+          <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+        )}
+      </button>
+
+      {isExpanded && (
+        <div className="grid gap-2 border-t border-input p-3 pt-2">
+          <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+            {category && (
+              <div className="col-span-2 grid grid-cols-subgrid">
+                <dt className="text-muted-foreground">{m.REQUEST_FIELDS.category}</dt>
+                <dd className="min-w-0 break-words">{category}</dd>
+              </div>
+            )}
+            <div className="col-span-2 grid grid-cols-subgrid">
+              <dt className="text-muted-foreground">{m.VENDOR_UI.paidByLabel}</dt>
+              <dd className="min-w-0 break-words">
+                {paidViaCredit ? `${m.VENDOR_UI.paidByCredit} — ${vendorName}` : m.VENDOR_UI.paidByCash}
+              </dd>
+            </div>
+            {mediaCount > 0 && (
+              <div className="col-span-2 grid grid-cols-subgrid">
+                <dt className="text-muted-foreground">{rowUi.attachmentsLabel}</dt>
+                <dd className="min-w-0 break-words">{rowUi.attachmentsCount(mediaCount)}</dd>
+              </div>
+            )}
+            {remark && (
+              <div className="col-span-2 grid grid-cols-subgrid">
+                <dt className="text-muted-foreground">{m.REQUEST_FIELDS.remark}</dt>
+                <dd className="min-w-0 break-words">{remark}</dd>
+              </div>
+            )}
+          </dl>
+
+          {r.status === 'REJECTED' && r.comment && (
+            <Notice tone="error" testId={`my-expense-request-${r.id}-reason`}>
+              {m.EXPENSE_REQUEST_UI.rejectedReasonPrefix} {r.comment}
+            </Notice>
           )}
-        >
-          {r.flagged ? tickUi.flagged : tickUi.verified}
-        </span>
-      )}
-      {r.status === 'REJECTED' && r.comment && (
-        <Notice tone="error" testId={`my-expense-request-${r.id}-reason`}>
-          {m.EXPENSE_REQUEST_UI.rejectedReasonPrefix} {r.comment}
-        </Notice>
+        </div>
       )}
     </li>
   );

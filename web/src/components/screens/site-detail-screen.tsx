@@ -230,7 +230,7 @@ export function SiteDetailScreen({ siteId }: { siteId: UUID }) {
                     testId={`fuel-row-${f.id}`}
                     primary={regNo(f.vehicleId)}
                     secondary={`${f.litres} ${m.OWNER_UI.litresSuffix}`}
-                    amount={formatPaise(f.amountPaise)}
+                    amount={f.amountPaise != null ? formatPaise(f.amountPaise) : '—'}
                     tertiary={`${formatBusinessDateShort(f.businessDate)} · ${m.OWNER_UI.readingPrefix} ${f.reading}`}
                     chip={<AuditChip row={f} users={users} />}
                   />

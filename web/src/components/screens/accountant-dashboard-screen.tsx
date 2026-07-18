@@ -42,7 +42,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Textarea } from '@/components/ui/textarea';
 import { ShowMore } from '@/components/ui/show-more';
 import { KhataCard } from '@/components/khata-card';
-import { MyMoneyCard } from '@/components/my-money-card';
 import { PayloadSummary } from '@/components/requests/request-bits';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
 import { cn } from '@/lib/utils';
@@ -174,7 +173,6 @@ export function AccountantDashboardScreen() {
       </div>
 
       <KhataCard />
-      <MyMoneyCard />
 
       <Card data-testid="acc-pending-requests">
         <CardHeader>

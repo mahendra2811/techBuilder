@@ -48,11 +48,12 @@ export class VendorsService {
     });
   }
 
-  /** OWNER (any site, or org-wide with siteId omitted) or SITE_MANAGER (own site only). */
+  /** OWNER (any site, or org-wide with siteId omitted) or SITE_MANAGER/ACCOUNTANT (own site only —
+   *  frozen.10: the accountant now also runs vendor accounts on his own site(s), same as an SM). */
   async create(p: Principal, input: CreateVendorInput): Promise<Vendor> {
     return this.dbs.runInTenant(p.orgId, async (tx) => {
       const ctx = await loadScope(tx, p);
-      if (ctx.role !== 'OWNER' && ctx.role !== 'SITE_MANAGER') {
+      if (ctx.role !== 'OWNER' && ctx.role !== 'SITE_MANAGER' && ctx.role !== 'ACCOUNTANT') {
         forbidScope(`Role ${ctx.role} cannot add a vendor`);
       }
 
@@ -60,6 +61,8 @@ export class VendorsService {
       if (ctx.role === 'OWNER') {
         siteId = input.siteId ?? null;
       } else {
+        // SITE_MANAGER / ACCOUNTANT: vendor is attached to HIS site — resolved from his own scope,
+        // never trusting a client-supplied siteId outside it.
         siteId = input.siteId ?? ctx.siteIds[0] ?? null;
         if (!siteId) forbidScope('No site assigned — ask the Owner');
         if (!ctx.siteIds.includes(siteId)) forbidScope('Site out of scope');

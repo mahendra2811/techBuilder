@@ -118,6 +118,21 @@ export const ENDPOINTS = {
   vendorPaymentVerify: { method: 'POST', path: '/vendors/payments/:id/verify' },
   // "money I've taken" — verified SALARY/PERSONAL draws of the caller
   myMoney: { method: 'GET', path: '/me/money' },
+
+  // ---- frozen.10 (5-role client-audit round) ----
+  // supervisor allots a vehicle to one of his crew drivers (direct, log-only + notifications;
+  // SM/Owner may also use it — service-scoped)
+  vehicleAssignDriver: { method: 'POST', path: '/vehicles/:id/assign-driver' },
+  // NOTE (no new paths): GET /cash-transfers now also accepts ?tag=&kind= (sub-page histories);
+  // GET /complaints now also accepts ?limit=&offset= (load-more paging).
+
+  // ---- frozen.9 (Profile page + guardian self-add) ----
+  // one-time guardian/emergency-contact self-add (any authenticated user with a linked person;
+  // service enforces set-once — edits stay SM/Owner-only via peopleUpdate)
+  meGuardianSet: { method: 'PATCH', path: '/me/guardian' },
+  // upper-role view of a subordinate's money-taken history (same MyMoney shape;
+  // OWNER any · SM/ACCOUNTANT site-scoped)
+  userMoney: { method: 'GET', path: '/users/:id/money' },
   // materials catalog (SM/Owner manage; supervisor/driver consume)
   materialsList: { method: 'GET', path: '/materials' },
   materialsCreate: { method: 'POST', path: '/materials' },

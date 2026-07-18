@@ -97,6 +97,11 @@ export const hi: Messages = {
     materials: "सामग्री",
     diesel: "डीज़ल",
     complaints: "शिकायत",
+    // frozen.9: cross-role Profile page.
+    profile: "प्रोफ़ाइल",
+    // frozen.10 (DRV-2): driver-only fuel + damage pages, split off /vehicle.
+    fuelEntry: "डीज़ल",
+    damage: "नुक़सान",
   },
 
   ATTENDANCE_STATUS_LABELS: {

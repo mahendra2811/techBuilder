@@ -35,15 +35,17 @@ export class CashTransfersController {
     return this.cash.create(u, body);
   }
 
-  // ENDPOINTS.cashTransfersList
+  // ENDPOINTS.cashTransfersList (frozen.10: + tag/kind slice filters for the khata sub-pages)
   @Get()
   list(
     @CurrentUser() u: Principal,
     @Query('limit') limit?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
+    @Query('tag') tag?: string,
+    @Query('kind') kind?: string,
   ) {
-    return this.cash.list(u, { limit, from, to });
+    return this.cash.list(u, { limit, from, to, tag, kind });
   }
 
   // ENDPOINTS.cashTransferVerify — Round 2 two-tick (site accountant / Owner; service-narrowed).
@@ -85,5 +87,20 @@ export class LedgerController {
   @Get('rollup')
   rollup(@CurrentUser() u: Principal) {
     return this.cash.rollup(u);
+  }
+}
+
+/** ENDPOINTS.userMoney = GET /users/:id/money (frozen.9) — upper-role view of a subordinate's
+ *  money-taken history. view.all reaches the route; the service narrows to Owner/SM/Accountant
+ *  (site-scoped) or self. */
+@UseGuards(JwtAuthGuard, RbacGuard)
+@Controller('users')
+export class UserMoneyController {
+  constructor(private readonly cash: CashTransfersService) {}
+
+  @RequireAction('view.all')
+  @Get(':id/money')
+  userMoney(@CurrentUser() u: Principal, @Param('id') id: string) {
+    return this.cash.userMoney(u, id);
   }
 }

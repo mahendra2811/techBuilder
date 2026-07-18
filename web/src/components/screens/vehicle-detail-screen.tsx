@@ -309,7 +309,7 @@ export function VehicleDetailScreen({ vehicleId, backHref }: { vehicleId: string
                       <span>
                         {formatBusinessDateShort(f.businessDate)} · {f.litres} {w.fuelLitresSuffix}
                       </span>
-                      <span className="font-medium">{formatPaise(f.amountPaise)}</span>
+                      <span className="font-medium">{f.amountPaise != null ? formatPaise(f.amountPaise) : '—'}</span>
                     </li>
                   ))}
                 </ul>

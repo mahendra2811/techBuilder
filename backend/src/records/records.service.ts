@@ -3,7 +3,7 @@ import { and, desc, eq, gte, isNull, lte, or, sql, type SQL } from 'drizzle-orm'
 import type { PgTable } from 'drizzle-orm/pg-core';
 import * as schema from '@techbuilder/contracts/db/schema';
 import { can, MaterialTypeConfigSchema, type Action } from '@techbuilder/contracts';
-import { loadOrgConfig } from '../common/org-config.util';
+import { loadExpenseLimits, loadOrgConfig } from '../common/org-config.util';
 import type {
   CreateProgressNoteInput,
   CreateExpenseInput,
@@ -139,14 +139,19 @@ export class RecordsService {
       assertSiteInScope(ctx, 'record.enter', input.siteId);
       const cfg = await loadOrgConfig(tx);
       await assertBackdateWindow(tx, ctx.role, input.businessDate, RECORD_CREATE_BACKDATE_LIMIT_DAYS, cfg.completion.cutoffLocalTime);
-      // Round 2: the SUPERVISOR has ZERO direct-expense authority (₹0) — every spend of his is a
-      // money request to the accountant (which has NO cap). The web form auto-converts.
+      // frozen.10 (SUP-9, replaces the Round-2 ₹0 rule): the SUPERVISOR books DIRECTLY up to his
+      // per-entry limit (site override → org default; still lands UNVERIFIED for the accountant's
+      // tick). Above the limit the web form converts it into an EXPENSE_ADD request that the
+      // ACCOUNTANT (or Owner) decides — same OVER_DIRECT_LIMIT field code the form converts on.
       if (ctx.role === 'SUPERVISOR') {
-        throw new ApiException(
-          'VALIDATION_FAILED',
-          'Supervisors record spends as money requests — submit it for the accountant instead',
-          { amountPaise: 'OVER_DIRECT_LIMIT' }, // same field code the form already converts on
-        );
+        const limits = await loadExpenseLimits(tx, input.siteId, cfg);
+        if (input.amountPaise > limits.thDirectLimitPaise) {
+          throw new ApiException(
+            'VALIDATION_FAILED',
+            'Amount is above your direct limit — submit it as a money request for the accountant instead',
+            { amountPaise: 'OVER_DIRECT_LIMIT' },
+          );
+        }
       }
       // SM/Owner: any amount books directly — but it lands UNVERIFIED and waits for the
       // accountant's tick (the v1 ₹1L→Owner ladder is removed).
@@ -157,6 +162,7 @@ export class RecordsService {
           orgId: p.orgId,
           siteId: input.siteId,
           category: input.category,
+          subcategory: input.subcategory ?? null, // frozen.10 (SM-2)
           amountPaise: input.amountPaise,
           vendorId: input.vendorId ?? null,
           billNo: input.billNo ?? null,
@@ -188,7 +194,11 @@ export class RecordsService {
     return this.dbs.runInTenant(p.orgId, async (tx) => {
       const ctx = await loadScope(tx, p);
       await assertVehicleInScope(tx, ctx, 'vehicleLog.enter', input.vehicleId);
-      await assertBackdateWindow(tx, ctx.role, input.businessDate, RECORD_CREATE_BACKDATE_LIMIT_DAYS);
+      // frozen.10 (DRV-4/D1): the DRIVER files fuel the day it happens — today only, no backdating.
+      await assertBackdateWindow(tx, ctx.role, input.businessDate, {
+        ...RECORD_CREATE_BACKDATE_LIMIT_DAYS,
+        DRIVER: 0,
+      });
       // Round 2 (C7): the driver's entry is the RECEIVED side of the diesel double-check —
       // pair it with the supervisor's unmatched issuance of the same vehicle + business day.
       const [issuance] = await tx
@@ -210,7 +220,9 @@ export class RecordsService {
           id: input.id,
           orgId: p.orgId,
           vehicleId: input.vehicleId,
-          amountPaise: input.amountPaise,
+          // frozen.10 (DRV-4): no amount = diesel from site stock / the shop's khata.
+          amountPaise: input.amountPaise ?? null,
+          paidByDriver: input.paidByDriver ?? (input.amountPaise != null && input.amountPaise > 0),
           litres: input.litres,
           reading: input.reading,
           receiptMediaId: input.receiptMediaId ?? null,
@@ -370,6 +382,7 @@ export class RecordsService {
           businessDate: input.businessDate,
           enteredRole: ctx.role,
           finalized: ctx.role !== 'DRIVER',
+          remark: input.remark ?? null, // frozen.10 (SUP-4)
           createdBy: p.userId,
           updatedBy: p.userId,
         })
@@ -792,6 +805,7 @@ function mapExpense(r: typeof schema.expenses.$inferSelect): Expense {
     orgId: r.orgId,
     siteId: r.siteId,
     category: r.category,
+    subcategory: r.subcategory ?? null, // frozen.10 (SM-2)
     amountPaise: r.amountPaise ?? 0,
     vendorId: r.vendorId ?? null,
     billNo: r.billNo ?? null,
@@ -820,7 +834,8 @@ function mapFuelLog(r: typeof schema.fuelLogs.$inferSelect): FuelLog {
     id: r.id,
     orgId: r.orgId,
     vehicleId: r.vehicleId,
-    amountPaise: r.amountPaise ?? 0,
+    amountPaise: r.amountPaise ?? null, // frozen.10 (DRV-4): null = from store/khata
+    paidByDriver: r.paidByDriver,
     litres: r.litres,
     reading: r.reading,
     receiptMediaId: r.receiptMediaId ?? null,
@@ -899,6 +914,7 @@ function mapMaterialTxn(r: typeof schema.materialTxns.$inferSelect): MaterialTxn
     // frozen.8 (Round-2 C11 per-type material config) — plain passthrough, not enforced yet.
     enteredRole: r.enteredRole ?? null,
     finalized: r.finalized,
+    remark: r.remark ?? null, // frozen.10 (SUP-4): "Other" material note
   };
 }
 

@@ -71,6 +71,14 @@ export interface UpdatePersonInput {
   guardianPhone?: string;
 }
 
+/** frozen.9: one-time guardian/emergency-contact self-add (PATCH /me/guardian).
+ *  Allowed only while BOTH fields are still empty on the caller's linked person;
+ *  later edits go through UpdatePersonInput (SM/Owner). */
+export interface SetGuardianInput {
+  guardianName: string;
+  guardianPhone: string;
+}
+
 export interface CreateSiteInput {
   id: UUID;
   name: string;
@@ -160,6 +168,8 @@ export interface CreateExpenseInput {
   id: UUID;
   siteId: UUID;
   category: ExpenseCategory;
+  /** frozen.10 (SM-2): key of an SM-configured subcategory under `category`. */
+  subcategory?: string;
   amountPaise: Paise;
   vendorId?: UUID;
   billNo?: string;
@@ -171,7 +181,10 @@ export interface CreateExpenseInput {
 export interface CreateFuelLogInput {
   id: UUID;
   vehicleId: UUID;
-  amountPaise: Paise;
+  /** frozen.10 (DRV-4): omitted when the diesel came from site stock / the shop's khata (no money paid). */
+  amountPaise?: Paise;
+  /** frozen.10 (DRV-4): true only when the driver actually paid out of pocket. */
+  paidByDriver?: boolean;
   litres: number;
   reading: number;
   receiptMediaId?: UUID;
@@ -207,6 +220,13 @@ export interface CreateMaterialTxnInput {
   counterpartSiteId?: UUID;
   relatedTxnId?: UUID;
   businessDate: BusinessDate;
+  /** frozen.10 (SUP-4): free note — the UI requires it when the "Other" material is picked. */
+  remark?: string;
+}
+
+/** frozen.10 (SUP-7): supervisor allots a vehicle to one of his crew drivers (direct, log-only). */
+export interface AssignDriverInput {
+  driverPersonId: UUID;
 }
 export interface CreateIssueInput {
   id: UUID;

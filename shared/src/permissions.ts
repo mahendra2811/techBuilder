@@ -55,6 +55,9 @@ export const PERMISSIONS: Record<Role, Partial<Record<Action, Scope>>> = {
     'user.create': 'OWN_CREW',
     'record.enter': 'OWN_CREW', // progress, materials (final entries), diesel stock+issuance
     'request.submit': 'OWN_CREW',
+    // frozen.10 (SUP-6): the supervisor decides his crew's VEHICLE_SWITCH requests ONLY —
+    // the service narrows by type; money requests never reach him (accountant's desk).
+    'request.decide': 'OWN_CREW',
     'view.all': 'OWN_CREW',
   },
   DRIVER: {

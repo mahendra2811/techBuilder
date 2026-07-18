@@ -186,7 +186,7 @@ function mapRequest(r: typeof schema.approvalRequests.$inferSelect) {
 }
 function mapExpense(r: typeof schema.expenses.$inferSelect) {
   return {
-    id: r.id, orgId: r.orgId, siteId: r.siteId, category: r.category, amountPaise: r.amountPaise,
+    id: r.id, orgId: r.orgId, siteId: r.siteId, category: r.category, subcategory: r.subcategory ?? null, amountPaise: r.amountPaise,
     vendorId: r.vendorId ?? null, billNo: r.billNo ?? null, receiptMediaId: r.receiptMediaId ?? null,
     paidVia: r.paidVia, remark: r.remark ?? null, businessDate: r.businessDate, enteredBy: r.enteredBy, void: r.void,
     ...auditOf(r), ...verificationOf(r),

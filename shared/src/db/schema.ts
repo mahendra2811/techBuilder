@@ -341,6 +341,8 @@ export const expenses = pgTable(
     ...base(),
     siteId: uuid('site_id').notNull(),
     category: expenseCategoryEnum('category').notNull(),
+    /** frozen.10 (SM-2): SM-configured subcategory key under the fixed category (config-driven; nullable). */
+    subcategory: text('subcategory'),
     amountPaise: money('amount_paise').notNull(),
     vendorId: uuid('vendor_id'),
     billNo: text('bill_no'),
@@ -407,7 +409,10 @@ export const fuelLogs = pgTable(
   {
     ...base(),
     vehicleId: uuid('vehicle_id').notNull(),
-    amountPaise: money('amount_paise').notNull(),
+    /** frozen.10 (DRV-4): nullable — ~95% of fills come from site stock / the vendor's khata, no money changes hands. */
+    amountPaise: money('amount_paise'),
+    /** frozen.10 (DRV-4): true only when the driver actually paid — distinguishes "from store" from a ₹0 typo. */
+    paidByDriver: boolean('paid_by_driver').notNull().default(false),
     litres: doublePrecision('litres').notNull(),
     reading: doublePrecision('reading').notNull(),
     receiptMediaId: uuid('receipt_media_id'),
@@ -520,6 +525,8 @@ export const materialTxns = pgTable(
     enteredRole: roleEnum('entered_role'),
     /** Supervisor entries are FINAL (true); driver picks are inputs (false) until reviewed. */
     finalized: boolean('finalized').notNull().default(true),
+    /** frozen.10 (SUP-4): free note — required by the UI when the "Other" material is picked. */
+    remark: text('remark'),
   },
   (t) => [index('mattxn_site_day_idx').on(t.orgId, t.siteId, t.businessDate)],
 );
@@ -586,6 +593,8 @@ export const complaints = pgTable(
   'complaints',
   {
     ...base(),
+    /** frozen.10 (SUP-1): per-org human number (#101, #102…) — the trackable ID everyone quotes. */
+    complaintNo: integer('complaint_no').notNull(),
     raisedBy: uuid('raised_by').notNull(),
     target: complaintTargetEnum('target').notNull(),
     siteId: uuid('site_id'),
@@ -593,7 +602,10 @@ export const complaints = pgTable(
     mediaIds: uuid('media_ids').array(),
     status: issueStatusEnum('status').notNull().default('OPEN'),
   },
-  (t) => [index('complaints_status_idx').on(t.orgId, t.status)],
+  (t) => [
+    index('complaints_status_idx').on(t.orgId, t.status),
+    uniqueIndex('complaints_org_no_uq').on(t.orgId, t.complaintNo),
+  ],
 );
 
 /** Per-vehicle document vault (SM + Owner ONLY — every read/write role-locked in the service). */

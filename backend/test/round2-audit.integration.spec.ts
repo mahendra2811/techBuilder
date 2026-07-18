@@ -188,19 +188,29 @@ describe.skipIf(!HAS_DB)('Round-2 final audit — visibility matrix (live DB)', 
   });
 
   // ---- accountant queue: role gate + per-site sealing ----
-  it('the queue is accountant/owner-only and per-site sealed', async () => {
-    // seed one unverified SM expense on site A
-    const expId = uuidv7();
-    await records.createExpense(SM_A(), { id: expId, siteId: siteA, category: 'MISC', amountPaise: 70_000, businessDate: TODAY });
+  // NOTE: not a deadlock — AccountantService.queue() fans out 3 concurrent round trips per call
+  // (Promise.all of a scoped tx + fuel.matchFlags + cash.myBalance) and this test drives SIX
+  // sequential queue() calls against live Neon (us-east-1, high RTT from India — see
+  // docs/perf/techBuilder-Performance-Report.md). Isolated it completes in ~43s; back-to-back
+  // with the file's other DB-heavy tests it can cross the global 60s testTimeout. Give it real
+  // headroom rather than racing the default.
+  it(
+    'the queue is accountant/owner-only and per-site sealed',
+    async () => {
+      // seed one unverified SM expense on site A
+      const expId = uuidv7();
+      await records.createExpense(SM_A(), { id: expId, siteId: siteA, category: 'MISC', amountPaise: 70_000, businessDate: TODAY });
 
-    for (const caller of [SUP(), DRIVER(), WORKER(), SM_A()]) {
-      await expect(accountant.queue(caller)).rejects.toMatchObject({ code: 'FORBIDDEN' });
-    }
-    const qa = await accountant.queue(ACC_A());
-    expect(qa.unverifiedExpenses.some((e) => e.id === expId)).toBe(true);
-    const qb = await accountant.queue(ACC_B());
-    expect(qb.unverifiedExpenses.some((e) => e.id === expId)).toBe(false); // other desk, other site
-  });
+      for (const caller of [SUP(), DRIVER(), WORKER(), SM_A()]) {
+        await expect(accountant.queue(caller)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      }
+      const qa = await accountant.queue(ACC_A());
+      expect(qa.unverifiedExpenses.some((e) => e.id === expId)).toBe(true);
+      const qb = await accountant.queue(ACC_B());
+      expect(qb.unverifiedExpenses.some((e) => e.id === expId)).toBe(false); // other desk, other site
+    },
+    120_000,
+  );
 
   // ---- insights: accountant gets NOTHING aggregated ----
   it('the accountant is FORBIDDEN from insights (SM/Owner only)', async () => {

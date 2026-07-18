@@ -296,16 +296,15 @@ describe.skipIf(!HAS_DB)('scope enforcement acceptance (live DB, RLS app role)',
     expect(corrected[0]!.status).toBe('HALF_DAY');
   });
 
-  // ---- Phase 4: record-CREATION backdating windows ----
-  // Round 2: SUPERVISOR direct expense is ₹0 (always converts to a request); SM keeps his window.
-  it('record creation obeys Round-2 rules: SUPERVISOR blocked, SM ≤7d, future rejected', async () => {
+  // ---- Phase 4 → frozen.10: record-CREATION backdating windows ----
+  // frozen.10 (D1/SUP-9/DRV-4): supervisor books ≤ his limit within today+yesterday; SM keeps 7d;
+  // the driver's fuel log is today-ONLY.
+  it('record creation obeys frozen.10 rules: SUPERVISOR ≤1d under-limit, SM ≤7d, driver fuel today-only', async () => {
     const mkExpense = (p: Principal, businessDate: string) =>
       records.createExpense(p, { id: uuidv7(), siteId: siteA, category: 'MISC', amountPaise: 500, businessDate });
 
-    await expect(mkExpense(TH(), addDays(TODAY, -1))).rejects.toMatchObject({
-      code: 'VALIDATION_FAILED',
-      fields: { amountPaise: 'OVER_DIRECT_LIMIT' },
-    });
+    await expect(mkExpense(TH(), addDays(TODAY, -1))).resolves.toBeDefined(); // yesterday, under-limit → books
+    await expect(mkExpense(TH(), addDays(TODAY, -2))).rejects.toMatchObject({ code: 'FORBIDDEN' }); // beyond 1d window
     await expect(mkExpense(SM_A(), addDays(TODAY, -5))).resolves.toBeDefined();
     await expect(mkExpense(SM_A(), addDays(TODAY, -10))).rejects.toMatchObject({ code: 'FORBIDDEN' });
     await expect(mkExpense(SM_A(), addDays(TODAY, 1))).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
@@ -319,8 +318,8 @@ describe.skipIf(!HAS_DB)('scope enforcement acceptance (live DB, RLS app role)',
         reading: 200,
         businessDate,
       });
-    await expect(mkFuel(addDays(TODAY, -1))).resolves.toBeDefined();
-    await expect(mkFuel(addDays(TODAY, -3))).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(mkFuel(TODAY)).resolves.toBeDefined();
+    await expect(mkFuel(addDays(TODAY, -1))).rejects.toMatchObject({ code: 'FORBIDDEN' }); // DRV-4: today only
   });
 
   it('sync CREATE events obey the same record rules (SM window; supervisor expense blocked outright)', async () => {
@@ -334,13 +333,13 @@ describe.skipIf(!HAS_DB)('scope enforcement acceptance (live DB, RLS app role)',
     ]);
     expect(results[0]).toMatchObject({ ok: false, errorCode: 'FORBIDDEN' });
 
-    // Round 2: a supervisor can't smuggle a direct expense through the sync path either.
+    // frozen.10: a supervisor's sync expense obeys the same two-tier rule — over-limit is refused.
     const supResults = await sync.pushBatch(TH(), [
       {
         outboxId: 'ob-p4b',
         entityType: 'expense',
         op: 'CREATE',
-        payload: { id: uuidv7(), siteId: siteA, category: 'MISC', amountPaise: 100, businessDate: TODAY, void: false },
+        payload: { id: uuidv7(), siteId: siteA, category: 'MISC', amountPaise: 3_000_000, businessDate: TODAY, void: false },
       },
     ]);
     expect(supResults[0]).toMatchObject({ ok: false, errorCode: 'VALIDATION_FAILED' });

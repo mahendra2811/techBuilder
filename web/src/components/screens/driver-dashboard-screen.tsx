@@ -1,9 +1,16 @@
 'use client';
 
 /**
- * Driver dashboard (/driver) — the driver's day, WO-7:
+ * Driver dashboard (/driver) — the driver's day (reworked per
+ * docs/role-page-map/driver/driver-role-updates.md DRV-1/DRV-5, frozen.10):
  *   1. Vehicle snapshot card — GET /vehicles/my-snapshot (own assigned vehicle,
- *      current vs. yesterday reading, pending vehicle-switch chip).
+ *      identity + status only — the current/yesterday reading readout is GONE
+ *      per client feedback). Instead: THREE traffic-light day-log status chips
+ *      (yesterday night / today morning / today evening), derived from today's
+ *      + yesterday's GET /records/vehicle-log rows. Tapping a YELLOW
+ *      (actionable) chip scrolls to the matching form below; green/red chips
+ *      are display-only (a missed day-log is informational — no back-fill).
+ *      Also keeps the pending vehicle-switch chip.
  *   2. Morning "start of day" form (compulsory) — shown until a vehicle_log
  *      row exists for today. "Today's log" is sourced from the existing
  *      generic GET /records/vehicle-log?from&to list endpoint (vehicle-scoped
@@ -12,23 +19,25 @@
  *   3. Evening "end of day" form (optional) — shown once the morning log
  *      exists; re-POSTs the SAME record id/businessDate, which the backend
  *      upserts (version bump).
+ * Recent fuel entries moved to the new /driver/fuel page (D3) — this screen no
+ * longer fetches /records/fuel at all.
  * NEVER calls /dashboards/owner or /completeness — those are OWNER + SITE_MANAGER
  * only (backend throws FORBIDDEN for DRIVER).
  */
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Truck } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { uuidv7 } from 'uuidv7';
-import type { CreateVehicleLogInput, FuelLog, UUID, VehicleLog, VehicleSnapshot } from '@techbuilder/contracts';
+import type { CreateVehicleLogInput, UUID, VehicleLog, VehicleSnapshot } from '@techbuilder/contracts';
 import { ApiClientError, api, me } from '@/lib/api-client';
 import { addDays, todayKolkata } from '@/lib/business-date';
 import { uploadPhoto, uploadPhotos } from '@/lib/media-upload';
 import { apiErrorMessage, type Messages } from '@/lib/i18n/messages';
-import { useMessages } from '@/lib/i18n/locale-context';
-import { formatPaise } from '@/lib/money';
+import { useLocale, useMessages } from '@/lib/i18n/locale-context';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -36,18 +45,94 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ContactPanel } from '@/components/contact-panel';
 import { KhataCard } from '@/components/khata-card';
-import { MyMoneyCard } from '@/components/my-money-card';
 import { PhotoField } from '@/components/entry/photo-field';
 import { PhotoMultiField } from '@/components/entry/photo-multi-field';
-import { RecentEntries } from '@/components/entry/recent-entries';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
 import { RequestStatusBadge } from '@/components/requests/request-bits';
 
+/** Module-local bilingual strings (repo convention: messages catalogs are for
+ * NAV_LABELS only — screen copy stays local, see DRIVER_FUEL_UI in fuel-screen.tsx). */
+const DAY_LOG_UI = {
+  en: {
+    yesterdayNight: 'Yesterday night',
+    todayMorning: 'Today morning',
+    todayEvening: 'Today evening',
+    filled: 'Filled',
+    pending: 'Pending',
+    missed: 'Missed',
+  },
+  hi: {
+    yesterdayNight: 'कल रात',
+    todayMorning: 'आज सुबह',
+    todayEvening: 'आज शाम',
+    filled: 'भरा गया',
+    pending: 'बाकी है',
+    missed: 'छूट गया',
+  },
+} as const;
+
+type DayLogTone = 'success' | 'warning' | 'warningMuted' | 'error';
+
+const DAY_LOG_TONE_CLASSES: Record<DayLogTone, string> = {
+  success: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+  warning: 'border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400',
+  warningMuted: 'border-input bg-muted/40 text-muted-foreground',
+  error: 'border-destructive/30 bg-destructive/10 text-destructive',
+};
+
+const DAY_LOG_DOT_CLASSES: Record<DayLogTone, string> = {
+  success: 'bg-emerald-500',
+  warning: 'bg-amber-500',
+  warningMuted: 'bg-amber-500/40',
+  error: 'bg-destructive',
+};
+
+/** One traffic-light day-log chip. Only wired with `onClick` when it's an
+ * actionable (bright) yellow — green/red/muted-yellow chips are display-only. */
+function DayLogChip({
+  label,
+  tone,
+  statusLabel,
+  onClick,
+  testId,
+}: {
+  label: string;
+  tone: DayLogTone;
+  statusLabel: string;
+  onClick?: () => void;
+  testId: string;
+}) {
+  return (
+    <button
+      type="button"
+      data-testid={testId}
+      onClick={onClick}
+      disabled={!onClick}
+      className={cn(
+        'grid gap-0.5 rounded-lg border px-2 py-1.5 text-left transition-colors',
+        DAY_LOG_TONE_CLASSES[tone],
+        onClick ? 'cursor-pointer hover:brightness-95' : 'cursor-default',
+      )}
+    >
+      <span className="flex items-center gap-1.5 text-[11px] font-medium leading-tight">
+        <span className={cn('size-1.5 shrink-0 rounded-full', DAY_LOG_DOT_CLASSES[tone])} aria-hidden="true" />
+        {label}
+      </span>
+      <span className="text-[11px] text-muted-foreground">{statusLabel}</span>
+    </button>
+  );
+}
+
 export function DriverDashboardScreen() {
   const m = useMessages();
+  const locale = useLocale();
+  const dayLogUi = DAY_LOG_UI[locale];
   const queryClient = useQueryClient();
   const today = useMemo(() => todayKolkata(), []);
+  const yesterday = useMemo(() => addDays(today, -1), [today]);
   const [morningPhotoWarning, setMorningPhotoWarning] = useState(false);
+  const morningFormRef = useRef<HTMLDivElement>(null);
+  const eveningFormRef = useRef<HTMLDivElement>(null);
 
   const meQ = useQuery({ queryKey: ['me'], queryFn: me });
   const driverPersonId = meQ.data?.user.personId ?? null;
@@ -70,16 +155,50 @@ export function DriverDashboardScreen() {
   });
   const todayLog = todayLogQ.data?.[0] ?? null;
 
-  const fuelQ = useQuery({
-    queryKey: ['records', 'fuel'],
+  // DRV-1: yesterday's log — needed only to derive the "yesterday night" chip
+  // (whether that day's evening entry was ever closed out).
+  const yesterdayLogQ = useQuery({
+    queryKey: ['records', 'vehicle-log', yesterday],
     queryFn: () => {
-      const qs = new URLSearchParams({ from: addDays(today, -7), to: today });
-      return api<FuelLog[]>('GET', `/records/fuel?${qs}`);
+      const qs = new URLSearchParams({ from: yesterday, to: yesterday });
+      return api<VehicleLog[]>('GET', `/records/vehicle-log?${qs}`);
     },
+    enabled: !!vehicle,
   });
+  const yesterdayLog = yesterdayLogQ.data?.[0] ?? null;
+
+  // Traffic-light day-log chips (DRV-1). While either fetch is loading/errored,
+  // all three render muted so we never flash a wrong red/green.
+  const dayLogsUnready = todayLogQ.isPending || !!todayLogQ.error || yesterdayLogQ.isPending || !!yesterdayLogQ.error;
+  const yesterdayNightTone: DayLogTone = dayLogsUnready
+    ? 'warningMuted'
+    : yesterdayLog?.endReading != null
+      ? 'success'
+      : 'error'; // window has passed — missed entries are informational only, no back-fill
+  const todayMorningTone: DayLogTone = dayLogsUnready ? 'warningMuted' : todayLog ? 'success' : 'warning';
+  const todayEveningTone: DayLogTone = dayLogsUnready
+    ? 'warningMuted'
+    : todayLog?.endReading != null
+      ? 'success'
+      : todayLog
+        ? 'warning' // morning done, evening still open — actionable
+        : 'warningMuted'; // evening can't be actioned before morning exists
+
+  const dayLogStatusLabel = (tone: DayLogTone) =>
+    tone === 'success' ? dayLogUi.filled : tone === 'error' ? dayLogUi.missed : dayLogUi.pending;
+
+  // Two dedicated callbacks (not a ref-taking helper called during render) — each
+  // reads `.current` only when actually invoked, from an event handler.
+  const scrollToMorningForm = useCallback(() => {
+    morningFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
+  const scrollToEveningForm = useCallback(() => {
+    eveningFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
 
   const invalidateDay = () => {
     void queryClient.invalidateQueries({ queryKey: ['records', 'vehicle-log', today] });
+    void queryClient.invalidateQueries({ queryKey: ['records', 'vehicle-log', yesterday] });
     void queryClient.invalidateQueries({ queryKey: ['vehicles', 'my-snapshot'] });
   };
 
@@ -112,19 +231,27 @@ export function DriverDashboardScreen() {
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <p className="text-xs text-muted-foreground">{m.DRIVER_DAY_UI.currentReadingLabel}</p>
-                    <p className="font-medium" data-testid="driver-current-reading">
-                      {snapshotQ.data.currentReading ?? m.DRIVER_DAY_UI.noReadingYet}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">{m.DRIVER_DAY_UI.yesterdayReadingLabel}</p>
-                    <p className="font-medium" data-testid="driver-previous-reading">
-                      {snapshotQ.data.previousReading ?? m.DRIVER_DAY_UI.noReadingYet}
-                    </p>
-                  </div>
+                <div className="grid grid-cols-3 gap-2" data-testid="driver-day-log-chips">
+                  <DayLogChip
+                    label={dayLogUi.yesterdayNight}
+                    tone={yesterdayNightTone}
+                    statusLabel={dayLogStatusLabel(yesterdayNightTone)}
+                    testId="daylog-yesterday-night"
+                  />
+                  <DayLogChip
+                    label={dayLogUi.todayMorning}
+                    tone={todayMorningTone}
+                    statusLabel={dayLogStatusLabel(todayMorningTone)}
+                    onClick={todayMorningTone === 'warning' ? scrollToMorningForm : undefined}
+                    testId="daylog-today-morning"
+                  />
+                  <DayLogChip
+                    label={dayLogUi.todayEvening}
+                    tone={todayEveningTone}
+                    statusLabel={dayLogStatusLabel(todayEveningTone)}
+                    onClick={todayEveningTone === 'warning' ? scrollToEveningForm : undefined}
+                    testId="daylog-today-evening"
+                  />
                 </div>
 
                 {snapshotQ.data.pendingSwitchRequestId && (
@@ -141,8 +268,6 @@ export function DriverDashboardScreen() {
 
       <KhataCard />
 
-      <MyMoneyCard />
-
       {vehicle && driverPersonId && (
         <>
           {todayLogQ.isPending ? (
@@ -158,17 +283,19 @@ export function DriverDashboardScreen() {
               </CardContent>
             </Card>
           ) : !todayLog ? (
-            <MorningForm
-              vehicleId={vehicle.id}
-              driverPersonId={driverPersonId}
-              today={today}
-              onSaved={(photoFailed) => {
-                setMorningPhotoWarning(photoFailed);
-                invalidateDay();
-              }}
-            />
+            <div ref={morningFormRef}>
+              <MorningForm
+                vehicleId={vehicle.id}
+                driverPersonId={driverPersonId}
+                today={today}
+                onSaved={(photoFailed) => {
+                  setMorningPhotoWarning(photoFailed);
+                  invalidateDay();
+                }}
+              />
+            </div>
           ) : (
-            <>
+            <div ref={eveningFormRef} className="grid gap-4">
               {morningPhotoWarning && (
                 <Notice tone="warning" testId="morning-photo-warning-persisted">
                   {m.ENTRY_UI.photoNotUploaded}
@@ -182,23 +309,10 @@ export function DriverDashboardScreen() {
                 todayLog={todayLog}
                 onSaved={invalidateDay}
               />
-            </>
+            </div>
           )}
         </>
       )}
-
-      <RecentEntries
-        testId="recent-fuel"
-        isLoading={fuelQ.isPending}
-        error={fuelQ.error}
-        onRetry={() => void fuelQ.refetch()}
-        rows={fuelQ.data?.map((f) => ({
-          id: f.id,
-          primary: `${f.litres} L`,
-          secondary: formatPaise(f.amountPaise),
-          tertiary: `${f.businessDate} · ${f.litres} L · ${f.reading}`,
-        }))}
-      />
 
       <ContactPanel />
     </div>

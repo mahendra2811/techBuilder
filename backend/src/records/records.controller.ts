@@ -38,6 +38,7 @@ const CreateExpenseSchema = z.object({
   id: z.string().uuid(),
   siteId: z.string().uuid(),
   category: z.enum(EXPENSE_CATEGORIES),
+  subcategory: z.string().max(40).optional(), // frozen.10 (SM-2): config-driven subcategory key
   amountPaise: z.number().int(),
   vendorId: z.string().uuid().optional(),
   billNo: z.string().max(120).optional(),
@@ -50,7 +51,8 @@ const CreateExpenseSchema = z.object({
 const CreateFuelLogSchema = z.object({
   id: z.string().uuid(),
   vehicleId: z.string().uuid(),
-  amountPaise: z.number().int(),
+  amountPaise: z.number().int().positive().optional(), // frozen.10 (DRV-4): omitted = from store/khata
+  paidByDriver: z.boolean().optional(),
   litres: z.number(),
   reading: z.number(),
   receiptMediaId: z.string().uuid().optional(),
@@ -89,6 +91,7 @@ const CreateMaterialTxnSchema = z.object({
   counterpartSiteId: z.string().uuid().optional(),
   relatedTxnId: z.string().uuid().optional(),
   businessDate: BusinessDateSchema,
+  remark: z.string().max(2000).optional(), // frozen.10 (SUP-4): required by the UI for the "Other" material
 });
 
 const CreateIssueSchema = z.object({

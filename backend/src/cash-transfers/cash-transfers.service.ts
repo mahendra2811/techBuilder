@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { and, desc, eq, gte, inArray, isNull, lte, or, sql, type SQL } from 'drizzle-orm';
+import { CASH_TRANSFER_KINDS, MONEY_TAGS } from '@techbuilder/contracts';
 import * as schema from '@techbuilder/contracts/db/schema';
 import type {
   CashTransfer,
@@ -158,10 +159,22 @@ export class CashTransfersService {
    * lifetime-history read. When `from`/`to` (businessDate range) are given — the Reports/export
    * use case — the cap raises to cover a full export window instead of just recent activity.
    */
-  async list(p: Principal, opts: { limit?: string; from?: string; to?: string } = {}): Promise<CashTransfer[]> {
+  async list(
+    p: Principal,
+    opts: { limit?: string; from?: string; to?: string; tag?: string; kind?: string } = {},
+  ): Promise<CashTransfer[]> {
     const hasRange = !!opts.from && !!opts.to;
     const maxCap = hasRange ? 5000 : 200;
     const limit = Math.min(Math.max(parseInt(opts.limit ?? '', 10) || 100, 1), maxCap);
+    // frozen.10 (ACC-2): the khata sub-pages fetch only their own slice.
+    const tagFilter =
+      opts.tag && (MONEY_TAGS as readonly string[]).includes(opts.tag)
+        ? eq(schema.cashTransfers.tag, opts.tag as (typeof MONEY_TAGS)[number])
+        : undefined;
+    const kindFilter =
+      opts.kind && (CASH_TRANSFER_KINDS as readonly string[]).includes(opts.kind)
+        ? eq(schema.cashTransfers.kind, opts.kind as (typeof CASH_TRANSFER_KINDS)[number])
+        : undefined;
     return this.dbs.runInTenant(p.orgId, async (tx) => {
       const ctx = await loadScope(tx, p);
       let filter: SQL | undefined;
@@ -192,7 +205,7 @@ export class CashTransfersService {
       const rows = await tx
         .select()
         .from(schema.cashTransfers)
-        .where(and(isNull(schema.cashTransfers.deletedAt), filter, dateFilter))
+        .where(and(isNull(schema.cashTransfers.deletedAt), filter, dateFilter, tagFilter, kindFilter))
         .orderBy(desc(schema.cashTransfers.createdAt))
         .limit(limit);
       return rows.map(mapCashTransfer);
@@ -215,40 +228,26 @@ export class CashTransfersService {
    * until the tick). Self-scoped: every role sees exactly his own list.
    */
   async myMoney(p: Principal): Promise<MyMoney> {
+    return this.dbs.runInTenant(p.orgId, (tx) => moneyTakenOf(tx, p.userId));
+  }
+
+  /**
+   * frozen.9 — an upper role reads a subordinate's money-taken history (the Profile page's
+   * "money taken" section on the person-detail view). Same shape as myMoney; scope enforced
+   * FRESH from the DB: OWNER any; SM/ACCOUNTANT only when the target sits at one of their
+   * sites (drivers carry no assignedSiteId — their site derives from the vehicle assignment).
+   */
+  async userMoney(p: Principal, targetUserId: string): Promise<MyMoney> {
     return this.dbs.runInTenant(p.orgId, async (tx) => {
-      const rows = await tx
-        .select({
-          id: schema.cashTransfers.id,
-          businessDate: schema.cashTransfers.businessDate,
-          amountPaise: schema.cashTransfers.amountPaise,
-          tag: schema.cashTransfers.tag,
-          fromUserId: schema.cashTransfers.fromUserId,
-          fromName: schema.users.name,
-          note: schema.cashTransfers.note,
-          verifiedAt: schema.cashTransfers.verifiedAt,
-        })
-        .from(schema.cashTransfers)
-        .leftJoin(schema.users, eq(schema.users.id, schema.cashTransfers.fromUserId))
-        .where(
-          and(
-            isNull(schema.cashTransfers.deletedAt),
-            eq(schema.cashTransfers.toUserId, p.userId),
-            sql`${schema.cashTransfers.tag} <> 'WORK'`,
-            sql`${schema.cashTransfers.verifiedAt} IS NOT NULL`,
-          ),
-        )
-        .orderBy(desc(schema.cashTransfers.businessDate));
-      const entries = rows.map((r) => ({
-        id: r.id,
-        businessDate: r.businessDate,
-        amountPaise: r.amountPaise,
-        tag: r.tag,
-        fromUserId: r.fromUserId,
-        fromName: r.fromName ?? '—',
-        note: r.note ?? null,
-        verifiedAt: (r.verifiedAt as Date).toISOString(),
-      }));
-      return { entries, totalPaise: entries.reduce((s, e) => s + e.amountPaise, 0) };
+      const ctx = await loadScope(tx, p);
+      if (ctx.userId !== targetUserId && ctx.role !== 'OWNER') {
+        if (ctx.role !== 'SITE_MANAGER' && ctx.role !== 'ACCOUNTANT') {
+          forbidScope('Only the Owner, a Site Manager or the Accountant may view another person’s money history');
+        }
+        const site = await partySiteIn(tx, targetUserId, ctx.siteIds);
+        if (!site || !ctx.siteIds.includes(site)) forbidScope('This person is outside your site scope');
+      }
+      return moneyTakenOf(tx, targetUserId);
     });
   }
 
@@ -288,14 +287,15 @@ export class CashTransfersService {
   }
 
   /**
-   * Ledger rollup. OWNER = every org user with any ledger/expense activity; SITE_MANAGER = the
-   * users at his site(s) + himself; everyone else FORBIDDEN. Aggregated with SQL group-bys (no N+1).
+   * Ledger rollup ("who holds what" — WORK cash only). OWNER = every org user with any
+   * ledger/expense activity; SITE_MANAGER / ACCOUNTANT (frozen.10 ACC-3) = the users at
+   * his site(s) + himself; everyone else FORBIDDEN. Aggregated with SQL group-bys (no N+1).
    */
   async rollup(p: Principal): Promise<LedgerRollupRow[]> {
     return this.dbs.runInTenant(p.orgId, async (tx) => {
       const ctx = await loadScope(tx, p);
-      if (ctx.role !== 'OWNER' && ctx.role !== 'SITE_MANAGER') {
-        forbidScope('Only the Owner or a Site Manager may view the ledger rollup');
+      if (ctx.role !== 'OWNER' && ctx.role !== 'SITE_MANAGER' && ctx.role !== 'ACCOUNTANT') {
+        forbidScope('Only the Owner, a Site Manager or the Accountant may view the ledger rollup');
       }
 
       const dir = await tx
@@ -369,6 +369,44 @@ async function assertSupervises(tx: Tx, higher: LedgerUser, lower: LedgerUser): 
   // Round 2: SUPERVISOR is no longer a cash node (WORK is blocked upstream; rank 2 also can't
   // out-rank anyone who matters here). DRIVER / WORKER can never be the higher party (rank 1).
   forbidScope('Transfer is not permitted by the chain');
+}
+
+/** A user's VERIFIED SALARY/PERSONAL draws, newest first + running total (the MyMoney shape).
+ *  Shared by the self view (myMoney) and the upper-role view (userMoney). */
+async function moneyTakenOf(tx: Tx, userId: string): Promise<MyMoney> {
+  const rows = await tx
+    .select({
+      id: schema.cashTransfers.id,
+      businessDate: schema.cashTransfers.businessDate,
+      amountPaise: schema.cashTransfers.amountPaise,
+      tag: schema.cashTransfers.tag,
+      fromUserId: schema.cashTransfers.fromUserId,
+      fromName: schema.users.name,
+      note: schema.cashTransfers.note,
+      verifiedAt: schema.cashTransfers.verifiedAt,
+    })
+    .from(schema.cashTransfers)
+    .leftJoin(schema.users, eq(schema.users.id, schema.cashTransfers.fromUserId))
+    .where(
+      and(
+        isNull(schema.cashTransfers.deletedAt),
+        eq(schema.cashTransfers.toUserId, userId),
+        sql`${schema.cashTransfers.tag} <> 'WORK'`,
+        sql`${schema.cashTransfers.verifiedAt} IS NOT NULL`,
+      ),
+    )
+    .orderBy(desc(schema.cashTransfers.businessDate));
+  const entries = rows.map((r) => ({
+    id: r.id,
+    businessDate: r.businessDate,
+    amountPaise: r.amountPaise,
+    tag: r.tag,
+    fromUserId: r.fromUserId,
+    fromName: r.fromName ?? '—',
+    note: r.note ?? null,
+    verifiedAt: (r.verifiedAt as Date).toISOString(),
+  }));
+  return { entries, totalPaise: entries.reduce((s, e) => s + e.amountPaise, 0) };
 }
 
 /** The first of a user's sites (assigned or vehicle-derived) that falls inside `siteIds` —

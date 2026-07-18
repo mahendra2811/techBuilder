@@ -19,7 +19,7 @@
  */
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Paperclip, Video } from 'lucide-react';
+import { ChevronDown, Paperclip, Video } from 'lucide-react';
 import { uuidv7 } from 'uuidv7';
 import type { Complaint, ComplaintTarget, CreateComplaintInput, UUID } from '@techbuilder/contracts';
 import { ApiClientError, api } from '@/lib/api-client';
@@ -61,6 +61,8 @@ const UI = {
     toSm: 'To: Site Manager',
     toOwner: 'To: Owner (private)',
     attachmentsPrefix: 'photo(s)',
+    expandAria: 'View complaint details',
+    collapseAria: 'Hide complaint details',
   },
   hi: {
     title: 'शिकायत बॉक्स',
@@ -84,6 +86,8 @@ const UI = {
     toSm: 'भेजा: साइट मैनेजर को',
     toOwner: 'भेजा: मालिक को (निजी)',
     attachmentsPrefix: 'फ़ोटो',
+    expandAria: 'शिकायत का विवरण देखें',
+    collapseAria: 'शिकायत का विवरण छिपाएं',
   },
 } as const;
 
@@ -98,6 +102,7 @@ export function ComplaintScreen() {
   const locale = useLocale();
   const ui = UI[locale];
   const queryClient = useQueryClient();
+  const [openId, setOpenId] = useState<UUID | null>(null);
 
   const listQ = useQuery({ queryKey: ['complaints'], queryFn: () => api<Complaint[]>('GET', '/complaints') });
 
@@ -131,34 +136,54 @@ export function ComplaintScreen() {
               as="ul"
               className="divide-y"
               testIdPrefix="my-complaints-list"
-              renderItem={(c) => (
-                <li key={c.id} className="grid gap-1 py-2 first:pt-0 last:pb-0" data-testid={`complaint-row-${c.id}`}>
-                  <div className="flex items-baseline justify-between gap-3">
-                    <span className="text-xs text-muted-foreground">
-                      {c.target === 'SITE_MANAGER' ? ui.toSm : ui.toOwner}
-                    </span>
-                    <span
-                      data-testid={`complaint-status-${c.id}`}
-                      className={cn(
-                        'inline-block w-fit shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium',
-                        STATUS_CLASS[c.status],
-                      )}
+              renderItem={(c) => {
+                const isOpen = openId === c.id;
+                return (
+                  <li key={c.id} className="py-2 first:pt-0 last:pb-0" data-testid={`my-complaint-row-${c.id}`}>
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-between gap-2 text-left"
+                      aria-expanded={isOpen}
+                      aria-label={isOpen ? ui.collapseAria : ui.expandAria}
+                      data-testid={`my-complaint-toggle-${c.id}`}
+                      onClick={() => setOpenId((cur) => (cur === c.id ? null : c.id))}
                     >
-                      {c.status === 'OPEN' ? ui.statusOpen : ui.statusResolved}
-                    </span>
-                  </div>
-                  <p className="text-sm whitespace-pre-wrap">{c.text}</p>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-xs text-muted-foreground">{formatKolkataDateTime(c.createdAt)}</span>
-                    {c.mediaIds.length > 0 && (
-                      <span className="inline-flex w-fit items-center gap-1 text-xs text-muted-foreground">
-                        <Paperclip className="size-3" aria-hidden="true" />
-                        {c.mediaIds.length} {ui.attachmentsPrefix}
-                      </span>
+                      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                        <span className="shrink-0 font-mono text-xs text-muted-foreground">#{c.complaintNo}</span>
+                        <span
+                          data-testid={`complaint-status-${c.id}`}
+                          className={cn(
+                            'inline-block w-fit shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium',
+                            STATUS_CLASS[c.status],
+                          )}
+                        >
+                          {c.status === 'OPEN' ? ui.statusOpen : ui.statusResolved}
+                        </span>
+                        <span className="text-xs text-muted-foreground">{formatKolkataDateTime(c.createdAt)}</span>
+                      </div>
+                      <ChevronDown
+                        className={cn('size-4 shrink-0 text-muted-foreground transition-transform', isOpen && 'rotate-180')}
+                        aria-hidden="true"
+                      />
+                    </button>
+
+                    {isOpen && (
+                      <div className="grid gap-1 pt-2" data-testid={`my-complaint-details-${c.id}`}>
+                        <span className="text-xs text-muted-foreground">
+                          {c.target === 'SITE_MANAGER' ? ui.toSm : ui.toOwner}
+                        </span>
+                        <p className="text-sm whitespace-pre-wrap">{c.text}</p>
+                        {c.mediaIds.length > 0 && (
+                          <span className="inline-flex w-fit items-center gap-1 text-xs text-muted-foreground">
+                            <Paperclip className="size-3" aria-hidden="true" />
+                            {c.mediaIds.length} {ui.attachmentsPrefix}
+                          </span>
+                        )}
+                      </div>
                     )}
-                  </div>
-                </li>
-              )}
+                  </li>
+                );
+              }}
             />
           )}
         </CardContent>

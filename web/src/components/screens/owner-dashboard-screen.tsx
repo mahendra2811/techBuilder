@@ -34,7 +34,6 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { CompletenessBadge, CompletenessDots } from '@/components/owner/completeness';
 import { KhataCard } from '@/components/khata-card';
-import { MyMoneyCard } from '@/components/my-money-card';
 import { FuelFlagsCard } from '@/components/fuel-flags-card';
 import { ApprovalsPendingCard } from '@/components/dashboard/approvals-pending-card';
 import { ContactPanel } from '@/components/contact-panel';
@@ -143,11 +142,6 @@ export function OwnerDashboardScreen({ variant = 'OWNER' }: { variant?: 'OWNER' 
       {/* My cash khata (WO-9) — one mount covers BOTH the owner home and the
           SM home (/site-manager renders this screen with variant="SITE_MANAGER"). */}
       <KhataCard />
-
-      {/* CW-7: "money I've taken" — SITE_MANAGER only. The Owner sees everyone's
-          money elsewhere (ledger rollup / accountant queue), so this personal-draws
-          card would be redundant/out of place on the Owner's own dashboard. */}
-      {!isOwner && <MyMoneyCard />}
 
       {/* WO-3 (wave 2): reuses the KPI already fetched by dashQ — zero extra calls. */}
       <ApprovalsPendingCard count={kpis?.pendingApprovals ?? 0} href={`${roleHome(variant)}/approvals`} />

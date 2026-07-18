@@ -213,22 +213,43 @@ function listScopeFilter(tx: Tx, ctx: ScopeContext): SQL | undefined {
       .select({ id: schema.users.id })
       .from(schema.users)
       .where(and(isNull(schema.users.deletedAt), inSet(schema.users.crewId, ctx.crewIds)));
-    return or(own, inArray(schema.approvalRequests.requestedBy, crewUsers)) as SQL;
+    // frozen.10 (SUP-6): money requests never reach the supervisor — his inbox is his own
+    // requests + his crew's VEHICLE_SWITCH ones only.
+    return or(
+      own,
+      and(
+        inArray(schema.approvalRequests.requestedBy, crewUsers),
+        eq(schema.approvalRequests.type, 'VEHICLE_SWITCH'),
+      ),
+    ) as SQL;
   }
   return own; // DRIVER / WORKER see only their own requests
 }
 
 /**
- * Round 2 decider map. OWNER: anything. SUPERVISOR: NOTHING — zero deciding authority (client
- * explicit; vehicle-switch requests now go to the SM). Money (EXPENSE_ADD): the site's
- * ACCOUNTANT is the routine decider; the SM may also approve (site scope) but his approval
- * still awaits the accountant's verify tick. Non-money types: SM only, site scope.
+ * frozen.10 decider map (replaces Round 2's). OWNER: anything (override). SUPERVISOR: his
+ * crew's VEHICLE_SWITCH requests ONLY. ACCOUNTANT: money (EXPENSE_ADD) only, site scope —
+ * THE money desk. SITE_MANAGER: non-money types only, site scope — fully out of the money
+ * loop (client decision 2026-07-18: "every money request goes through the accountant").
  */
 async function assertDecideScope(tx: Tx, ctx: ScopeContext, requestedBy: string, type: string): Promise<void> {
   if (ctx.role === 'OWNER') return;
-  if (ctx.role === 'SUPERVISOR') forbidScope('Supervisors do not decide requests');
+  if (ctx.role === 'SUPERVISOR') {
+    if (type !== 'VEHICLE_SWITCH') forbidScope('Supervisors decide vehicle-change requests only');
+    const [requester] = await tx
+      .select({ crewId: schema.users.crewId })
+      .from(schema.users)
+      .where(and(eq(schema.users.id, requestedBy), isNull(schema.users.deletedAt)));
+    if (!requester?.crewId || !ctx.crewIds.includes(requester.crewId)) {
+      forbidScope('Request is outside your crew');
+    }
+    return;
+  }
   if (ctx.role === 'ACCOUNTANT' && type !== 'EXPENSE_ADD') {
     forbidScope('The accountant decides money requests only');
+  }
+  if (ctx.role === 'SITE_MANAGER' && type === 'EXPENSE_ADD') {
+    forbidScope('Money requests are decided by the accountant (or the Owner)');
   }
   if (ctx.role !== 'SITE_MANAGER' && ctx.role !== 'ACCOUNTANT') {
     forbidScope(`Role ${ctx.role} cannot decide requests`);
@@ -266,6 +287,7 @@ async function requesterSiteIds(tx: Tx, userId: string): Promise<string[]> {
 const ExpenseAddPayloadSchema = z.object({
   siteId: z.string().uuid().optional(), // derived server-side for workers/drivers
   category: z.enum(EXPENSE_CATEGORIES),
+  subcategory: z.string().max(40).optional(), // frozen.10 (SM-2): carried through to the booked expense
   amountPaise: z.number().int().positive(),
   businessDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   paidVia: z.enum(PAYMENT_MODES).default('CASH'),
@@ -351,6 +373,7 @@ async function materializeExpense(
       orgId: req.orgId,
       siteId: pl.siteId,
       category: categoryOverride ?? pl.category,
+      subcategory: pl.subcategory ?? null, // frozen.10 (SM-2)
       amountPaise: pl.amountPaise,
       vendorId: pl.vendorId ?? null,
       billNo: pl.billNo ?? null,

@@ -64,7 +64,7 @@ export function eachDate(from: BusinessDate, to: BusinessDate): BusinessDate[] {
  * OWNER is unlimited (absent). DRIVER gets the conservative TH window.
  */
 const BACKDATE_LIMIT_DAYS: Partial<Record<Role, number>> = {
-  SUPERVISOR: 2,
+  SUPERVISOR: 1, // frozen.10 (D1/SUP-3): today + yesterday only (was 2; org thBackdateDays default is now 1)
   SITE_MANAGER: 7,
   DRIVER: 2,
 };

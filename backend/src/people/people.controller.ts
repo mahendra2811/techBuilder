@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { z } from 'zod';
-import type { CreatePersonInput, UpdatePersonInput } from '@techbuilder/contracts';
+import type { CreatePersonInput, SetGuardianInput, UpdatePersonInput } from '@techbuilder/contracts';
 import { PeopleService } from './people.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RbacGuard, RequireAction } from '../common/rbac.guard';
@@ -56,5 +56,25 @@ export class PeopleController {
     @Body(new ZodBody(UpdatePersonSchema)) body: UpdatePersonInput,
   ) {
     return this.people.update(u, id, body);
+  }
+}
+
+// frozen.9: one-time guardian self-add — both fields required (it's set-once, so a partial
+// set would burn the one chance with half the data).
+const SetGuardianSchema = z.object({
+  guardianName: z.string().min(1).max(120),
+  guardianPhone: z.string().min(1).max(20),
+});
+
+/** ENDPOINTS.meGuardianSet = PATCH /me/guardian. No @RequireAction — any authenticated user
+ *  (worker/driver have no RBAC action that fits); the service enforces linked-person + set-once. */
+@UseGuards(JwtAuthGuard)
+@Controller('me')
+export class MeGuardianController {
+  constructor(private readonly people: PeopleService) {}
+
+  @Patch('guardian')
+  setGuardian(@CurrentUser() u: Principal, @Body(new ZodBody(SetGuardianSchema)) body: SetGuardianInput) {
+    return this.people.setOwnGuardian(u, body);
   }
 }

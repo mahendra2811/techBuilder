@@ -36,6 +36,8 @@ describe('RBAC matrix snapshot (frozen contracts)', () => {
         'user.create': 'OWN_CREW',
         'record.enter': 'OWN_CREW',
         'request.submit': 'OWN_CREW',
+        // frozen.10 (SUP-6): crew VEHICLE_SWITCH requests only — service narrows by type.
+        'request.decide': 'OWN_CREW',
         'view.all': 'OWN_CREW',
       },
       DRIVER: {
@@ -67,7 +69,8 @@ describe('RBAC matrix snapshot (frozen contracts)', () => {
     expect(can('SUPERVISOR', 'wage.view')).toBe(false);
     expect(can('SUPERVISOR', 'report.export')).toBe(false);
     expect(can('SUPERVISOR', 'attendance.mark')).toBe(false);
-    expect(can('SUPERVISOR', 'request.decide')).toBe(false);
+    // frozen.10 (SUP-6): the supervisor decides crew VEHICLE_SWITCH requests (type-narrowed in the service).
+    expect(can('SUPERVISOR', 'request.decide')).toBe(true);
   });
 
   it('scopeFor returns NONE for undefined role/action pairs', () => {

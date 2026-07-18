@@ -98,7 +98,7 @@ export function DriverDetailScreen({ driverUserId, backHref }: { driverUserId: s
                       <span>
                         {formatBusinessDateShort(f.businessDate)} · {f.litres} {w.fuelLitresSuffix}
                       </span>
-                      <span className="font-medium">{formatPaise(f.amountPaise)}</span>
+                      <span className="font-medium">{f.amountPaise != null ? formatPaise(f.amountPaise) : '—'}</span>
                     </li>
                   ))}
                 </ul>

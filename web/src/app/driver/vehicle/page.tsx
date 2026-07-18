@@ -1,14 +1,8 @@
-import { FuelScreen } from '@/components/screens/fuel-screen';
 import { VehicleSwitchScreen } from '@/components/screens/vehicle-switch-screen';
 
 // Auth + role pinning + shell come from the parent driver/layout.tsx.
-// Stacked: WO-11 self-switch + damage report/history, then the existing fuel entry
-// screen (WO-0) — the most discoverable "my vehicle" surface a driver already visits daily.
+// DRV-2 (docs/role-page-map/driver/driver-role-updates.md, frozen.10): this page now
+// hosts vehicle-switch ONLY — fuel moved to /driver/fuel, damage moved to /driver/damage.
 export default function Page() {
-  return (
-    <div className="grid gap-4">
-      <VehicleSwitchScreen />
-      <FuelScreen />
-    </div>
-  );
+  return <VehicleSwitchScreen />;
 }

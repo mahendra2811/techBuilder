@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { and, desc, eq, isNull, sql, type SQL } from 'drizzle-orm';
 import * as schema from '@techbuilder/contracts/db/schema';
-import type { CreatePersonInput, Person, UpdatePersonInput } from '@techbuilder/contracts';
+import type { CreatePersonInput, Person, SetGuardianInput, UpdatePersonInput } from '@techbuilder/contracts';
 import { DbService } from '../db/db.service';
 import { ApiException } from '../common/api-exception';
 import type { Principal } from '../common/current-user.decorator';
@@ -86,6 +86,45 @@ export class PeopleService {
 
       const [row] = await tx.update(schema.people).set(set as never).where(eq(schema.people.id, id)).returning();
       if (!row) throw new ApiException('CONFLICT', 'Could not update person');
+      return mapPerson(row);
+    });
+  }
+
+  /**
+   * frozen.9 — one-time guardian/emergency-contact SELF-add (PATCH /me/guardian).
+   * Any authenticated user with a linked person may fill the guardian fields exactly once,
+   * while BOTH are still empty; afterwards edits stay SM-in-reach/Owner-only via update().
+   */
+  async setOwnGuardian(p: Principal, input: SetGuardianInput): Promise<Person> {
+    return this.dbs.runInTenant(p.orgId, async (tx) => {
+      const [me] = await tx
+        .select({ personId: schema.users.personId })
+        .from(schema.users)
+        .where(and(eq(schema.users.id, p.userId), isNull(schema.users.deletedAt)));
+      if (!me?.personId) throw new ApiException('NOT_FOUND', 'No labour-master person is linked to your login');
+
+      const [person] = await tx
+        .select()
+        .from(schema.people)
+        .where(and(eq(schema.people.id, me.personId), isNull(schema.people.deletedAt)));
+      if (!person) throw new ApiException('NOT_FOUND', 'Person not found');
+
+      if (person.guardianName || person.guardianPhone) {
+        forbidScope('Guardian details are already set — ask your Site Manager to change them');
+      }
+
+      const [row] = await tx
+        .update(schema.people)
+        .set({
+          guardianName: input.guardianName,
+          guardianPhone: input.guardianPhone,
+          updatedBy: p.userId,
+          updatedAt: new Date(),
+          version: sql`${schema.people.version} + 1`,
+        })
+        .where(eq(schema.people.id, me.personId))
+        .returning();
+      if (!row) throw new ApiException('CONFLICT', 'Could not save guardian details');
       return mapPerson(row);
     });
   }

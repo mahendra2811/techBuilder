@@ -431,7 +431,7 @@ export function ReportsScreen() {
       summaries.push({
         label: sectionLabel(m, 'fleet'),
         rowCount: fuel.length + vlogs.length + trips.length,
-        totalPaise: fuel.reduce((sum, f) => sum + f.amountPaise, 0),
+        totalPaise: fuel.reduce((sum, f) => sum + (f.amountPaise ?? 0), 0),
       });
     }
     if (checked.has('issue')) {

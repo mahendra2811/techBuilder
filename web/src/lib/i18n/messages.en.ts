@@ -123,6 +123,11 @@ export const en = {
     materials: "Materials",
     diesel: "Diesel",
     complaints: "Complaints",
+    // frozen.9: cross-role Profile page.
+    profile: "Profile",
+    // frozen.10 (DRV-2): driver-only fuel + damage pages, split off /vehicle.
+    fuelEntry: "Fuel",
+    damage: "Damage",
   },
 
   /** Attendance status labels (enum values come from the frozen contracts). */

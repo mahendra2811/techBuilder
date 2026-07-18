@@ -10,6 +10,12 @@
  *   (c) a small vehicle-type list + "add vehicle type" form — both roles hold
  *       `vehicle.manage`, so both may add a type (keeps the picker self-serve;
  *       no separate admin-only screen needed for this small a form).
+ *
+ * frozen.10 (SM-5) restructure: the landing view is now the vehicle LIST only
+ * (rows still link straight to the existing `/fleet/[id]` detail page,
+ * unchanged); "Add vehicle" and "Vehicle types" (list + its own add-form) moved
+ * behind section cards → in-page sub-pages (`useSubPage` — URL never changes,
+ * `SubPageHeader`'s back button returns to the vehicle list).
  */
 import { useState } from 'react';
 import Link from 'next/link';
@@ -30,22 +36,66 @@ import type {
 } from '@techbuilder/contracts';
 import { ApiClientError, api } from '@/lib/api-client';
 import { apiErrorMessage } from '@/lib/i18n/messages';
-import { useMessages } from '@/lib/i18n/locale-context';
+import { useLocale, useMessages } from '@/lib/i18n/locale-context';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
+import { SubPageHeader, useSubPage } from '@/components/ui/sub-page';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
 
 type FleetRole = 'OWNER' | 'SITE_MANAGER';
+type FleetSection = 'addVehicle' | 'types';
+
+/** Module-local, bilingual — landing section-card hints only (new copy; every
+ *  other string here still comes from `m.FLEET_UI`). */
+const UI = {
+  en: {
+    addVehicleHint: 'Register a new truck, loader, or other vehicle.',
+    typesHint: 'Vehicle categories and how their usage is tracked.',
+  },
+  hi: {
+    addVehicleHint: 'नया ट्रक, लोडर या अन्य वाहन दर्ज करें।',
+    typesHint: 'वाहन श्रेणियां और उनके उपयोग को ट्रैक करने का तरीका।',
+  },
+} as const;
 
 export function FleetScreen({ role }: { role: FleetRole }) {
   const m = useMessages();
+  const locale = useLocale();
+  const ui = UI[locale];
+  const { current: section, open: openSection, close: closeSection } = useSubPage<FleetSection>();
   const vehiclesQ = useQuery({ queryKey: ['vehicles'], queryFn: () => api<Vehicle[]>('GET', '/vehicles') });
   const vehicleTypesQ = useQuery({ queryKey: ['vehicle-types'], queryFn: () => api<VehicleType[]>('GET', '/vehicle-types') });
   const sitesQ = useQuery({ queryKey: ['sites'], queryFn: () => api<Site[]>('GET', '/sites') });
   const peopleQ = useQuery({ queryKey: ['people'], queryFn: () => api<Person[]>('GET', '/people') });
+
+  if (section === 'addVehicle') {
+    return (
+      <div className="grid gap-4" data-testid="fleet-screen">
+        <SubPageHeader title={m.FLEET_UI.addVehicleTitle} onBack={closeSection} />
+        <CreateVehicleForm
+          role={role}
+          vehicleTypes={vehicleTypesQ.data}
+          vehicleTypesLoading={vehicleTypesQ.isPending}
+          sites={sitesQ.data}
+          sitesLoading={sitesQ.isPending}
+          people={peopleQ.data ?? []}
+        />
+      </div>
+    );
+  }
+
+  if (section === 'types') {
+    return (
+      <div className="grid gap-4" data-testid="fleet-screen">
+        <SubPageHeader title={m.FLEET_UI.typesTitle} onBack={closeSection} />
+        <VehicleTypeList vehicleTypesQ={vehicleTypesQ} />
+        <CreateVehicleTypeForm />
+      </div>
+    );
+  }
 
   return (
     <div className="grid gap-4" data-testid="fleet-screen">
@@ -54,6 +104,10 @@ export function FleetScreen({ role }: { role: FleetRole }) {
           <CardTitle>{m.FLEET_UI.title}</CardTitle>
           <CardDescription>{m.FLEET_UI.subtitle}</CardDescription>
         </CardHeader>
+        <CardContent className="grid gap-2">
+          <SectionCard title={m.FLEET_UI.addVehicleTitle} hint={ui.addVehicleHint} testId="fleet-open-add-vehicle" onClick={() => openSection('addVehicle')} />
+          <SectionCard title={m.FLEET_UI.typesTitle} hint={ui.typesHint} testId="fleet-open-types" onClick={() => openSection('types')} />
+        </CardContent>
       </Card>
 
       <VehicleList
@@ -63,20 +117,34 @@ export function FleetScreen({ role }: { role: FleetRole }) {
         sites={sitesQ.data ?? []}
         people={peopleQ.data ?? []}
       />
-
-      <CreateVehicleForm
-        role={role}
-        vehicleTypes={vehicleTypesQ.data}
-        vehicleTypesLoading={vehicleTypesQ.isPending}
-        sites={sitesQ.data}
-        sitesLoading={sitesQ.isPending}
-        people={peopleQ.data ?? []}
-      />
-
-      <VehicleTypeList vehicleTypesQ={vehicleTypesQ} />
-
-      <CreateVehicleTypeForm />
     </div>
+  );
+}
+
+function SectionCard({
+  title,
+  hint,
+  testId,
+  onClick,
+}: {
+  title: string;
+  hint: string;
+  testId: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="flex w-full items-center justify-between gap-3 rounded-lg border border-input px-3.5 py-3 text-left hover:bg-accent"
+      data-testid={testId}
+      onClick={onClick}
+    >
+      <span className="grid min-w-0 gap-0.5">
+        <span className="text-sm font-medium">{title}</span>
+        <span className="truncate text-xs text-muted-foreground">{hint}</span>
+      </span>
+      <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+    </button>
   );
 }
 

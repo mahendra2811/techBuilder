@@ -99,7 +99,7 @@ export class DashboardsService {
           ),
         );
       const spendTodayPaise =
-        expToday.reduce((s, x) => s + x.amt, 0) + fuelToday.reduce((s, x) => s + x.amt, 0);
+        expToday.reduce((s, x) => s + x.amt, 0) + fuelToday.reduce((s, x) => s + (x.amt ?? 0), 0);
 
       const openIssuesRows = await tx
         .select({ id: schema.issues.id })
@@ -164,7 +164,7 @@ export class DashboardsService {
 
       const costRollup: CostRollup = {
         bySite: rollup(exp, (x) => x.siteId, (x) => x.amt).map(([siteId, totalPaise]) => ({ siteId, totalPaise })),
-        byVehicle: rollup(fuel, (x) => x.vehicleId, (x) => x.amt).map(([vehicleId, totalPaise]) => ({ vehicleId, totalPaise })),
+        byVehicle: rollup(fuel, (x) => x.vehicleId, (x) => x.amt ?? 0).map(([vehicleId, totalPaise]) => ({ vehicleId, totalPaise })),
         byCrew: rollup(advByCrew.filter((x) => x.crewId), (x) => x.crewId as string, (x) => x.amt).map(([crewId, totalPaise]) => ({ crewId, totalPaise })),
         byMaterial: rollup(matUse, (x) => x.materialId, (x) => x.qty).map(([materialId, qty]) => ({ materialId, qty, uom: matUse.find((m) => m.materialId === materialId)?.uom ?? 'NOS' })),
       };

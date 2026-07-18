@@ -319,7 +319,9 @@ export function FuelScreen({ role = 'DRIVER' }: { role?: 'DRIVER' | 'SITE_MANAGE
               (f): RecentRow => ({
                 id: f.id,
                 primary: regNoOf(f.vehicleId) || `${f.litres} L`,
-                secondary: formatPaise(f.amountPaise),
+                // frozen.10 (DRV-4): amountPaise is null when diesel came from site
+                // stock/khata (no money paid) — render '—', never feed null to formatPaise.
+                secondary: f.amountPaise != null ? formatPaise(f.amountPaise) : '—',
                 tertiary: `${f.businessDate} · ${f.litres} L · ${f.reading}`,
                 badge: role === 'DRIVER' ? fuelStatusBadge(f.status, driverUi) : undefined,
               }),

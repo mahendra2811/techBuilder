@@ -408,6 +408,7 @@ function mapExpense(r: typeof schema.expenses.$inferSelect): Expense {
     orgId: r.orgId,
     siteId: r.siteId,
     category: r.category,
+    subcategory: r.subcategory ?? null,
     amountPaise: r.amountPaise ?? 0,
     vendorId: r.vendorId ?? null,
     billNo: r.billNo ?? null,

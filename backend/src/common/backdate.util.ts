@@ -25,9 +25,9 @@ export const ATTENDANCE_BACKDATE_LIMIT_DAYS: Partial<Record<Role, number>> = {
  * Closes the gap found in web Phase 3A: creates previously accepted ANY past date.
  */
 export const RECORD_CREATE_BACKDATE_LIMIT_DAYS: Partial<Record<Role, number>> = {
-  SUPERVISOR: 7, // client-plan v1 (T-2): TH direct entry ≤7 days; older routes as an EXPENSE_ADD request
+  SUPERVISOR: 1, // frozen.10 (D1): supervisor entries = today + yesterday only (was 7)
   SITE_MANAGER: 7,
-  DRIVER: 2,
+  DRIVER: 2, // fuel narrows this to 0 (today only) at the call site — frozen.10 DRV-4
 };
 
 /** Reject future dates outright; reject past dates beyond the role's window. */

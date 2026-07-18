@@ -16,6 +16,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
   BadgeCheck,
   Boxes,
+  CircleUserRound,
   FileSpreadsheet,
   Fuel,
   IndianRupee,
@@ -29,6 +30,7 @@ import {
   Truck,
   Users,
   Wallet,
+  Wrench,
 } from 'lucide-react';
 import { roleHome } from './roles';
 import type { Messages } from '@/lib/i18n/messages';
@@ -58,6 +60,11 @@ const NAV_DEFS: NavDef[] = [
   // The old combined Records screen stays routable at /records but is out of the menu.
   // { action: 'record.enter', labelKey: 'records', path: '/records', icon: NotebookPen },
   { action: 'vehicleLog.enter', labelKey: 'vehicleFuel', path: '/vehicle', icon: Fuel },
+  // DRV-2 (docs/role-page-map/driver/driver-role-updates.md, frozen.10): fuel + damage
+  // split off the combined /vehicle page into their own DRIVER-only pages. Explicit
+  // testIds since all three entries here share the `vehicleLog.enter` action.
+  { action: 'vehicleLog.enter', labelKey: 'fuelEntry', path: '/fuel', icon: Fuel, roles: ['DRIVER'], testId: 'nav-fuel-entry' },
+  { action: 'vehicleLog.enter', labelKey: 'damage', path: '/damage', icon: Wrench, roles: ['DRIVER'], testId: 'nav-damage' },
   { action: 'request.submit', labelKey: 'requests', path: '/requests', icon: Send },
   { action: 'request.decide', labelKey: 'approvals', path: '/approvals', icon: BadgeCheck },
   // Round 2: the SUPERVISOR lost request.decide but keeps READ-ONLY visibility of his own
@@ -90,6 +97,9 @@ const NAV_DEFS: NavDef[] = [
   // Complaint box: four roles raise; SM/Owner read the inbox (OWNER-target rows never reach an SM).
   { action: 'view.all', labelKey: 'complaints', path: '/complaints', icon: MessageSquareWarning, roles: ['WORKER', 'DRIVER', 'SUPERVISOR', 'ACCOUNTANT'], testId: 'nav-complaints' },
   { action: 'view.all', labelKey: 'complaints', path: '/complaints', icon: MessageSquareWarning, roles: ['SITE_MANAGER', 'OWNER'], testId: 'nav-complaints-inbox' },
+  // frozen.9: cross-role Profile page — every role holds view.all, so this reaches all 6;
+  // the explicit testId avoids colliding with the Dashboard entry's derived nav-view-all.
+  { action: 'view.all', labelKey: 'profile', path: '/profile', icon: CircleUserRound, testId: 'nav-profile' },
 ];
 
 export interface NavItem {

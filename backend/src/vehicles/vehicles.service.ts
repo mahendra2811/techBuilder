@@ -290,6 +290,143 @@ export class VehiclesService {
   }
 
   /**
+   * frozen.10 (SUP-7/D5) — direct driver↔vehicle allotment: the SUPERVISOR re-allots vehicles
+   * among HIS crew drivers (log-only, auto-approved — no request); SM (own site) and OWNER may
+   * use it too. Notifies the vehicle's SM + the displaced and newly-assigned drivers.
+   */
+  async assignDriver(p: Principal, vehicleId: string, driverPersonId: string): Promise<Vehicle> {
+    return this.dbs.runInTenant(p.orgId, async (tx) => {
+      const ctx = await loadScope(tx, p);
+      if (ctx.role !== 'OWNER' && ctx.role !== 'SITE_MANAGER' && ctx.role !== 'SUPERVISOR') {
+        forbidScope(`Role ${ctx.role} cannot allot vehicles`);
+      }
+
+      const [target] = await tx
+        .select()
+        .from(schema.vehicles)
+        .where(and(eq(schema.vehicles.id, vehicleId), isNull(schema.vehicles.deletedAt)));
+      if (!target) throw new ApiException('NOT_FOUND', 'Vehicle not found');
+      if (target.status === 'MAINTENANCE') {
+        throw new ApiException('VALIDATION_FAILED', 'Vehicle is under maintenance');
+      }
+
+      // Vehicle scope: SM = own site; SUPERVISOR = crew-driver vehicles or his own site's.
+      if (ctx.role === 'SITE_MANAGER' && !(target.assignedSiteId && ctx.siteIds.includes(target.assignedSiteId))) {
+        forbidScope('Vehicle is outside your site scope');
+      }
+      if (
+        ctx.role === 'SUPERVISOR' &&
+        !ctx.vehicleIds.includes(target.id) &&
+        !(target.assignedSiteId && ctx.siteIds.includes(target.assignedSiteId))
+      ) {
+        forbidScope('Vehicle is outside your crew/site scope');
+      }
+
+      // Target driver: an active DRIVER login linked to this person; supervisors only within their crew.
+      const [driverUser] = await tx
+        .select({ id: schema.users.id, crewId: schema.users.crewId, active: schema.users.active })
+        .from(schema.users)
+        .where(
+          and(
+            eq(schema.users.personId, driverPersonId),
+            eq(schema.users.role, 'DRIVER'),
+            isNull(schema.users.deletedAt),
+          ),
+        );
+      if (!driverUser) throw new ApiException('NOT_FOUND', 'No driver login is linked to that person');
+      if (!driverUser.active) {
+        throw new ApiException('VALIDATION_FAILED', 'Driver is inactive', { driverPersonId: 'inactive' });
+      }
+      if (ctx.role === 'SUPERVISOR' && (!driverUser.crewId || !ctx.crewIds.includes(driverUser.crewId))) {
+        forbidScope('That driver is not in your crew');
+      }
+
+      // Who is being displaced off this vehicle (for the notification)?
+      const displacedPersonId = target.assignedDriverPersonId;
+
+      // Clear the incoming driver off any other vehicle(s), then assign him here.
+      const previous = await tx
+        .select({ id: schema.vehicles.id, regNo: schema.vehicles.regNo })
+        .from(schema.vehicles)
+        .where(
+          and(
+            eq(schema.vehicles.assignedDriverPersonId, driverPersonId),
+            isNull(schema.vehicles.deletedAt),
+            ne(schema.vehicles.id, target.id),
+          ),
+        );
+      if (previous.length) {
+        await tx
+          .update(schema.vehicles)
+          .set({
+            assignedDriverPersonId: null,
+            updatedBy: p.userId,
+            updatedAt: new Date(),
+            version: sql`${schema.vehicles.version} + 1`,
+          })
+          .where(inArray(schema.vehicles.id, previous.map((v) => v.id)));
+      }
+
+      const [updated] = await tx
+        .update(schema.vehicles)
+        .set({
+          assignedDriverPersonId: driverPersonId,
+          updatedBy: p.userId,
+          updatedAt: new Date(),
+          version: sql`${schema.vehicles.version} + 1`,
+        })
+        .where(eq(schema.vehicles.id, target.id))
+        .returning();
+      if (!updated) throw new ApiException('CONFLICT', 'Could not allot the vehicle');
+
+      // Best-effort notifications: the vehicle's SM + the new driver + the displaced driver.
+      const targets = new Set<string>();
+      if (updated.assignedSiteId) {
+        const [site] = await tx
+          .select({ sm: schema.sites.siteManagerId })
+          .from(schema.sites)
+          .where(and(eq(schema.sites.id, updated.assignedSiteId), isNull(schema.sites.deletedAt)));
+        if (site?.sm && site.sm !== p.userId) targets.add(site.sm);
+      }
+      targets.add(driverUser.id);
+      if (displacedPersonId && displacedPersonId !== driverPersonId) {
+        const [displaced] = await tx
+          .select({ id: schema.users.id })
+          .from(schema.users)
+          .where(
+            and(
+              eq(schema.users.personId, displacedPersonId),
+              eq(schema.users.role, 'DRIVER'),
+              isNull(schema.users.deletedAt),
+            ),
+          );
+        if (displaced) targets.add(displaced.id);
+      }
+      targets.delete(p.userId);
+      if (targets.size) {
+        await tx.insert(schema.notifications).values(
+          [...targets].map((userId) => ({
+            id: uuidv7(),
+            orgId: p.orgId,
+            userId,
+            type: 'ASSIGNMENT_CHANGED' as const,
+            payload: {
+              allottedBy: p.userId,
+              driverPersonId,
+              vehicleId: updated.id,
+              regNo: updated.regNo,
+              fromVehicleId: previous[0]?.id ?? null,
+              fromRegNo: previous[0]?.regNo ?? null,
+            },
+          })),
+        );
+      }
+
+      return mapVehicle(updated);
+    });
+  }
+
+  /**
    * WO-12 — fleet drill-down: SM (own site) / OWNER (any). Analytics are computed here (no
    * stored rollup table): per-day run = endReading−startReading over the last 90 days of
    * vehicle_logs, averaged over the 7/30/90-day sub-windows; fuel litres/paise over the last
@@ -447,7 +584,8 @@ function mapFuelLog(r: typeof schema.fuelLogs.$inferSelect): FuelLog {
     id: r.id,
     orgId: r.orgId,
     vehicleId: r.vehicleId,
-    amountPaise: r.amountPaise ?? 0,
+    amountPaise: r.amountPaise ?? null,
+    paidByDriver: r.paidByDriver,
     litres: r.litres,
     reading: r.reading,
     receiptMediaId: r.receiptMediaId ?? null,

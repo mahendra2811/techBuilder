@@ -84,6 +84,8 @@ const VERIFY_UI = {
     verifying: 'Saving…',
     verifiedNotice: 'Verified.',
     flaggedNotice: 'Flagged.',
+    // frozen.10 (SUP-6): SM no longer decides money requests — the accountant (or Owner) does.
+    smMoneyNote: 'The accountant (or Owner) decides money requests.',
   },
   hi: {
     verifiedBadge: '✓ सत्यापित',
@@ -97,6 +99,7 @@ const VERIFY_UI = {
     verifying: 'सेव हो रहा है…',
     verifiedNotice: 'सत्यापित हो गया।',
     flaggedNotice: 'फ़्लैग कर दिया।',
+    smMoneyNote: 'पैसों की माँग अकाउंटेंट (या ओनर) तय करेंगे।',
   },
 } as const;
 
@@ -142,10 +145,14 @@ export function ApprovalsScreen({ role }: { role: DecideRole }) {
     if (r.status !== 'PENDING') return false;
     if (!myUserId || r.requestedBy === myUserId) return false;
     if (role === 'OWNER') return true;
-    // Round 2: the SUPERVISOR decides NOTHING — this screen is read-only crew visibility for him.
-    if (role === 'SUPERVISOR') return false;
+    // frozen.10 (SUP-6): the SUPERVISOR decides his crew's VEHICLE_SWITCH requests only — his
+    // GET /requests inbox is already server-filtered to own+crew VEHICLE_SWITCH, this mirrors
+    // the backend's assertDecideScope as defense-in-depth. Never money — that's the accountant's.
+    if (role === 'SUPERVISOR') return r.type === 'VEHICLE_SWITCH' && usersById.has(r.requestedBy);
     // CW-3: the accountant decides money requests only (assertDecideScope server-side).
     if (role === 'ACCOUNTANT' && r.type !== 'EXPENSE_ADD') return false;
+    // frozen.10 (SUP-6): the SM is fully out of the money loop — the accountant (or Owner) decides.
+    if (role === 'SITE_MANAGER' && r.type === 'EXPENSE_ADD') return false;
     return usersById.has(r.requestedBy); // in-scope requester ⟺ present in scoped users list
   };
 
@@ -542,6 +549,12 @@ export function ApprovalsScreen({ role }: { role: DecideRole }) {
                       {isOwn && (
                         <p className="text-xs text-muted-foreground" data-testid={`approval-own-${r.id}`}>
                           {m.APPROVALS_UI.ownRequestNote}
+                        </p>
+                      )}
+
+                      {!isOwn && role === 'SITE_MANAGER' && r.type === 'EXPENSE_ADD' && !decidable && (
+                        <p className="text-xs text-muted-foreground" data-testid={`approval-sm-money-note-${r.id}`}>
+                          {verifyUi.smMoneyNote}
                         </p>
                       )}
 

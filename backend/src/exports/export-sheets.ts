@@ -372,7 +372,7 @@ function sheetFor(key: ExportSectionKey, data: ExportData, L: Labels): SheetSpec
       const rows = data.sites.map((s) => {
         const fuelPaise = data.fuel
           .filter((f) => data.vehicles.find((v) => v.id === f.vehicleId)?.assignedSiteId === s.id)
-          .reduce((sum, f) => sum + f.amountPaise, 0);
+          .reduce((sum, f) => sum + (f.amountPaise ?? 0), 0);
         return {
           site: s.name,
           marked: data.attendance.filter((a) => a.siteId === s.id).length,
@@ -426,7 +426,7 @@ function sheetFor(key: ExportSectionKey, data: ExportData, L: Labels): SheetSpec
     case 'fleet': {
       const regNos = data.vehicles.map((v) => ({ id: v.id, name: v.regNo }));
       const fuel = [...data.fuel].sort((a, b) => a.businessDate.localeCompare(b.businessDate));
-      const totalFuel = fuel.reduce((sum, f) => sum + f.amountPaise, 0);
+      const totalFuel = fuel.reduce((sum, f) => sum + (f.amountPaise ?? 0), 0);
       const vlogs = [...data.vehicleLogs].sort((a, b) => a.businessDate.localeCompare(b.businessDate));
       const trips = [...data.trips].sort((a, b) => a.businessDate.localeCompare(b.businessDate));
       return [
@@ -443,7 +443,8 @@ function sheetFor(key: ExportSectionKey, data: ExportData, L: Labels): SheetSpec
             date: l.businessDate,
             vehicle: nameOf(regNos, l.vehicleId),
             litres: l.litres,
-            amount: rupees(l.amountPaise),
+            // frozen.10: no amount = diesel from site stock/khata — blank cell, not ₹0
+            amount: l.amountPaise != null ? rupees(l.amountPaise) : '',
             reading: l.reading,
           })),
           totals: { date: L.totalsLabel, amount: rupees(totalFuel) },

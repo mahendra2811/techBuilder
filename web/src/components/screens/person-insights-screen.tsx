@@ -16,7 +16,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, ChevronDown, Pencil } from 'lucide-react';
-import type { Person, PersonInsights, UpdatePersonInput, User, UUID } from '@techbuilder/contracts';
+import type { MyMoney, Person, PersonInsights, UpdatePersonInput, User, UUID } from '@techbuilder/contracts';
 import { ApiClientError, api, me } from '@/lib/api-client';
 import { CREATABLE_ROLES } from '@/lib/cascade';
 import { formatBusinessDate, todayKolkata } from '@/lib/business-date';
@@ -32,8 +32,15 @@ import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry
 import { DatePresets, type DateRange } from '@/components/insights/date-presets';
 import { ProgressList, ExpenseList, RequestList } from '@/components/insights/record-lists';
 import { PeriodSummary } from '@/components/insights/period-summary';
+import { MoneyTakenList } from '@/components/my-money-card';
 import { ResetPasswordAction } from '@/components/people/reset-password-action';
 import { cn } from '@/lib/utils';
+
+// frozen.9: "Money taken" section label (the upper-role view of GET /users/:id/money).
+const MONEY_UI = {
+  en: { title: 'Money taken' },
+  hi: { title: 'लिया गया पैसा' },
+} as const;
 
 type PeopleRole = 'OWNER' | 'SITE_MANAGER' | 'SUPERVISOR';
 const DAY_PAGE_SIZE = 7;
@@ -149,6 +156,8 @@ export function PersonInsightsScreen({ userId, backHref, role }: { userId: UUID;
 
       {targetPerson && <PersonIdCardSection person={targetPerson} canEdit={canEditIdCard} />}
 
+      <PersonMoneySection userId={userId} />
+
       {insightsQ.data && (
         <>
           <Card data-testid="person-insights-totals-card">
@@ -229,6 +238,38 @@ export function PersonInsightsScreen({ userId, backHref, role }: { userId: UUID;
         </>
       )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Money taken (frozen.9) — upper-role view of GET /users/:id/money (same
+// MyMoney shape as the self view). A 403 (out of the caller's reach) renders
+// the normal ErrorState rather than crashing.
+// ---------------------------------------------------------------------------
+
+function PersonMoneySection({ userId }: { userId: UUID }) {
+  const locale = useLocale();
+  const ui = MONEY_UI[locale];
+  const moneyQ = useQuery({
+    queryKey: ['user-money', userId],
+    queryFn: () => api<MyMoney>('GET', `/users/${userId}/money`),
+  });
+
+  return (
+    <Card data-testid="person-insights-money">
+      <CardHeader>
+        <CardTitle>{ui.title}</CardTitle>
+      </CardHeader>
+      <CardContent className="grid min-h-16 content-start gap-3">
+        {moneyQ.isPending ? (
+          <LoadingState />
+        ) : moneyQ.error ? (
+          <ErrorState error={moneyQ.error} onRetry={() => void moneyQ.refetch()} />
+        ) : (
+          <MoneyTakenList money={moneyQ.data as MyMoney} locale={locale} />
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

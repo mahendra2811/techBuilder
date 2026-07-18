@@ -11,7 +11,9 @@
  *       so toUserId is ALWAYS the selected junior for both kinds).
  *   (b) Transfers history — GET /cash-transfers (own transfers; SM also his
  *       site's; Owner all), names resolved via the /users list (self via /me),
- *       falling back to a shortened id for out-of-scope users.
+ *       falling back to a shortened id for out-of-scope users. Each row shows
+ *       a <TagBadge> next to the kind chip (renders nothing for a WORK-tagged
+ *       transfer).
  *   (c) Rollup — GET /ledger/rollup, rendered ONLY for OWNER and SITE_MANAGER
  *       (the API 403s for SUPERVISOR/ACCOUNTANT): per-person balance + received/
  *       given/spent + ₹-per-category chips — the "where did my one lakh go" view.
@@ -19,13 +21,17 @@
  * Round 2 (CW-3): the ACCOUNTANT variant — his own khata + give/return-cash form
  * work exactly like the SM's (rank 4, giving down to SITE_MANAGER/SUPERVISOR/
  * DRIVER/WORKER — see backend balance-calc.ts ROLE_RANK + cash-transfers.service.ts),
- * and the rollup stays hidden (server-side 403 for non-SM/Owner). KNOWN GAP: the
- * recipient picker sources GET /users, which for ACCOUNTANT currently returns only
- * himself (no ACCOUNTANT branch in backend UsersService.list — falls to self-only,
- * same gap noted on the approvals screen) — so `candidates` filters to empty and
- * the give/return form shows a "coming soon" note instead (see TransferForm below),
- * even though the backend would otherwise allow the transfer. Not fixed here
- * (backend/**), flagged in the CW-3 handoff.
+ * and the rollup stays hidden (server-side 403 for non-SM/Owner).
+ *
+ * Round 2 tag picker (`CreateCashTransferInput.tag`, OWNER + ACCOUNTANT only): a
+ * WORK / SALARY / PERSONAL toggle rendered above the kind toggle. WORK (the
+ * default, sent as "no tag" — server defaults it) is an ordinary khata advance
+ * counted in the recipient's balance. SALARY/PERSONAL is always a GIVE (the
+ * server rejects RETURN for a non-WORK tag) and only surfaces on the
+ * recipient's Profile / "money I've taken" list once the accountant ticks it
+ * — while a non-WORK tag is selected the kind toggle is hidden and locked to
+ * GIVE. SITE_MANAGER and SUPERVISOR never see the tag picker and never send a
+ * tag at all.
  */
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -36,6 +42,7 @@ import type {
   CashTransferKind,
   CreateCashTransferInput,
   LedgerRollupRow,
+  MoneyTag,
   Role,
   UUID,
   User,
@@ -54,6 +61,7 @@ import { NativeSelect } from '@/components/ui/native-select';
 import { ShowMore } from '@/components/ui/show-more';
 import { DateField } from '@/components/entry/date-field';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
+import { TagBadge } from '@/components/my-money-card';
 
 type LedgerRole = Extract<Role, 'OWNER' | 'SITE_MANAGER' | 'SUPERVISOR' | 'ACCOUNTANT'>;
 
@@ -65,11 +73,25 @@ const TARGET_ROLES: Record<LedgerRole, readonly Role[]> = {
   ACCOUNTANT: ['SITE_MANAGER', 'SUPERVISOR', 'DRIVER', 'WORKER'],
 };
 
-// Module-local — the frozen LEDGER_UI catalog predates the ACCOUNTANT variant's
-// "recipients not reachable yet" note (see the backend-gap comment above).
-const COMING_SOON_UI = {
-  en: 'Giving/returning cash from here is coming soon.',
-  hi: 'यहाँ से पैसे देना/वापस लेना जल्द आ रहा है।',
+// Module-local — the frozen LEDGER_UI catalog predates the Round 2 tag picker
+// (OWNER + ACCOUNTANT only) and the <TagBadge> on history rows.
+const TAG_PICKER_UI = {
+  en: {
+    label: 'What is this for?',
+    tagWork: 'Work cash',
+    tagSalary: 'Salary',
+    tagPersonal: 'Personal',
+    hint: 'Work cash counts in the khata. Salary/Personal shows on the person’s Profile only after the accountant’s tick.',
+    lockedToGive: 'Salary/Personal draws are always a "give" — return doesn’t apply here.',
+  },
+  hi: {
+    label: 'यह किसके लिए है?',
+    tagWork: 'काम का पैसा',
+    tagSalary: 'वेतन',
+    tagPersonal: 'निजी',
+    hint: 'काम का पैसा खाते में गिना जाता है। वेतन/निजी अकाउंटेंट की पुष्टि के बाद ही व्यक्ति की प्रोफ़ाइल पर दिखता है।',
+    lockedToGive: 'वेतन/निजी रक़म हमेशा "देना" ही होती है — यहां वापसी लागू नहीं होती।',
+  },
 } as const;
 
 export function LedgerScreen({ role }: { role: LedgerRole }) {
@@ -104,12 +126,24 @@ function TransferForm({ role, usersQ }: { role: LedgerRole; usersQ: ReturnType<t
 
   const [toUserId, setToUserId] = useState<UUID | ''>('');
   const [kind, setKind] = useState<CashTransferKind>('GIVE');
+  const [tag, setTag] = useState<MoneyTag>('WORK');
   const [amountRupees, setAmountRupees] = useState('');
   const [date, setDate] = useState(today);
   const [note, setNote] = useState('');
   const [personError, setPersonError] = useState<string | null>(null);
   const [amountError, setAmountError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+
+  // Round 2: only OWNER/ACCOUNTANT may tag a transfer SALARY/PERSONAL (server
+  // rules: tag ≠ WORK ⇒ giver must be OWNER/SITE_MANAGER/ACCOUNTANT). SM/SUPERVISOR
+  // stay WORK-only — no picker, no tag sent.
+  const showTagPicker = role === 'OWNER' || role === 'ACCOUNTANT';
+
+  const handleTagChange = (next: MoneyTag) => {
+    setTag(next);
+    // Non-WORK draws are always a GIVE — the server rejects RETURN otherwise.
+    if (next !== 'WORK') setKind('GIVE');
+  };
 
   const candidates = useMemo(
     () => (usersQ.data ?? []).filter((u) => u.active && TARGET_ROLES[role].includes(u.role)),
@@ -129,9 +163,11 @@ function TransferForm({ role, usersQ }: { role: LedgerRole; usersQ: ReturnType<t
       setAmountRupees('');
       setDate(today);
       setNote('');
+      setTag('WORK');
       void queryClient.invalidateQueries({ queryKey: ['me', 'balance'] });
       void queryClient.invalidateQueries({ queryKey: ['cash-transfers'] });
       void queryClient.invalidateQueries({ queryKey: ['ledger-rollup'] });
+      void queryClient.invalidateQueries({ queryKey: ['my-money'] });
     },
     onError: () => setSaved(false),
   });
@@ -153,12 +189,16 @@ function TransferForm({ role, usersQ }: { role: LedgerRole; usersQ: ReturnType<t
       setAmountError(null);
     }
     if (bad || !toUserId) return;
+    // Non-WORK draws are always a GIVE server-side — enforce it here too even
+    // though the toggle is hidden/locked while tag !== 'WORK'.
+    const effectiveKind: CashTransferKind = tag === 'WORK' ? kind : 'GIVE';
     create.mutate({
       id: uuidv7(),
       toUserId,
       amountPaise,
-      kind,
+      kind: effectiveKind,
       businessDate: date,
+      ...(tag !== 'WORK' ? { tag } : {}),
       ...(note.trim() ? { note: note.trim() } : {}),
     });
   };
@@ -177,41 +217,78 @@ function TransferForm({ role, usersQ }: { role: LedgerRole; usersQ: ReturnType<t
           <LoadingState />
         ) : usersQ.error ? (
           <ErrorState error={usersQ.error} onRetry={() => void usersQ.refetch()} />
-        ) : candidates.length === 0 && role === 'ACCOUNTANT' ? (
-          // Backend gap (see file header): GET /users returns only himself for ACCOUNTANT,
-          // so `candidates` always filters to empty — a distinct note, not the generic
-          // "no people" copy, since the reason isn't that no one exists.
-          <EmptyState label={COMING_SOON_UI[locale]} />
         ) : candidates.length === 0 ? (
           <EmptyState label={m.LEDGER_UI.noPeople} />
         ) : (
           <form className="grid gap-4" noValidate onSubmit={onSubmit}>
-            <div className="grid gap-2">
-              <Label>{m.LEDGER_UI.kindLabel}</Label>
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  type="button"
-                  variant={kind === 'GIVE' ? 'default' : 'outline'}
-                  data-testid="transfer-kind-give"
-                  aria-pressed={kind === 'GIVE'}
-                  onClick={() => setKind('GIVE')}
-                >
-                  {m.LEDGER_UI.kindGive}
-                </Button>
-                <Button
-                  type="button"
-                  variant={kind === 'RETURN' ? 'default' : 'outline'}
-                  data-testid="transfer-kind-return"
-                  aria-pressed={kind === 'RETURN'}
-                  onClick={() => setKind('RETURN')}
-                >
-                  {m.LEDGER_UI.kindReturn}
-                </Button>
+            {showTagPicker && (
+              <div className="grid gap-2">
+                <Label>{TAG_PICKER_UI[locale].label}</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  <Button
+                    type="button"
+                    variant={tag === 'WORK' ? 'default' : 'outline'}
+                    data-testid="transfer-tag-WORK"
+                    aria-pressed={tag === 'WORK'}
+                    onClick={() => handleTagChange('WORK')}
+                  >
+                    {TAG_PICKER_UI[locale].tagWork}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={tag === 'SALARY' ? 'default' : 'outline'}
+                    data-testid="transfer-tag-SALARY"
+                    aria-pressed={tag === 'SALARY'}
+                    onClick={() => handleTagChange('SALARY')}
+                  >
+                    {TAG_PICKER_UI[locale].tagSalary}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={tag === 'PERSONAL' ? 'default' : 'outline'}
+                    data-testid="transfer-tag-PERSONAL"
+                    aria-pressed={tag === 'PERSONAL'}
+                    onClick={() => handleTagChange('PERSONAL')}
+                  >
+                    {TAG_PICKER_UI[locale].tagPersonal}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">{TAG_PICKER_UI[locale].hint}</p>
               </div>
-              <p className="text-xs text-muted-foreground">
-                {kind === 'GIVE' ? m.LEDGER_UI.kindGiveHint : m.LEDGER_UI.kindReturnHint}
+            )}
+
+            {tag === 'WORK' ? (
+              <div className="grid gap-2">
+                <Label>{m.LEDGER_UI.kindLabel}</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    type="button"
+                    variant={kind === 'GIVE' ? 'default' : 'outline'}
+                    data-testid="transfer-kind-give"
+                    aria-pressed={kind === 'GIVE'}
+                    onClick={() => setKind('GIVE')}
+                  >
+                    {m.LEDGER_UI.kindGive}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={kind === 'RETURN' ? 'default' : 'outline'}
+                    data-testid="transfer-kind-return"
+                    aria-pressed={kind === 'RETURN'}
+                    onClick={() => setKind('RETURN')}
+                  >
+                    {m.LEDGER_UI.kindReturn}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {kind === 'GIVE' ? m.LEDGER_UI.kindGiveHint : m.LEDGER_UI.kindReturnHint}
+                </p>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground" data-testid="transfer-kind-locked-give">
+                {m.LEDGER_UI.kindGive} — {TAG_PICKER_UI[locale].lockedToGive}
               </p>
-            </div>
+            )}
 
             <div className="grid gap-2">
               <Label htmlFor="transfer-person">{m.LEDGER_UI.personLabel}</Label>
@@ -305,6 +382,7 @@ function KindChip({ kind }: { kind: CashTransferKind }) {
 
 function TransfersHistory({ usersQ }: { usersQ: ReturnType<typeof useQuery<User[]>> }) {
   const m = useMessages();
+  const locale = useLocale();
   const transfersQ = useQuery({
     queryKey: ['cash-transfers'],
     queryFn: () => api<CashTransfer[]>('GET', '/cash-transfers'),
@@ -349,6 +427,7 @@ function TransfersHistory({ usersQ }: { usersQ: ReturnType<typeof useQuery<User[
                 </div>
                 <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                   <KindChip kind={t.kind} />
+                  <TagBadge tag={t.tag} ui={TAG_PICKER_UI[locale]} />
                   <span>{t.businessDate}</span>
                   {t.note && <span className="min-w-0 truncate">· {t.note}</span>}
                 </p>

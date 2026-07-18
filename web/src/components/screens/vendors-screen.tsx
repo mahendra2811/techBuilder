@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 /**
  * Vendor / shop accounts — udhaar khata (WO-10). Site-Manager screen:
@@ -19,15 +19,16 @@
  * Round 2 (CW-3): also mounted for the ACCOUNTANT (nav.ts `vendors` entry —
  * SITE_MANAGER + ACCOUNTANT only, OWNER has no vendors nav item at all, so those
  * are the only two callers). The accountant records payments (backend allows
- * OWNER/SITE_MANAGER/ACCOUNTANT — his own entry is auto-verified, two-tick) but
- * may NOT add a shop (backend `VendorsService.create` is OWNER/SITE_MANAGER only)
- * — a hard role assumption, so the "add shop" form is hidden for him (role read
- * via GET /me) rather than left to fail with a 403 on every submit.
+ * OWNER/SITE_MANAGER/ACCOUNTANT — his own entry is auto-verified, two-tick).
+ *
+ * ACC-1 (frozen.10): the accountant CAN now add a shop too — `VendorsService.create`
+ * gained an ACCOUNTANT branch (site-attached, mirroring the SM rule), so the
+ * "add shop" form below is unconditional for both roles (no more role-gating).
  */
-import { useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft } from 'lucide-react';
-import { uuidv7 } from 'uuidv7';
+import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft } from "lucide-react";
+import { uuidv7 } from "uuidv7";
 import type {
   CreateVendorInput,
   CreateVendorPaymentInput,
@@ -35,55 +36,56 @@ import type {
   Vendor,
   VendorLedger,
   VendorPaymentKind,
-} from '@techbuilder/contracts';
-import { ApiClientError, api, me } from '@/lib/api-client';
-import { todayKolkata } from '@/lib/business-date';
-import { apiErrorMessage } from '@/lib/i18n/messages';
-import { useLocale, useMessages } from '@/lib/i18n/locale-context';
-import { formatPaise, formatSignedPaise, rupeesToPaise } from '@/lib/money';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
-import { ShowMore } from '@/components/ui/show-more';
-import { DateField } from '@/components/entry/date-field';
-import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
+} from "@techbuilder/contracts";
+import { ApiClientError, api } from "@/lib/api-client";
+import { todayKolkata } from "@/lib/business-date";
+import { apiErrorMessage } from "@/lib/i18n/messages";
+import { useLocale, useMessages } from "@/lib/i18n/locale-context";
+import { formatPaise, formatSignedPaise, rupeesToPaise } from "@/lib/money";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { ShowMore } from "@/components/ui/show-more";
+import { DateField } from "@/components/entry/date-field";
+import { LoadingState, EmptyState, ErrorState, Notice } from "@/components/entry/states";
 
 // Round 2 (CW-6): vendor money-IN — a payment can now go either direction. The frozen VENDOR_UI
 // catalog only has PAYMENT-shaped copy (amountLabel = "Amount paid"), so the direction toggle +
 // the direction-aware amount label live here, module-local, per the i18n convention.
 const UI = {
   en: {
-    directionLabel: 'Direction',
-    directionPayment: 'We paid the shop',
-    directionReceipt: 'Shop gave us money',
-    directionPaymentHint: 'देना — settles what we owe the shop.',
-    directionReceiptHint: 'लेना — the shop handed the site cash (increases what we owe).',
-    amountLabelPayment: 'Amount paid (₹)',
-    amountLabelReceipt: 'Amount received (₹)',
-    receivedLabel: 'Vendor money-IN',
-    monthReceived: 'Received',
+    directionLabel: "Direction",
+    directionPayment: "We paid the shop",
+    directionReceipt: "Shop gave us money",
+    directionPaymentHint: "settles what we owe the shop.",
+    directionReceiptHint: "the shop handed the site cash (increases what we owe).",
+    amountLabelPayment: "Amount paid (₹)",
+    amountLabelReceipt: "Amount received (₹)",
+    receivedLabel: "Vendor money-IN",
+    monthReceived: "Received",
   },
   hi: {
-    directionLabel: 'दिशा',
-    directionPayment: 'हमने दुकान को दिया',
-    directionReceipt: 'दुकान ने हमें दिया',
-    directionPaymentHint: 'देना — दुकान का बकाया चुकाना।',
-    directionReceiptHint: 'लेना — दुकान ने साइट को पैसे दिए (हमारा बकाया बढ़ता है)।',
-    amountLabelPayment: 'दी गई राशि (₹)',
-    amountLabelReceipt: 'मिली राशि (₹)',
-    receivedLabel: 'दुकान से मिला पैसा (मनी-इन)',
-    monthReceived: 'मिला',
+    directionLabel: "दिशा",
+    directionPayment: "हमने दुकान को दिया",
+    directionReceipt: "दुकान ने हमें दिया",
+    directionPaymentHint: "देना — दुकान का बकाया चुकाना।",
+    directionReceiptHint: "लेना — दुकान ने साइट को पैसे दिए (हमारा बकाया बढ़ता है)।",
+    amountLabelPayment: "दी गई राशि (₹)",
+    amountLabelReceipt: "मिली राशि (₹)",
+    receivedLabel: "दुकान से मिला पैसा (मनी-इन)",
+    monthReceived: "मिला",
   },
 } as const;
 
 export function VendorsScreen() {
   const m = useMessages();
-  const meQ = useQuery({ queryKey: ['me'], queryFn: me });
-  const vendorsQ = useQuery({ queryKey: ['vendors'], queryFn: () => api<Vendor[]>('GET', '/vendors') });
+  const vendorsQ = useQuery({
+    queryKey: ["vendors"],
+    queryFn: () => api<Vendor[]>("GET", "/vendors"),
+  });
   const [selectedId, setSelectedId] = useState<UUID | null>(null);
-  const canCreateVendor = meQ.data?.user.role !== 'ACCOUNTANT';
 
   return (
     <div className="grid gap-4" data-testid="vendors-screen">
@@ -103,7 +105,7 @@ export function VendorsScreen() {
       ) : (
         <>
           <VendorList vendorsQ={vendorsQ} onSelect={setSelectedId} />
-          {canCreateVendor && <CreateVendorForm />}
+          <CreateVendorForm />
         </>
       )}
     </div>
@@ -148,11 +150,13 @@ function VendorList({
                     <p className="truncate text-sm font-medium">{v.name}</p>
                     <p className="truncate text-xs text-muted-foreground">
                       {v.sells ?? m.VENDOR_UI.sellsUnknown}
-                      {' · '}
+                      {" · "}
                       {v.phone ?? m.VENDOR_UI.phoneUnknown}
                     </p>
                   </span>
-                  <span className="shrink-0 text-xs text-muted-foreground underline">{m.VENDOR_UI.viewLedger}</span>
+                  <span className="shrink-0 text-xs text-muted-foreground underline">
+                    {m.VENDOR_UI.viewLedger}
+                  </span>
                 </button>
               </li>
             ))}
@@ -171,20 +175,20 @@ function CreateVendorForm() {
   const m = useMessages();
   const queryClient = useQueryClient();
 
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [sells, setSells] = useState('');
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [sells, setSells] = useState("");
   const [nameError, setNameError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
   const create = useMutation({
-    mutationFn: (input: CreateVendorInput) => api<Vendor>('POST', '/vendors', input),
+    mutationFn: (input: CreateVendorInput) => api<Vendor>("POST", "/vendors", input),
     onSuccess: () => {
       setSaved(true);
-      setName('');
-      setPhone('');
-      setSells('');
-      void queryClient.invalidateQueries({ queryKey: ['vendors'] });
+      setName("");
+      setPhone("");
+      setSells("");
+      void queryClient.invalidateQueries({ queryKey: ["vendors"] });
     },
     onError: () => setSaved(false),
   });
@@ -207,7 +211,11 @@ function CreateVendorForm() {
   };
 
   const serverError =
-    create.error instanceof ApiClientError ? apiErrorMessage(m, create.error.code) : create.error ? apiErrorMessage(m) : null;
+    create.error instanceof ApiClientError
+      ? apiErrorMessage(m, create.error.code)
+      : create.error
+        ? apiErrorMessage(m)
+        : null;
 
   return (
     <Card data-testid="create-vendor">
@@ -218,7 +226,12 @@ function CreateVendorForm() {
         <form className="grid gap-4" noValidate onSubmit={onSubmit}>
           <div className="grid gap-2">
             <Label htmlFor="vendor-name">{m.VENDOR_UI.nameLabel}</Label>
-            <Input id="vendor-name" data-testid="vendor-name" value={name} onChange={(e) => setName(e.target.value)} />
+            <Input
+              id="vendor-name"
+              data-testid="vendor-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
             {nameError && (
               <p className="text-sm text-destructive" role="alert">
                 {nameError}
@@ -228,12 +241,24 @@ function CreateVendorForm() {
 
           <div className="grid gap-2">
             <Label htmlFor="vendor-phone">{m.VENDOR_UI.phoneLabel}</Label>
-            <Input id="vendor-phone" type="tel" inputMode="tel" data-testid="vendor-phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
+            <Input
+              id="vendor-phone"
+              type="tel"
+              inputMode="tel"
+              data-testid="vendor-phone"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+            />
           </div>
 
           <div className="grid gap-2">
             <Label htmlFor="vendor-sells">{m.VENDOR_UI.sellsLabel}</Label>
-            <Input id="vendor-sells" data-testid="vendor-sells" value={sells} onChange={(e) => setSells(e.target.value)} />
+            <Input
+              id="vendor-sells"
+              data-testid="vendor-sells"
+              value={sells}
+              onChange={(e) => setSells(e.target.value)}
+            />
           </div>
 
           {serverError && (
@@ -260,18 +285,33 @@ function CreateVendorForm() {
 // (c) Shop detail — ledger + record payment
 // ---------------------------------------------------------------------------
 
-function VendorDetail({ vendorId, vendorName, onBack }: { vendorId: UUID; vendorName: string | undefined; onBack: () => void }) {
+function VendorDetail({
+  vendorId,
+  vendorName,
+  onBack,
+}: {
+  vendorId: UUID;
+  vendorName: string | undefined;
+  onBack: () => void;
+}) {
   const m = useMessages();
   const locale = useLocale();
   const ui = UI[locale];
   const ledgerQ = useQuery({
-    queryKey: ['vendor-ledger', vendorId],
-    queryFn: () => api<VendorLedger>('GET', `/vendors/${vendorId}/ledger`),
+    queryKey: ["vendor-ledger", vendorId],
+    queryFn: () => api<VendorLedger>("GET", `/vendors/${vendorId}/ledger`),
   });
 
   return (
     <div className="grid gap-4" data-testid="vendor-detail">
-      <Button type="button" variant="outline" size="sm" className="w-fit" data-testid="vendor-detail-back" onClick={onBack}>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="w-fit"
+        data-testid="vendor-detail-back"
+        onClick={onBack}
+      >
         <ArrowLeft className="size-4" aria-hidden="true" />
         {m.VENDOR_UI.backToList}
       </Button>
@@ -329,11 +369,15 @@ function VendorDetail({ vendorId, vendorName, onBack }: { vendorId: UUID; vendor
                     className="divide-y"
                     testIdPrefix="vendor-ledger-months"
                     renderItem={(row) => (
-                      <li key={row.month} className="flex items-center justify-between gap-3 py-2 text-sm first:pt-0 last:pb-0">
+                      <li
+                        key={row.month}
+                        className="flex items-center justify-between gap-3 py-2 text-sm first:pt-0 last:pb-0"
+                      >
                         <span className="font-medium">{row.month}</span>
                         <span className="text-xs text-muted-foreground">
-                          {m.VENDOR_UI.monthPurchased} {formatPaise(row.purchasedPaise)} · {ui.monthReceived}{' '}
-                          {formatPaise(row.receivedPaise)} · {m.VENDOR_UI.monthPaid} {formatPaise(row.paidPaise)}
+                          {m.VENDOR_UI.monthPurchased} {formatPaise(row.purchasedPaise)} ·{" "}
+                          {ui.monthReceived} {formatPaise(row.receivedPaise)} ·{" "}
+                          {m.VENDOR_UI.monthPaid} {formatPaise(row.paidPaise)}
                         </span>
                       </li>
                     )}
@@ -359,10 +403,10 @@ function RecordPaymentForm({ vendorId }: { vendorId: UUID }) {
 
   // Round 2 (CW-6): direction toggle — PAYMENT (default, देना — we pay the shop) or
   // RECEIPT (लेना — vendor money-IN, the shop hands the site cash).
-  const [kind, setKind] = useState<VendorPaymentKind>('PAYMENT');
-  const [amountRupees, setAmountRupees] = useState('');
+  const [kind, setKind] = useState<VendorPaymentKind>("PAYMENT");
+  const [amountRupees, setAmountRupees] = useState("");
   const [date, setDate] = useState(today);
-  const [note, setNote] = useState('');
+  const [note, setNote] = useState("");
   const [amountError, setAmountError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
@@ -372,15 +416,15 @@ function RecordPaymentForm({ vendorId }: { vendorId: UUID }) {
   })();
 
   const create = useMutation({
-    mutationFn: (input: Omit<CreateVendorPaymentInput, 'vendorId'>) =>
-      api('POST', `/vendors/${vendorId}/payments`, input),
+    mutationFn: (input: Omit<CreateVendorPaymentInput, "vendorId">) =>
+      api("POST", `/vendors/${vendorId}/payments`, input),
     onSuccess: () => {
       setSaved(true);
-      setKind('PAYMENT');
-      setAmountRupees('');
+      setKind("PAYMENT");
+      setAmountRupees("");
       setDate(today);
-      setNote('');
-      void queryClient.invalidateQueries({ queryKey: ['vendor-ledger', vendorId] });
+      setNote("");
+      void queryClient.invalidateQueries({ queryKey: ["vendor-ledger", vendorId] });
     },
     onError: () => setSaved(false),
   });
@@ -403,7 +447,11 @@ function RecordPaymentForm({ vendorId }: { vendorId: UUID }) {
   };
 
   const serverError =
-    create.error instanceof ApiClientError ? apiErrorMessage(m, create.error.code) : create.error ? apiErrorMessage(m) : null;
+    create.error instanceof ApiClientError
+      ? apiErrorMessage(m, create.error.code)
+      : create.error
+        ? apiErrorMessage(m)
+        : null;
 
   return (
     <Card data-testid="vendor-record-payment">
@@ -417,31 +465,31 @@ function RecordPaymentForm({ vendorId }: { vendorId: UUID }) {
             <div className="grid grid-cols-2 gap-2">
               <Button
                 type="button"
-                variant={kind === 'PAYMENT' ? 'default' : 'outline'}
+                variant={kind === "PAYMENT" ? "default" : "outline"}
                 data-testid="vendor-payment-kind-payment"
-                aria-pressed={kind === 'PAYMENT'}
-                onClick={() => setKind('PAYMENT')}
+                aria-pressed={kind === "PAYMENT"}
+                onClick={() => setKind("PAYMENT")}
               >
                 {ui.directionPayment}
               </Button>
               <Button
                 type="button"
-                variant={kind === 'RECEIPT' ? 'default' : 'outline'}
+                variant={kind === "RECEIPT" ? "default" : "outline"}
                 data-testid="vendor-payment-kind-receipt"
-                aria-pressed={kind === 'RECEIPT'}
-                onClick={() => setKind('RECEIPT')}
+                aria-pressed={kind === "RECEIPT"}
+                onClick={() => setKind("RECEIPT")}
               >
                 {ui.directionReceipt}
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              {kind === 'PAYMENT' ? ui.directionPaymentHint : ui.directionReceiptHint}
+              {kind === "PAYMENT" ? ui.directionPaymentHint : ui.directionReceiptHint}
             </p>
           </div>
 
           <div className="grid gap-2">
             <Label htmlFor="vendor-payment-amount">
-              {kind === 'PAYMENT' ? ui.amountLabelPayment : ui.amountLabelReceipt}
+              {kind === "PAYMENT" ? ui.amountLabelPayment : ui.amountLabelReceipt}
             </Label>
             <Input
               id="vendor-payment-amount"
@@ -460,11 +508,22 @@ function RecordPaymentForm({ vendorId }: { vendorId: UUID }) {
             )}
           </div>
 
-          <DateField id="vendor-payment-date" testId="vendor-payment-date" value={date} onChange={setDate} max={today} />
+          <DateField
+            id="vendor-payment-date"
+            testId="vendor-payment-date"
+            value={date}
+            onChange={setDate}
+            max={today}
+          />
 
           <div className="grid gap-2">
             <Label htmlFor="vendor-payment-note">{m.VENDOR_UI.noteLabel}</Label>
-            <Input id="vendor-payment-note" data-testid="vendor-payment-note" value={note} onChange={(e) => setNote(e.target.value)} />
+            <Input
+              id="vendor-payment-note"
+              data-testid="vendor-payment-note"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+            />
           </div>
 
           {serverError && (

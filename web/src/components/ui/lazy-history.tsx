@@ -1,0 +1,119 @@
+'use client';
+
+/**
+ * "Form first, history on demand" section — banking-app style (same idea as
+ * `<KhataCard />`'s eye-toggle): a form/action stays the focus of the screen;
+ * its history list is collapsed behind a "Show history" tap so it never
+ * competes with the primary content's first paint or network calls.
+ *
+ * IMPORTANT — the intended usage gates the caller's React Query `enabled` on
+ * the same `shown` flag, via `useLazySection()`:
+ * ```tsx
+ * function MySection() {
+ *   const { shown, show } = useLazySection();
+ *   const historyQ = useQuery({
+ *     queryKey: ['my-history'],
+ *     queryFn: () => api<MyRow[]>('GET', '/my-history'),
+ *     enabled: shown,
+ *   });
+ *   return (
+ *     <LazyHistorySection
+ *       title="History"
+ *       testId="my-history"
+ *       shown={shown}
+ *       onFirstShow={show}
+ *       onRefresh={() => void historyQ.refetch()}
+ *       refreshing={historyQ.isFetching}
+ *     >
+ *       {historyQ.isPending ? <LoadingState /> : ...render historyQ.data...}
+ *     </LazyHistorySection>
+ *   );
+ * }
+ * ```
+ * Callers who don't need query-gating can omit `shown`/`onFirstShow` entirely
+ * — the section then just tracks its own open/closed state internally.
+ */
+import { useState } from 'react';
+import { History, RefreshCw } from 'lucide-react';
+import { useLocale } from '@/lib/i18n/locale-context';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+
+const UI = {
+  en: { showHistory: 'Show history', refresh: 'Refresh' },
+  hi: { showHistory: 'इतिहास देखें', refresh: 'रिफ्रेश करें' },
+} as const;
+
+/** Standalone state hook for callers who need `shown` in their own scope (e.g. a `useQuery enabled`). */
+export function useLazySection() {
+  const [shown, setShown] = useState(false);
+  return { shown, show: () => setShown(true) };
+}
+
+export function LazyHistorySection({
+  title,
+  shown: shownProp,
+  onFirstShow,
+  onRefresh,
+  refreshing,
+  testId = 'lazy-history',
+  children,
+}: {
+  title: string;
+  /** Controlled-optional. Pass the `shown` from `useLazySection()` to drive this externally; omit for internal state. */
+  shown?: boolean;
+  /** Called once, on the tap that first reveals the section (wire to `show` from `useLazySection()` when controlled). */
+  onFirstShow?: () => void;
+  /** Refresh icon button in the title row, shown only once revealed. */
+  onRefresh?: () => void;
+  refreshing?: boolean;
+  testId?: string;
+  children: React.ReactNode;
+}) {
+  const locale = useLocale();
+  const ui = UI[locale];
+  const [internalShown, setInternalShown] = useState(false);
+  const controlled = shownProp !== undefined;
+  const shown = controlled ? shownProp : internalShown;
+
+  const reveal = () => {
+    if (!controlled) setInternalShown(true);
+    onFirstShow?.();
+  };
+
+  return (
+    <div className="grid gap-2" data-testid={testId}>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-medium">{title}</p>
+        {shown && onRefresh && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            data-testid={`${testId}-refresh`}
+            aria-label={ui.refresh}
+            disabled={refreshing}
+            onClick={onRefresh}
+          >
+            <RefreshCw className={cn('size-4', refreshing && 'animate-spin')} aria-hidden="true" />
+          </Button>
+        )}
+      </div>
+      {!shown ? (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="w-fit"
+          data-testid={`${testId}-show`}
+          onClick={reveal}
+        >
+          <History className="size-4" aria-hidden="true" />
+          {ui.showHistory}
+        </Button>
+      ) : (
+        children
+      )}
+    </div>
+  );
+}

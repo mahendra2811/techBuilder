@@ -69,4 +69,17 @@ export class VehiclesController {
   detail(@CurrentUser() u: Principal, @Param('id') id: string) {
     return this.vehicles.detail(u, id);
   }
+
+  // frozen.10 (SUP-7): ENDPOINTS.vehicleAssignDriver — direct driver↔vehicle allotment.
+  // view.all (every role) reaches the route; the service narrows to OWNER / SM (site) /
+  // SUPERVISOR (own crew drivers + crew/site vehicles) — the supervisor holds no vehicle.manage.
+  @RequireAction('view.all')
+  @Post(':id/assign-driver')
+  assignDriver(
+    @CurrentUser() u: Principal,
+    @Param('id') id: string,
+    @Body(new ZodBody(z.object({ driverPersonId: z.string().uuid() }))) body: { driverPersonId: string },
+  ) {
+    return this.vehicles.assignDriver(u, id, body.driverPersonId);
+  }
 }

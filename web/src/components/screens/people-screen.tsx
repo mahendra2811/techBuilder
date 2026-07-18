@@ -13,12 +13,20 @@
  * crew name cannot be shown or chosen); the Owner may pick any site (optional).
  * New logins always get a generated temp password shown once (backend forces a
  * change on first login).
+ *
+ * frozen.10 (SM-6) restructure: landing is now section cards → in-page
+ * sub-pages (`useSubPage`) for Logins / Add login / Add worker / Labour master
+ * (ID cards) — same pattern as fleet/complaints/settings this round. Also:
+ * the "link to labour-master person" select on the create-login form is
+ * REMOVED entirely (client: not feasible), the labour-master edit affordance
+ * is now a pencil ICON ONLY (the old "Edit ID card" text label got cut off),
+ * and each login row's secondary line now shows the phone number too.
  */
 import { useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { uuidv7 } from 'uuidv7';
-import { Pencil } from 'lucide-react';
+import { ChevronRight, Pencil } from 'lucide-react';
 import { PERSON_SKILLS } from '@techbuilder/contracts';
 import type {
   CreatePersonInput,
@@ -42,11 +50,30 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
+import { SubPageHeader, useSubPage } from '@/components/ui/sub-page';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
 import { ShowMore } from '@/components/ui/show-more';
 import { ResetPasswordAction } from '@/components/people/reset-password-action';
 
 type PeopleRole = 'OWNER' | 'SITE_MANAGER' | 'SUPERVISOR';
+type PeopleSection = 'logins' | 'addLogin' | 'addWorker' | 'labourMaster';
+
+/** Module-local, bilingual — landing section-card copy only (new; every other
+ *  string here still comes from `m.PEOPLE_UI` / `ID_CARD_UI`). */
+const LANDING_UI = {
+  en: {
+    loginsHint: 'Everyone with an app login at your site.',
+    addLoginHint: 'Create a new login for a worker, driver, or team member.',
+    addWorkerHint: 'Add a person to the labour master (no login needed).',
+    labourMasterHint: 'Names, mobiles, and ID-card details.',
+  },
+  hi: {
+    loginsHint: 'आपकी साइट पर ऐप लॉगिन वाले सभी लोग।',
+    addLoginHint: 'मज़दूर, ड्राइवर या टीम सदस्य के लिए नया लॉगिन बनाएं।',
+    addWorkerHint: 'मज़दूर सूची में व्यक्ति जोड़ें (लॉगिन ज़रूरी नहीं)।',
+    labourMasterHint: 'नाम, मोबाइल और ID कार्ड जानकारी।',
+  },
+} as const;
 
 // Round 2 (CW-4): ID-card edit affordance — OWNER/SITE_MANAGER only (server enforces the
 // same narrow rule; see backend/src/people/people.service.ts `update()`).
@@ -85,10 +112,50 @@ type IdCardUi = { [K in keyof (typeof ID_CARD_UI)['en']]: string };
 
 export function PeopleScreen({ role }: { role: PeopleRole }) {
   const m = useMessages();
+  const locale = useLocale();
+  const landing = LANDING_UI[locale];
+  const { current: section, open: openSection, close: closeSection } = useSubPage<PeopleSection>();
   const meQ = useQuery({ queryKey: ['me'], queryFn: me });
   const usersQ = useQuery({ queryKey: ['users'], queryFn: () => api<User[]>('GET', '/users') });
   const sitesQ = useQuery({ queryKey: ['sites'], queryFn: () => api<Site[]>('GET', '/sites') });
   const peopleQ = useQuery({ queryKey: ['people'], queryFn: () => api<Person[]>('GET', '/people') });
+  const canAddWorker = role === 'OWNER' || role === 'SITE_MANAGER';
+
+  if (section === 'logins') {
+    return (
+      <div className="grid gap-4" data-testid="people-screen">
+        <SubPageHeader title={m.PEOPLE_UI.usersTitle} onBack={closeSection} />
+        <UserList role={role} usersQ={usersQ} myUserId={meQ.data?.user.id} />
+      </div>
+    );
+  }
+
+  if (section === 'addLogin') {
+    return (
+      <div className="grid gap-4" data-testid="people-screen">
+        <SubPageHeader title={m.PEOPLE_UI.createUserTitle} onBack={closeSection} />
+        <CreateUserForm role={role} sites={sitesQ.data} sitesLoading={sitesQ.isPending} myCrewId={meQ.data?.user.crewId ?? null} />
+      </div>
+    );
+  }
+
+  if (section === 'addWorker' && canAddWorker) {
+    return (
+      <div className="grid gap-4" data-testid="people-screen">
+        <SubPageHeader title={m.PEOPLE_UI.createPersonTitle} onBack={closeSection} />
+        <CreatePersonForm />
+      </div>
+    );
+  }
+
+  if (section === 'labourMaster') {
+    return (
+      <div className="grid gap-4" data-testid="people-screen">
+        <SubPageHeader title={ID_CARD_UI[locale].sectionTitle} onBack={closeSection} />
+        <PersonList role={role} peopleQ={peopleQ} />
+      </div>
+    );
+  }
 
   return (
     <div className="grid gap-4" data-testid="people-screen">
@@ -97,22 +164,43 @@ export function PeopleScreen({ role }: { role: PeopleRole }) {
           <CardTitle>{m.PEOPLE_UI.title}</CardTitle>
           <CardDescription>{m.PEOPLE_UI.subtitle}</CardDescription>
         </CardHeader>
+        <CardContent className="grid gap-2">
+          <SectionCard title={m.PEOPLE_UI.usersTitle} hint={landing.loginsHint} testId="people-open-logins" onClick={() => openSection('logins')} />
+          <SectionCard title={m.PEOPLE_UI.createUserTitle} hint={landing.addLoginHint} testId="people-open-add-login" onClick={() => openSection('addLogin')} />
+          {canAddWorker && (
+            <SectionCard title={m.PEOPLE_UI.createPersonTitle} hint={landing.addWorkerHint} testId="people-open-add-worker" onClick={() => openSection('addWorker')} />
+          )}
+          <SectionCard title={ID_CARD_UI[locale].sectionTitle} hint={landing.labourMasterHint} testId="people-open-labour-master" onClick={() => openSection('labourMaster')} />
+        </CardContent>
       </Card>
-
-      <UserList role={role} usersQ={usersQ} myUserId={meQ.data?.user.id} />
-
-      <CreateUserForm
-        role={role}
-        sites={sitesQ.data}
-        sitesLoading={sitesQ.isPending}
-        people={peopleQ.data ?? []}
-        myCrewId={meQ.data?.user.crewId ?? null}
-      />
-
-      {(role === 'OWNER' || role === 'SITE_MANAGER') && <CreatePersonForm />}
-
-      <PersonList role={role} peopleQ={peopleQ} />
     </div>
+  );
+}
+
+function SectionCard({
+  title,
+  hint,
+  testId,
+  onClick,
+}: {
+  title: string;
+  hint: string;
+  testId: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="flex w-full items-center justify-between gap-3 rounded-lg border border-input px-3.5 py-3 text-left hover:bg-accent"
+      data-testid={testId}
+      onClick={onClick}
+    >
+      <span className="grid min-w-0 gap-0.5">
+        <span className="text-sm font-medium">{title}</span>
+        <span className="truncate text-xs text-muted-foreground">{hint}</span>
+      </span>
+      <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+    </button>
   );
 }
 
@@ -160,15 +248,18 @@ function PersonList({ role, peopleQ }: { role: PeopleRole; peopleQ: UseQueryResu
                     </p>
                   </div>
                   {canEditIdCard && editingId !== person.id && (
+                    // frozen.10 (SM-6): pencil ICON ONLY — the old "Edit ID card" text
+                    // label got cut off/overflowed in the row; aria-label keeps it
+                    // accessible without the visible text.
                     <Button
                       type="button"
-                      size="sm"
+                      size="icon-sm"
                       variant="outline"
+                      aria-label={ui.edit}
                       data-testid={`person-edit-toggle-${person.id}`}
                       onClick={() => setEditingId(person.id)}
                     >
-                      <Pencil className="mr-1 size-3.5" aria-hidden="true" />
-                      {ui.edit}
+                      <Pencil className="size-3.5" aria-hidden="true" />
                     </Button>
                   )}
                 </div>
@@ -363,6 +454,7 @@ function UserList({
                         <p className="truncate text-sm font-medium">{u.name}</p>
                         <p className="truncate text-xs text-muted-foreground">
                           {u.username} · {m.ROLE_LABELS[u.role]}
+                          {u.phone && ` · ${u.phone}`}
                         </p>
                       </div>
                     ) : (
@@ -370,6 +462,7 @@ function UserList({
                         <p className="truncate text-sm font-medium">{u.name}</p>
                         <p className="truncate text-xs text-muted-foreground">
                           {u.username} · {m.ROLE_LABELS[u.role]}
+                          {u.phone && ` · ${u.phone}`}
                         </p>
                       </Link>
                     )}
@@ -456,13 +549,11 @@ function CreateUserForm({
   role,
   sites,
   sitesLoading,
-  people,
   myCrewId,
 }: {
   role: PeopleRole;
   sites: Site[] | undefined;
   sitesLoading: boolean;
-  people: Person[];
   myCrewId: UUID | null;
 }) {
   const m = useMessages();
@@ -474,13 +565,11 @@ function CreateUserForm({
   const [username, setUsername] = useState('');
   const [phone, setPhone] = useState('');
   const [assignedSiteId, setAssignedSiteId] = useState<UUID | ''>('');
-  const [linkPersonId, setLinkPersonId] = useState<UUID | ''>('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [created, setCreated] = useState<{ username: string; tempPassword: string } | null>(null);
 
   const showSite = role === 'OWNER' || role === 'SITE_MANAGER';
   const siteRequired = role === 'SITE_MANAGER';
-  const showPersonLink = targetRole === 'WORKER' || targetRole === 'DRIVER';
   // A Supervisor creates inside their own crew — blocked entirely if they have none.
   const thBlocked = role === 'SUPERVISOR' && !myCrewId;
 
@@ -492,7 +581,6 @@ function CreateUserForm({
       setUsername('');
       setPhone('');
       setAssignedSiteId('');
-      setLinkPersonId('');
       setErrors({});
       void queryClient.invalidateQueries({ queryKey: ['users'] });
     },
@@ -518,7 +606,8 @@ function CreateUserForm({
       ...(phone.trim() ? { phone: phone.trim() } : {}),
       ...(assignedSiteId ? { assignedSiteId } : {}),
       ...(role === 'SUPERVISOR' && myCrewId ? { crewId: myCrewId } : {}),
-      ...(showPersonLink && linkPersonId ? { personId: linkPersonId } : {}),
+      // frozen.10 (SM-6): the "link to labour-master person" field is REMOVED
+      // entirely (client: not feasible) — no `personId` is ever sent here.
     };
     create.mutate(input);
   };
@@ -619,25 +708,6 @@ function CreateUserForm({
 
             {role === 'SUPERVISOR' && (
               <p className="text-xs text-muted-foreground" data-testid="create-crew-note">{m.PEOPLE_UI.crewPrefillNote}</p>
-            )}
-
-            {showPersonLink && (
-              <div className="grid gap-2">
-                <Label htmlFor="user-person">{m.PEOPLE_UI.linkPerson}</Label>
-                <NativeSelect
-                  id="user-person"
-                  data-testid="user-person"
-                  value={linkPersonId}
-                  onChange={(e) => setLinkPersonId(e.target.value)}
-                >
-                  <option value="">{m.PEOPLE_UI.none}</option>
-                  {people.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </NativeSelect>
-              </div>
             )}
 
             {serverError && (
