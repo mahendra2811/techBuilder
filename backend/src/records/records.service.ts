@@ -349,6 +349,16 @@ export class RecordsService {
       const ctx = await loadScope(tx, p);
       if (ctx.role === 'DRIVER') {
         assertSiteInScope(ctx, 'vehicleLog.enter', input.siteId);
+      } else if (ctx.role === 'OWNER') {
+        // SM-round client rule: whatever the supervisor can file, the SM — and the OWNER —
+        // can file too (fallback when the supervisor isn't around). OWNER holds no
+        // record.enter, so he's allowed explicitly at ORG scope — but the target site must
+        // exist in HIS org (RLS-scoped select; rejects dangling/foreign siteIds).
+        const [site] = await tx
+          .select({ id: schema.sites.id })
+          .from(schema.sites)
+          .where(and(eq(schema.sites.id, input.siteId), isNull(schema.sites.deletedAt)));
+        if (!site) throw new ApiException('NOT_FOUND', 'Site not found');
       } else {
         if (!can(ctx.role, 'record.enter')) forbidScope(`Role ${ctx.role} cannot record.enter`);
         assertSiteInScope(ctx, 'record.enter', input.siteId);
@@ -415,12 +425,23 @@ export class RecordsService {
         else if (input.vehicleId) await assertVehicleInScope(tx, ctx, 'record.enter', input.vehicleId);
       }
       await assertBackdateWindow(tx, ctx.role, input.businessDate, RECORD_CREATE_BACKDATE_LIMIT_DAYS);
+      // frozen.11: vehicle-only damage reports used to store siteId=null, which made them
+      // invisible to the site-scoped readers (the supervisor's crew damage history) — derive
+      // the site from the vehicle's assignment when the client didn't send one.
+      let siteId = input.siteId ?? null;
+      if (!siteId && input.vehicleId) {
+        const [v] = await tx
+          .select({ assignedSiteId: schema.vehicles.assignedSiteId })
+          .from(schema.vehicles)
+          .where(and(eq(schema.vehicles.id, input.vehicleId), isNull(schema.vehicles.deletedAt)));
+        siteId = v?.assignedSiteId ?? null;
+      }
       const [row] = await tx
         .insert(schema.issues)
         .values({
           id: input.id,
           orgId: p.orgId,
-          siteId: input.siteId ?? null,
+          siteId,
           vehicleId: input.vehicleId ?? null,
           severity: input.severity,
           description: input.description,

@@ -17,11 +17,30 @@
  * - WhatsApp digest (pilot-critical): plain-text summary of TODAY composed
  *   entirely from data this screen already fetched (a today-window dashboard
  *   query + per-site attendance counts) — no new endpoints.
+ *
+ * SM testing-feedback round 2: the SITE_MANAGER variant (only — OWNER's composition is
+ * untouched) drops the inline <FuelFlagsCard /> (it now lives inside the Fuel monitor
+ * sub-page, /site-manager/fuel) and folds the standalone insights-link-card into an
+ * expanded <QuickActions /> grid (Fuel/Insights/Khata/People/Fleet/Materials/Reports/
+ * Complaints) — one-tap shortcuts to every one of his main pages.
  */
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useQueries, useQuery } from '@tanstack/react-query';
-import { ChevronRight, Copy, FileSpreadsheet, Fuel, MessageCircle, RefreshCw } from 'lucide-react';
+import {
+  BarChart3,
+  Boxes,
+  ChevronRight,
+  Copy,
+  FileSpreadsheet,
+  Fuel,
+  MessageCircle,
+  MessageSquareWarning,
+  RefreshCw,
+  Truck,
+  Users,
+  Wallet,
+} from 'lucide-react';
 import type { Attendance, Completeness, OwnerDashboard, Site, UUID, Vehicle } from '@techbuilder/contracts';
 import { api, me } from '@/lib/api-client';
 import { addDays, formatBusinessDate, todayKolkata } from '@/lib/business-date';
@@ -146,25 +165,31 @@ export function OwnerDashboardScreen({ variant = 'OWNER' }: { variant?: 'OWNER' 
       {/* WO-3 (wave 2): reuses the KPI already fetched by dashQ — zero extra calls. */}
       <ApprovalsPendingCard count={kpis?.pendingApprovals ?? 0} href={`${roleHome(variant)}/approvals`} />
 
-      {/* CW-5: diesel double-check red flags — both OWNER and SITE_MANAGER get the
-          same collapsed-by-default card (the ACCOUNTANT sees his own copy in his
-          work queue, not here). */}
-      <FuelFlagsCard />
+      {/* CW-5: diesel double-check red flags. SM testing-feedback round 2: moved into
+          the Fuel monitor sub-page (site-manager/fuel/page.tsx, reusing
+          accountant-diesel-screen.tsx's own flags card) — OWNER keeps this
+          collapsed-by-default dashboard card unchanged; the ACCOUNTANT still sees his
+          own copy in his work queue, not here. */}
+      {isOwner && <FuelFlagsCard />}
 
       {/* WO-13: day-wise insights link — role-aware href via the same variant this
           screen already uses for the owner/SM split (roleHome() from the shared
-          Role → URL-slug map, not a redefinition of it). */}
-      <Card data-testid="insights-link-card">
-        <CardContent>
-          <Link href={`${roleHome(variant)}/insights`} data-testid="insights-link" className="flex items-center gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium">{m.INSIGHTS_UI.dashboardLinkTitle}</p>
-              <p className="truncate text-xs text-muted-foreground">{m.INSIGHTS_UI.dashboardLinkSubtitle}</p>
-            </div>
-            <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-          </Link>
-        </CardContent>
-      </Card>
+          Role → URL-slug map, not a redefinition of it). OWNER only: SM testing-
+          feedback round 2 folded this link into his expanded <QuickActions /> grid
+          below instead (one card there, not a separate one here). */}
+      {isOwner && (
+        <Card data-testid="insights-link-card">
+          <CardContent>
+            <Link href={`${roleHome(variant)}/insights`} data-testid="insights-link" className="flex items-center gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium">{m.INSIGHTS_UI.dashboardLinkTitle}</p>
+                <p className="truncate text-xs text-muted-foreground">{m.INSIGHTS_UI.dashboardLinkSubtitle}</p>
+              </div>
+              <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            </Link>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
@@ -241,8 +266,14 @@ export function OwnerDashboardScreen({ variant = 'OWNER' }: { variant?: 'OWNER' 
       {!isOwner && (
         <QuickActions
           actions={[
-            { href: '/site-manager/vehicle', label: m.NAV_LABELS.vehicleFuel, icon: Fuel, testId: 'qa-vehicle' },
-            { href: '/site-manager/reports', label: m.NAV_LABELS.reports, icon: FileSpreadsheet, testId: 'qa-reports' },
+            { href: `${roleHome(variant)}/fuel`, label: m.NAV_LABELS.fuelEntry, icon: Fuel, testId: 'qa-fuel' },
+            { href: `${roleHome(variant)}/insights`, label: m.NAV_LABELS.insights, icon: BarChart3, testId: 'qa-insights' },
+            { href: `${roleHome(variant)}/ledger`, label: m.NAV_LABELS.ledger, icon: Wallet, testId: 'qa-ledger' },
+            { href: `${roleHome(variant)}/people`, label: m.NAV_LABELS.people, icon: Users, testId: 'qa-people' },
+            { href: `${roleHome(variant)}/fleet`, label: m.NAV_LABELS.fleet, icon: Truck, testId: 'qa-fleet' },
+            { href: `${roleHome(variant)}/materials`, label: m.NAV_LABELS.materials, icon: Boxes, testId: 'qa-materials' },
+            { href: `${roleHome(variant)}/reports`, label: m.NAV_LABELS.reports, icon: FileSpreadsheet, testId: 'qa-reports' },
+            { href: `${roleHome(variant)}/complaints`, label: m.NAV_LABELS.complaints, icon: MessageSquareWarning, testId: 'qa-complaints' },
           ]}
         />
       )}

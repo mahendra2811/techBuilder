@@ -58,7 +58,6 @@ import { DateField } from '@/components/entry/date-field';
 import { PhotoMultiField } from '@/components/entry/photo-multi-field';
 import { VoiceField } from '@/components/entry/voice-field';
 import { RecentEntries } from '@/components/entry/recent-entries';
-import { SitePicker } from '@/components/entry/site-picker';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
 
 type EntryRole = 'SITE_MANAGER' | 'SUPERVISOR';
@@ -93,7 +92,6 @@ export function ExpenseScreen({ role }: { role: EntryRole }) {
   const today = useMemo(() => todayKolkata(), []);
   const minDate = minEntryDate(role, today);
 
-  const [pickedSiteId, setPickedSiteId] = useState<UUID | ''>('');
   const [date, setDate] = useState<BusinessDate>(today);
 
   const meQ = useQuery({ queryKey: ['me'], queryFn: me });
@@ -105,9 +103,9 @@ export function ExpenseScreen({ role }: { role: EntryRole }) {
   const userName = (id: UUID) => usersQ.data?.find((u) => u.id === id)?.name ?? m.EXPENSE_UI.unknownUser;
 
   const sites = sitesQ.data;
-  // frozen.10 (SUP-2): the SUPERVISOR has exactly one site — default to it, no picker at all.
-  // SM may still have a pickable set — unchanged for that role.
-  const siteId: UUID | '' = role === 'SUPERVISOR' ? (sites?.[0]?.id ?? '') : pickedSiteId !== '' ? pickedSiteId : (sites?.[0]?.id ?? '');
+  // frozen.10 (SUP-2) + SM-sweep: both roles this screen serves have exactly one
+  // site (server-scoped GET /sites) — auto-picked, never a dropdown, for either.
+  const siteId: UUID | '' = sites?.[0]?.id ?? '';
   const selectedSite = sites?.find((s) => s.id === siteId);
   const orgExpense = meQ.data?.org.config.expense;
   const voiceEnabled = meQ.data?.org.config.features.voiceNotes ?? false;
@@ -147,35 +145,26 @@ export function ExpenseScreen({ role }: { role: EntryRole }) {
           <CardDescription>{m.EXPENSE_UI.subtitle}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
-          {role === 'SUPERVISOR' ? (
-            <div className="grid gap-2">
-              <Label htmlFor="expense-site">{local.site}</Label>
-              {sitesQ.isPending ? (
-                <LoadingState />
-              ) : sitesQ.error ? (
-                <ErrorState error={sitesQ.error} onRetry={() => void sitesQ.refetch()} />
-              ) : !selectedSite ? (
-                <EmptyState label={local.noSites} />
-              ) : (
-                <p
-                  id="expense-site"
-                  data-testid="expense-site-fixed"
-                  className="flex h-8 items-center rounded-lg border border-input bg-muted/40 px-2.5 text-sm"
-                >
-                  {selectedSite.name} ({selectedSite.code})
-                </p>
-              )}
-            </div>
-          ) : (
-            <SitePicker
-              sites={sites}
-              isLoading={sitesQ.isPending}
-              value={siteId}
-              onChange={setPickedSiteId}
-              error={sitesQ.error}
-              onRetry={() => void sitesQ.refetch()}
-            />
-          )}
+          {/* SM-sweep: no site select for either role this screen serves — both are
+              server-scoped to exactly one site, always shown as a fixed label. */}
+          <div className="grid gap-2">
+            <Label htmlFor="expense-site">{local.site}</Label>
+            {sitesQ.isPending ? (
+              <LoadingState />
+            ) : sitesQ.error ? (
+              <ErrorState error={sitesQ.error} onRetry={() => void sitesQ.refetch()} />
+            ) : !selectedSite ? (
+              <EmptyState label={local.noSites} />
+            ) : (
+              <p
+                id="expense-site"
+                data-testid="expense-site-fixed"
+                className="flex h-8 items-center rounded-lg border border-input bg-muted/40 px-2.5 text-sm"
+              >
+                {selectedSite.name} ({selectedSite.code})
+              </p>
+            )}
+          </div>
           <DateField id="expense-date" testId="expense-date" value={date} onChange={setDate} min={minDate} max={today} />
 
           <Separator />

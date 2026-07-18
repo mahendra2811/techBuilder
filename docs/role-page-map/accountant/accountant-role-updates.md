@@ -1,5 +1,13 @@
 # ACCOUNTANT role — client review updates (round: role-by-role audit)
 
+> **✅ BUILT (frozen.10/11) + post-audit round (client testing feedback, 2026-07-18 late evening, all UI-only):**
+> 1. **Khata form bug fixed** — Give/Receive (work-cash) dropdowns offered SUPERVISORS, whom the server rightly rejects from the work-cash chain (Round-2 rule) → the generic FORBIDDEN message. Supervisors now filtered from WORK forms (still offered on Give-salary); same latent fix applied to the Owner's ledger form. Browser-verified.
+> 2. **3-day date window** on all khata forms (today/yesterday/day-before).
+> 3. **Dashboard = briefs only** (counts + 1–2 newest rows + links); the three verify queues moved with their actions to the new **`/accountant/verify`** desk (reached via the dashboard cards, no nav entry by design); diesel flags brief links to the new diesel page.
+> 4. **New `/accountant/diesel`** monitoring page (nav "Diesel"): per-site stock, purchases (litres+₹ per day), truck-wise issuances with match status, 🚩 flags — read-only.
+> 5. "Shop" wording → **"Vendor"** on the vendors screen (SM + accountant viewers).
+> 6. Dev-login panel site labels corrected (several were inverted vs the real devco assignments — acct1/sm1 are Sunrise, acct2/sm2 Greenfield, th1/th4 GF, th2/th3 ST).
+
 > **Status: 📋 PENDING — DO NOT BUILD YET.** Part of the role-by-role client review (2026-07-18); all roles build together in one pass at the end. Tracker: [`../ROLE-AUDIT-TRACKER.md`](../ROLE-AUDIT-TRACKER.md).
 >
 > Current-state facts code-verified against `vendors-screen.tsx`, `ledger-screen.tsx`, `backend/src/vendors/vendors.service.ts`, `backend/src/cash-transfers/cash-transfers.service.ts` (contracts `frozen.9`).

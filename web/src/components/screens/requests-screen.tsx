@@ -19,6 +19,12 @@
  * product sense), so /supervisor/requests was removed. His crew-vehicle re-allotment is
  * direct (see supervisor-crew-vehicles-card.tsx, no request/approval), and his own
  * expense-request form moved to expense-request-screen.tsx (ExpenseRequestScreen).
+ *
+ * SM testing-feedback round 2: the SITE_MANAGER variant's "My requests" list is now
+ * behind a `LazyHistorySection` ("Request history") instead of an eager-fetched card —
+ * the form stays the focus of the screen (banking-app "form first" idiom, same as
+ * khata-screen.tsx). The DRIVER variant (also mounted on /driver/vehicle, stacked with
+ * VehicleSwitchScreen) is UNTOUCHED — still an eager "My requests" card.
  */
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -42,6 +48,7 @@ import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
 import { PayloadSummary, RequestStatusBadge } from '@/components/requests/request-bits';
+import { LazyHistorySection, useLazySection } from '@/components/ui/lazy-history';
 
 type SubmitRole = 'SITE_MANAGER' | 'DRIVER';
 
@@ -65,8 +72,15 @@ export function RequestsScreen({ role }: { role: SubmitRole }) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
 
+  // SM (only): the history list is lazy-revealed — see the render branch below. DRIVER
+  // keeps the query eager exactly as before (historyLazy.shown is simply unused for him).
+  const historyLazy = useLazySection();
   const meQ = useQuery({ queryKey: ['me'], queryFn: me });
-  const requestsQ = useQuery({ queryKey: ['requests', 'ALL'], queryFn: () => api<ApprovalRequest[]>('GET', '/requests') });
+  const requestsQ = useQuery({
+    queryKey: ['requests', 'ALL'],
+    queryFn: () => api<ApprovalRequest[]>('GET', '/requests'),
+    enabled: role === 'DRIVER' || historyLazy.shown,
+  });
   const vehiclesQ = useQuery({ queryKey: ['vehicles'], queryFn: () => api<Vehicle[]>('GET', '/vehicles') });
   const vehicleTypesQ = useQuery({ queryKey: ['vehicle-types'], queryFn: () => api<VehicleType[]>('GET', '/vehicle-types') });
 
@@ -372,32 +386,74 @@ export function RequestsScreen({ role }: { role: SubmitRole }) {
         </CardContent>
       </Card>
 
-      <Card size="sm" data-testid="my-requests">
-        <CardHeader>
-          <CardTitle>{m.REQUESTS_UI.myRequestsTitle}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {requestsQ.isPending || meQ.isPending ? (
-            <LoadingState />
-          ) : requestsQ.error ? (
-            <ErrorState error={requestsQ.error} onRetry={() => void requestsQ.refetch()} />
-          ) : myRequests.length === 0 ? (
-            <EmptyState label={m.REQUESTS_UI.myRequestsEmpty} />
-          ) : (
-            <ul className="grid gap-3">
-              {myRequests.map((r) => (
-                <li key={r.id} className="grid gap-1.5 rounded-lg border border-input p-3" data-testid={`my-request-${r.id}`}>
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-medium">{m.APPROVAL_TYPE_LABELS[r.type]}</p>
-                    <RequestStatusBadge status={r.status} />
-                  </div>
-                  <PayloadSummary type={r.type} payload={r.payload} />
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+      {role === 'SITE_MANAGER' ? (
+        <Card size="sm" data-testid="my-requests">
+          <CardContent className="pt-4">
+            <LazyHistorySection
+              title={m.REQUESTS_UI.historyTitle}
+              shown={historyLazy.shown}
+              onFirstShow={historyLazy.show}
+              onRefresh={() => void requestsQ.refetch()}
+              refreshing={requestsQ.isFetching}
+              testId="requests-history"
+            >
+              <MyRequestsList
+                isPending={requestsQ.isPending || meQ.isPending}
+                error={requestsQ.error}
+                onRetry={() => void requestsQ.refetch()}
+                myRequests={myRequests}
+              />
+            </LazyHistorySection>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card size="sm" data-testid="my-requests">
+          <CardHeader>
+            <CardTitle>{m.REQUESTS_UI.myRequestsTitle}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <MyRequestsList
+              isPending={requestsQ.isPending || meQ.isPending}
+              error={requestsQ.error}
+              onRetry={() => void requestsQ.refetch()}
+              myRequests={myRequests}
+            />
+          </CardContent>
+        </Card>
+      )}
     </div>
+  );
+}
+
+/** Shared "my requests" list body — all statuses visible (pending/approved/rejected via
+ *  the existing status badges). Extracted so the SM's lazy-wrapped card and the DRIVER's
+ *  eager card render identical content without duplicating the list markup. */
+function MyRequestsList({
+  isPending,
+  error,
+  onRetry,
+  myRequests,
+}: {
+  isPending: boolean;
+  error: unknown;
+  onRetry: () => void;
+  myRequests: ApprovalRequest[];
+}) {
+  const m = useMessages();
+  if (isPending) return <LoadingState />;
+  if (error) return <ErrorState error={error} onRetry={onRetry} />;
+  if (myRequests.length === 0) return <EmptyState label={m.REQUESTS_UI.myRequestsEmpty} />;
+  return (
+    <ul className="grid gap-3">
+      {myRequests.map((r) => (
+        <li key={r.id} className="grid gap-1.5 rounded-lg border border-input p-3" data-testid={`my-request-${r.id}`}>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-medium">{m.APPROVAL_TYPE_LABELS[r.type]}</p>
+            <RequestStatusBadge status={r.status} />
+          </div>
+          <PayloadSummary type={r.type} payload={r.payload} />
+        </li>
+      ))}
+    </ul>
   );
 }

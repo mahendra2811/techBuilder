@@ -104,8 +104,10 @@ export const hi: Messages = {
     damage: "नुक़सान",
     // frozen.10 (DRV-1/DRV-5): driver-only Start-of-day/End-of-day forms page.
     meter: "मीटर",
-    // frozen.10 (DRV-2 nav restructure): driver-only label for /driver/vehicle — the
-    // SM keeps `vehicleFuel` ("गाड़ी / तेल") for /site-manager/vehicle unchanged.
+    // frozen.10 (DRV-2 nav restructure): driver-only label for /driver/vehicle.
+    // `vehicleFuel` ("गाड़ी / तेल") is unused since SM testing-feedback round 2 — the
+    // SM's /site-manager/vehicle page was replaced by /site-manager/fuel, which reuses
+    // `fuelEntry` ("डीज़ल") below instead.
     vehicle: "वाहन",
   },
 
@@ -644,6 +646,7 @@ export const hi: Messages = {
     submitting: "भेजी जा रही है…",
     submitted: "रिक्वेस्ट भेज दी गई।",
     myRequestsTitle: "मेरी रिक्वेस्ट",
+    historyTitle: "अनुरोध इतिहास",
     myRequestsEmpty: "आपने अभी तक कोई रिक्वेस्ट नहीं भेजी।",
     selectVehicle: "गाड़ी चुनें",
     noVehiclesInScope: "आपके लिए कोई गाड़ी नहीं है।",

@@ -146,8 +146,13 @@ function TransferForm({ role, usersQ }: { role: LedgerRole; usersQ: ReturnType<t
   };
 
   const candidates = useMemo(
-    () => (usersQ.data ?? []).filter((u) => u.active && TARGET_ROLES[role].includes(u.role)),
-    [usersQ.data, role],
+    // Round 2: SUPERVISORS are outside the WORK-cash chain (the server 403s such transfers) —
+    // offer them only for SALARY/PERSONAL draws. Same fix as khata-screen's candidateRoles.
+    () =>
+      (usersQ.data ?? []).filter(
+        (u) => u.active && TARGET_ROLES[role].includes(u.role) && !(tag === 'WORK' && u.role === 'SUPERVISOR'),
+      ),
+    [usersQ.data, role, tag],
   );
 
   const amountPaise = (() => {

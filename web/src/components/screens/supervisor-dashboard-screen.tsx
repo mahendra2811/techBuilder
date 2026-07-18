@@ -12,9 +12,11 @@
  * a UI-only removal. Site is shown as a fixed label (SUP-2: no site picker —
  * `GET /sites` already returns exactly one site for this role).
  *
- * frozen.10 (SUP-7/D5) addition: a "crew vehicles" card (who's driving what +
- * direct re-allotment) and a damage-report shortcut — see
- * `SupervisorCrewVehiclesCard`.
+ * frozen.10 (SUP-7/D5) added a "crew vehicles" card (who's driving what + direct
+ * re-allotment) and a damage-report shortcut here; the SUPERVISOR restructure then moved
+ * BOTH off the dashboard onto their own pages — `SupervisorCrewVehiclesCard` now lives at
+ * /supervisor/vehicle, damage reporting at /supervisor/damage (see those files' header
+ * comments) — the dashboard should only link out, not host full functionality.
  *
  * Answers the Supervisor's one remaining daily question — "did I write today's
  * note?" — then shortcuts to the screens where they act.
@@ -28,7 +30,6 @@ import { useMessages } from '@/lib/i18n/locale-context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { KhataCard } from '@/components/khata-card';
 import { ApprovalsPendingCard } from '@/components/dashboard/approvals-pending-card';
-import { SupervisorCrewVehiclesCard } from '@/components/dashboard/supervisor-crew-vehicles-card';
 import { ContactPanel } from '@/components/contact-panel';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
 
@@ -100,9 +101,6 @@ export function SupervisorDashboardScreen() {
           )}
         </CardContent>
       </Card>
-
-      {/* frozen.10 (SUP-7/D5): crew vehicles + re-allotment + damage-report shortcut. */}
-      <SupervisorCrewVehiclesCard />
 
       {/* WO-4 (wave 2): same emergency/contacts footer already used by worker + driver. */}
       <ContactPanel />

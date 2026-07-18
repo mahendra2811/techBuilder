@@ -1,20 +1,28 @@
 'use client';
 
 /**
- * SUPERVISOR material entry (CW-8, updated frozen.10 / SUP-4) — /supervisor/materials.
+ * Material entry (CW-8, updated frozen.10 / SUP-4; SM-sweep: OWNER + SITE_MANAGER
+ * added) — /supervisor/materials, and (as a sub-page) /site-manager/materials +
+ * /owner/materials via materials-screen.tsx's "Material entry" section.
  *
- * The Supervisor's entry is the FINAL, accountable material record — the
- * backend stamps `enteredRole: 'SUPERVISOR', finalized: true` on every txn
- * this screen submits (RecordsService.createMaterialTxn). Only material types
- * with `config.supervisorLogs !== false` are offered in the picker (types the
- * SM/Owner marked driver-only-view or otherwise excluded don't show here).
+ * BACKEND FACT (SM-sweep): `POST /records/material-txn` now accepts OWNER too —
+ * "whatever the supervisor can file, SM and OWNER can file too" — on top of the
+ * pre-existing SUPERVISOR/SITE_MANAGER (record.enter) and DRIVER (vehicleLog.enter,
+ * data-only pick) paths. The backend stamps `enteredRole: <role>, finalized: true`
+ * for every non-DRIVER role — all three roles this screen serves file the FINAL,
+ * accountable record. Only material types with `config.supervisorLogs !== false`
+ * are offered in the picker (types the SM/Owner marked driver-only-view or
+ * otherwise excluded don't show here, for any of the three roles).
  *
- * frozen.10 (SUP-4): no site picker — `GET /sites` is server-scoped to the
- * supervisor's ONE site (SUP-2), shown as a fixed label. Date is limited to
- * today + yesterday (`minEntryDate('SUPERVISOR', …)`). Picking the org's
- * auto-provisioned "Other" material (matched by name, case-insensitive) opens
- * a REQUIRED remark field describing what it is (`material_txns.remark`).
- * "Recent entries" is now a lazy `LazyHistorySection` (collapsed by default).
+ * Site: SUPERVISOR and SITE_MANAGER never see a picker — `GET /sites` is
+ * server-scoped to their ONE site (SUP-2 / SM-sweep), shown as a fixed label.
+ * OWNER is genuinely multi-site, so gets the real pickable `SitePicker`. Date
+ * window is role-parameterized (`minEntryDate(role, …)`: SUPERVISOR today+
+ * yesterday, SITE_MANAGER 7 days, OWNER unlimited) — mirrors the backend's
+ * `RECORD_CREATE_BACKDATE_LIMIT_DAYS`. Picking the org's auto-provisioned
+ * "Other" material (matched by name, case-insensitive) opens a REQUIRED remark
+ * field describing what it is (`material_txns.remark`). "Recent entries" is a
+ * lazy `LazyHistorySection` (collapsed by default).
  *
  * A later work order builds the DRIVER's data-only pick screen (matched
  * against these entries by the accountant) — this screen does not touch that.
@@ -34,8 +42,11 @@ import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
 import { Textarea } from '@/components/ui/textarea';
 import { DateField } from '@/components/entry/date-field';
+import { SitePicker } from '@/components/entry/site-picker';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
 import { useLazySection, LazyHistorySection } from '@/components/ui/lazy-history';
+
+export type MaterialEntryRole = 'SUPERVISOR' | 'SITE_MANAGER' | 'OWNER';
 
 const UI = {
   en: {
@@ -94,23 +105,28 @@ type UiText = Record<keyof (typeof UI)['en'], string>;
 
 const isOtherMaterial = (mat: Material | undefined) => (mat?.name ?? '').trim().toLowerCase() === 'other';
 
-export function MaterialEntryScreen() {
+export function MaterialEntryScreen({ role }: { role: MaterialEntryRole }) {
   const locale = useLocale();
   const ui = UI[locale];
   const queryClient = useQueryClient();
   const today = todayKolkata();
-  const minDate = minEntryDate('SUPERVISOR', today);
+  const minDate = minEntryDate(role, today);
 
   const [date, setDate] = useState(today);
+  const [pickedSiteId, setPickedSiteId] = useState<UUID | ''>('');
 
   const sitesQ = useQuery({ queryKey: ['sites'], queryFn: () => api<Site[]>('GET', '/sites') });
   const materialsQ = useQuery({ queryKey: ['materials'], queryFn: () => api<Material[]>('GET', '/materials') });
 
   const sites = sitesQ.data ?? [];
-  const site = sites[0]; // frozen.10 (SUP-2): supervisor has exactly one site — no picker.
-  const siteId: UUID | '' = site?.id ?? '';
+  // SUPERVISOR/SITE_MANAGER: exactly one site (server-scoped) — no picker at all.
+  // OWNER: genuinely multi-site — a real picker, defaulting to the first site.
+  const singleSite = sites[0];
+  const siteId: UUID | '' =
+    role === 'OWNER' ? (pickedSiteId !== '' ? pickedSiteId : (singleSite?.id ?? '')) : (singleSite?.id ?? '');
 
-  // Only offer types the SM/Owner marked for supervisor entry (default true when unconfigured).
+  // Only offer types the SM/Owner marked for supervisor entry (default true when unconfigured) —
+  // this is the SAME entry form/eligibility rule for all three roles.
   const eligibleMaterials = (materialsQ.data ?? []).filter((mat) => mat.config?.supervisorLogs !== false);
 
   return (
@@ -121,24 +137,35 @@ export function MaterialEntryScreen() {
           <CardDescription>{ui.subtitle}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
-          <div className="grid gap-2">
-            <Label htmlFor="material-entry-site">{ui.site}</Label>
-            {sitesQ.isPending ? (
-              <LoadingState />
-            ) : sitesQ.error ? (
-              <ErrorState error={sitesQ.error} onRetry={() => void sitesQ.refetch()} />
-            ) : !site ? (
-              <EmptyState label={ui.noSites} />
-            ) : (
-              <p
-                id="material-entry-site"
-                data-testid="material-entry-site-fixed"
-                className="flex h-8 items-center rounded-lg border border-input bg-muted/40 px-2.5 text-sm"
-              >
-                {site.name} ({site.code})
-              </p>
-            )}
-          </div>
+          {role === 'OWNER' ? (
+            <SitePicker
+              sites={sitesQ.data}
+              isLoading={sitesQ.isPending}
+              value={siteId}
+              onChange={setPickedSiteId}
+              error={sitesQ.error}
+              onRetry={() => void sitesQ.refetch()}
+            />
+          ) : (
+            <div className="grid gap-2">
+              <Label htmlFor="material-entry-site">{ui.site}</Label>
+              {sitesQ.isPending ? (
+                <LoadingState />
+              ) : sitesQ.error ? (
+                <ErrorState error={sitesQ.error} onRetry={() => void sitesQ.refetch()} />
+              ) : !singleSite ? (
+                <EmptyState label={ui.noSites} />
+              ) : (
+                <p
+                  id="material-entry-site"
+                  data-testid="material-entry-site-fixed"
+                  className="flex h-8 items-center rounded-lg border border-input bg-muted/40 px-2.5 text-sm"
+                >
+                  {singleSite.name} ({singleSite.code})
+                </p>
+              )}
+            </div>
+          )}
 
           <DateField id="material-entry-date" testId="material-entry-date" value={date} onChange={setDate} min={minDate} max={today} />
 

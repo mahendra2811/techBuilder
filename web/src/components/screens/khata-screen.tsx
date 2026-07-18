@@ -72,6 +72,20 @@ const TARGET_ROLES: Record<KhataRole, readonly Role[]> = {
   SITE_MANAGER: ['SUPERVISOR', 'DRIVER', 'WORKER'],
 };
 
+/**
+ * BUG FIX (2026-07-18): Round 2 made the SUPERVISOR NOT a cash node for WORK-tagged
+ * transfers — the backend (`cash-transfers.service.ts` `create()`) throws FORBIDDEN
+ * the moment either party of a `tag==='WORK'` transfer is a SUPERVISOR ("Supervisors
+ * are outside the work-cash chain (Round 2) — money requests only"). `TARGET_ROLES`
+ * above still lists SUPERVISOR (correctly — he IS a valid salary/personal recipient),
+ * so the give/receive (work-cash) forms were offering him as a person option too,
+ * and picking him 403'd with the generic "outside your scope or date window" message.
+ * Salary (`tag==='SALARY'`) has no such restriction — only WORK needs the exclusion.
+ */
+function candidateRoles(role: KhataRole, tag: MoneyTag): readonly Role[] {
+  return tag === 'WORK' ? TARGET_ROLES[role].filter((r) => r !== 'SUPERVISOR') : TARGET_ROLES[role];
+}
+
 // Module-local bilingual UI (per convention — the frozen message catalogs
 // predate this 3-sub-page + rollup split; generic bits like person/amount/note
 // labels still come from `m.LEDGER_UI`).
@@ -304,6 +318,11 @@ function MoneyForm({
   const m = useMessages();
   const queryClient = useQueryClient();
   const today = useMemo(() => todayKolkata(), []);
+  // Client rule: the khata entry date fields offer exactly THREE days — today,
+  // yesterday, day-before (today−2..today). The server has no window on the
+  // ledger (see cash-transfers.service.ts create()'s "no back-limit" comment),
+  // so this is a UX-only cap, not a validation the server would otherwise reject.
+  const minDate = useMemo(() => addDays(today, -2), [today]);
   const testIdPrefix = `khata-${slice}`;
 
   const [toUserId, setToUserId] = useState<UUID | ''>('');
@@ -314,10 +333,10 @@ function MoneyForm({
   const [amountError, setAmountError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  const candidates = useMemo(
-    () => (usersQ.data ?? []).filter((u) => u.active && TARGET_ROLES[role].includes(u.role)),
-    [usersQ.data, role],
-  );
+  const candidates = useMemo(() => {
+    const roles = candidateRoles(role, tag);
+    return (usersQ.data ?? []).filter((u) => u.active && roles.includes(u.role));
+  }, [usersQ.data, role, tag]);
 
   const amountPaise = (() => {
     const n = Number(amountRupees);
@@ -429,7 +448,14 @@ function MoneyForm({
               )}
             </div>
 
-            <DateField id={`${testIdPrefix}-date`} testId={`${testIdPrefix}-date`} value={date} onChange={setDate} max={today} />
+            <DateField
+              id={`${testIdPrefix}-date`}
+              testId={`${testIdPrefix}-date`}
+              value={date}
+              onChange={setDate}
+              min={minDate}
+              max={today}
+            />
 
             <div className="grid gap-2">
               <Label htmlFor={`${testIdPrefix}-note`}>{m.LEDGER_UI.noteLabel}</Label>

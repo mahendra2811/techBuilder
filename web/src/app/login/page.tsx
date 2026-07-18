@@ -46,15 +46,15 @@ const DEV_LOGIN_GROUPS: Array<{ group: string; logins: Array<{ username: string;
   {
     group: 'Site Managers',
     logins: [
-      { username: 'sm1', label: 'Site Manager — GF' },
-      { username: 'sm2', label: 'Site Manager — ST' },
+      { username: 'sm1', label: 'Site Manager — ST' },
+      { username: 'sm2', label: 'Site Manager — GF' },
     ],
   },
   {
     group: 'Accountants',
     logins: [
-      { username: 'acct1', label: 'Accountant — GF' },
-      { username: 'acct2', label: 'Accountant — ST' },
+      { username: 'acct1', label: 'Accountant — ST' },
+      { username: 'acct2', label: 'Accountant — GF' },
     ],
   },
   {
@@ -62,8 +62,8 @@ const DEV_LOGIN_GROUPS: Array<{ group: string; logins: Array<{ username: string;
     logins: [
       { username: 'th1', label: 'Supervisor — GF (1)' },
       { username: 'th2', label: 'Supervisor — ST (1)' },
-      { username: 'th3', label: 'Supervisor — GF (2)' },
-      { username: 'th4', label: 'Supervisor — ST (2)' },
+      { username: 'th3', label: 'Supervisor — ST (2)' },
+      { username: 'th4', label: 'Supervisor — GF (2)' },
     ],
   },
   {

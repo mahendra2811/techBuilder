@@ -54,33 +54,66 @@ import { LoadingState, EmptyState, ErrorState, Notice } from "@/components/entry
 // Round 2 (CW-6): vendor money-IN — a payment can now go either direction. The frozen VENDOR_UI
 // catalog only has PAYMENT-shaped copy (amountLabel = "Amount paid"), so the direction toggle +
 // the direction-aware amount label live here, module-local, per the i18n convention.
+//
+// ACC-restructure (client, 2026-07-18): "make it a vendor and work it as a vendor only" — the
+// frozen VENDOR_UI catalog's copy still says "shop" throughout (shared across many other
+// screens' paidByCredit/shopLabel fields, so it can't be renamed there without touching other
+// roles' surfaces). This screen (SM + ACCOUNTANT, its only two callers) overrides every
+// shop-worded string it actually renders with vendor-worded module-local copy instead — same
+// convention as the direction/amount strings above. VENDOR_UI itself stays untouched.
 const UI = {
   en: {
     directionLabel: "Direction",
-    directionPayment: "We paid the shop",
-    directionReceipt: "Shop gave us money",
-    directionPaymentHint: "settles what we owe the shop.",
-    directionReceiptHint: "the shop handed the site cash (increases what we owe).",
+    directionPayment: "We paid the vendor",
+    directionReceipt: "Vendor gave us money",
+    directionPaymentHint: "settles what we owe the vendor.",
+    directionReceiptHint: "the vendor handed the site cash (increases what we owe).",
     amountLabelPayment: "Amount paid (₹)",
     amountLabelReceipt: "Amount received (₹)",
     receivedLabel: "Vendor money-IN",
     monthReceived: "Received",
+    // Vendor-worded overrides for m.VENDOR_UI's shop-worded copy (see banner above).
+    title: "Vendors (Udhaar Khata)",
+    subtitle: "Vendors you buy from on credit — track what's owed and record payments.",
+    listTitle: "Vendors",
+    listEmpty: "No vendors added yet.",
+    viewLedger: "View vendor ledger",
+    backToList: "Back to vendors",
+    addShopTitle: "Add vendor",
+    nameLabel: "Vendor name",
+    nameRequired: "Enter the vendor name.",
+    addShopSubmit: "Add vendor",
+    shopAdded: "Vendor added.",
+    ledgerTitle: "Vendor ledger",
   },
   hi: {
     directionLabel: "दिशा",
-    directionPayment: "हमने दुकान को दिया",
-    directionReceipt: "दुकान ने हमें दिया",
-    directionPaymentHint: "देना — दुकान का बकाया चुकाना।",
-    directionReceiptHint: "लेना — दुकान ने साइट को पैसे दिए (हमारा बकाया बढ़ता है)।",
+    directionPayment: "हमने वेंडर को दिया",
+    directionReceipt: "वेंडर ने हमें दिया",
+    directionPaymentHint: "देना — वेंडर का बकाया चुकाना।",
+    directionReceiptHint: "लेना — वेंडर ने साइट को पैसे दिए (हमारा बकाया बढ़ता है)।",
     amountLabelPayment: "दी गई राशि (₹)",
     amountLabelReceipt: "मिली राशि (₹)",
-    receivedLabel: "दुकान से मिला पैसा (मनी-इन)",
+    receivedLabel: "वेंडर से मिला पैसा (मनी-इन)",
     monthReceived: "मिला",
+    title: "वेंडर (उधार खाता)",
+    subtitle: "जिन वेंडरों से उधार पर सामान लेते हैं — बकाया देखें और पेमेंट दर्ज करें।",
+    listTitle: "वेंडर",
+    listEmpty: "अभी कोई वेंडर नहीं जोड़ा गया।",
+    viewLedger: "वेंडर खाता देखें",
+    backToList: "वेंडर पर वापस जाएं",
+    addShopTitle: "वेंडर जोड़ें",
+    nameLabel: "वेंडर का नाम",
+    nameRequired: "वेंडर का नाम डालें।",
+    addShopSubmit: "वेंडर जोड़ें",
+    shopAdded: "वेंडर जुड़ गया।",
+    ledgerTitle: "वेंडर खाता",
   },
 } as const;
 
 export function VendorsScreen() {
-  const m = useMessages();
+  const locale = useLocale();
+  const ui = UI[locale];
   const vendorsQ = useQuery({
     queryKey: ["vendors"],
     queryFn: () => api<Vendor[]>("GET", "/vendors"),
@@ -91,8 +124,8 @@ export function VendorsScreen() {
     <div className="grid gap-4" data-testid="vendors-screen">
       <Card>
         <CardHeader>
-          <CardTitle>{m.VENDOR_UI.title}</CardTitle>
-          <CardDescription>{m.VENDOR_UI.subtitle}</CardDescription>
+          <CardTitle>{ui.title}</CardTitle>
+          <CardDescription>{ui.subtitle}</CardDescription>
         </CardHeader>
       </Card>
 
@@ -124,10 +157,12 @@ function VendorList({
   onSelect: (id: UUID) => void;
 }) {
   const m = useMessages();
+  const locale = useLocale();
+  const ui = UI[locale];
   return (
     <Card data-testid="vendor-list">
       <CardHeader>
-        <CardTitle>{m.VENDOR_UI.listTitle}</CardTitle>
+        <CardTitle>{ui.listTitle}</CardTitle>
       </CardHeader>
       <CardContent>
         {vendorsQ.isPending ? (
@@ -135,7 +170,7 @@ function VendorList({
         ) : vendorsQ.error ? (
           <ErrorState error={vendorsQ.error} onRetry={() => void vendorsQ.refetch()} />
         ) : !vendorsQ.data || vendorsQ.data.length === 0 ? (
-          <EmptyState label={m.VENDOR_UI.listEmpty} />
+          <EmptyState label={ui.listEmpty} />
         ) : (
           <ul className="divide-y">
             {vendorsQ.data.map((v) => (
@@ -155,7 +190,7 @@ function VendorList({
                     </p>
                   </span>
                   <span className="shrink-0 text-xs text-muted-foreground underline">
-                    {m.VENDOR_UI.viewLedger}
+                    {ui.viewLedger}
                   </span>
                 </button>
               </li>
@@ -173,6 +208,8 @@ function VendorList({
 
 function CreateVendorForm() {
   const m = useMessages();
+  const locale = useLocale();
+  const ui = UI[locale];
   const queryClient = useQueryClient();
 
   const [name, setName] = useState("");
@@ -197,7 +234,7 @@ function CreateVendorForm() {
     e.preventDefault();
     setSaved(false);
     if (!name.trim()) {
-      setNameError(m.VENDOR_UI.nameRequired);
+      setNameError(ui.nameRequired);
       return;
     }
     setNameError(null);
@@ -220,12 +257,12 @@ function CreateVendorForm() {
   return (
     <Card data-testid="create-vendor">
       <CardHeader>
-        <CardTitle>{m.VENDOR_UI.addShopTitle}</CardTitle>
+        <CardTitle>{ui.addShopTitle}</CardTitle>
       </CardHeader>
       <CardContent>
         <form className="grid gap-4" noValidate onSubmit={onSubmit}>
           <div className="grid gap-2">
-            <Label htmlFor="vendor-name">{m.VENDOR_UI.nameLabel}</Label>
+            <Label htmlFor="vendor-name">{ui.nameLabel}</Label>
             <Input
               id="vendor-name"
               data-testid="vendor-name"
@@ -268,12 +305,12 @@ function CreateVendorForm() {
           )}
           {saved && (
             <Notice tone="success" testId="create-vendor-success">
-              {m.VENDOR_UI.shopAdded}
+              {ui.shopAdded}
             </Notice>
           )}
 
           <Button type="submit" data-testid="create-vendor-submit" disabled={create.isPending}>
-            {create.isPending ? m.VENDOR_UI.addingShop : m.VENDOR_UI.addShopSubmit}
+            {create.isPending ? m.VENDOR_UI.addingShop : ui.addShopSubmit}
           </Button>
         </form>
       </CardContent>
@@ -313,13 +350,13 @@ function VendorDetail({
         onClick={onBack}
       >
         <ArrowLeft className="size-4" aria-hidden="true" />
-        {m.VENDOR_UI.backToList}
+        {ui.backToList}
       </Button>
 
       <Card data-testid="vendor-ledger">
         <CardHeader>
-          <CardTitle>{vendorName ?? ledgerQ.data?.name ?? m.VENDOR_UI.ledgerTitle}</CardTitle>
-          <CardDescription>{m.VENDOR_UI.ledgerTitle}</CardDescription>
+          <CardTitle>{vendorName ?? ledgerQ.data?.name ?? ui.ledgerTitle}</CardTitle>
+          <CardDescription>{ui.ledgerTitle}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
           {ledgerQ.isPending ? (

@@ -1,24 +1,37 @@
 'use client';
 
 /**
- * Materials catalog manager (CW-8) — /site-manager/materials, /owner/materials.
+ * Materials catalog manager (CW-8; SM-sweep restructure) — /site-manager/materials,
+ * /owner/materials.
  *
  * The SM (or Owner) defines the org's 10-20 material TYPES once (e.g. cement,
  * sand, steel). Each type carries a `MaterialTypeConfig` (shared/src/config.ts)
  * that drives who may enter transactions for it downstream:
- *   - supervisorLogs: the SUPERVISOR's entry is the FINAL, accountable record
- *     (backend stamps enteredRole=SUPERVISOR, finalized=true).
+ *   - supervisorLogs: the SUPERVISOR's (also SM's/Owner's) entry is the FINAL,
+ *     accountable record (backend stamps enteredRole=<role>, finalized=true).
  *   - driverPicks: a DRIVER may additionally submit a data-only PICK for this
- *     type (finalized=false) — matched against the supervisor's entry later by
- *     the accountant (a later work order builds that review screen).
+ *     type (finalized=false) — matched against the final entry later by the
+ *     accountant (a later work order builds that review screen).
  *   - driverViewOnly: drivers may see this type's numbers but never enter them.
  *
- * This screen only manages the catalog (create + rename/retoggle); it does not
- * enter any material transactions itself — that is the SUPERVISOR's
- * material-entry-screen (and, later, the driver pick screen).
+ * SM-sweep restructure: the landing view is now exactly three tappable section
+ * cards (`useSubPage`, the same in-page list↔detail split fleet-screen.tsx
+ * uses) — no inline list/form on the landing itself:
+ *   (a) "Material types" — the pre-existing read + inline-edit list.
+ *   (b) "Add material type" — the SAME types list, compact + read-only, shown
+ *       above the create form (client: "will show the current material types
+ *       available and the form to create a new material type").
+ *   (c) "Material entry" — NEW for SM+Owner: the exact same IN/CONSUME entry
+ *       form the SUPERVISOR uses (`material-entry-screen.tsx`'s `MaterialEntryScreen`,
+ *       now role-aware and reused here directly rather than duplicated) —
+ *       backend fact: `POST /records/material-txn` now accepts OWNER too
+ *       ("whatever the supervisor can file, SM and OWNER can file too"). SM
+ *       gets the auto single-site fixed label (no picker); OWNER gets a real
+ *       site picker (he's genuinely multi-site) — both live INSIDE that form.
  */
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ChevronRight } from 'lucide-react';
 import { uuidv7 } from 'uuidv7';
 import { UOMS, type CreateMaterialInput, type Material, type MaterialTypeConfig, type UpdateMaterialInput } from '@techbuilder/contracts';
 import { ApiClientError, api } from '@/lib/api-client';
@@ -29,15 +42,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
+import { SubPageHeader, useSubPage } from '@/components/ui/sub-page';
 import { LoadingState, ErrorState, EmptyState, Notice } from '@/components/entry/states';
+import { MaterialEntryScreen } from './material-entry-screen';
 
 const UI = {
   en: {
     title: 'Materials catalog',
     subtitle: 'Define the material types your sites track — who logs each one is set here.',
     listTitle: 'Material types',
+    listHint: 'See and edit the material types you track.',
     listEmpty: 'No material types yet — add the first one below.',
     addTitle: 'Add a material type',
+    addHint: 'See the current list, then add a new material type.',
     nameLabel: 'Name',
     namePlaceholder: 'e.g. Cement',
     unitLabel: 'Unit',
@@ -53,13 +70,17 @@ const UI = {
     toggleSupervisorLogs: 'Supervisor logs it',
     toggleDriverPicks: 'Driver can pick it',
     toggleDriverViewOnly: 'Driver view-only',
+    entryTitle: 'Material entry',
+    entryHint: "Log today's material IN / used, the same way the supervisor does.",
   },
   hi: {
     title: 'सामान की सूची',
     subtitle: 'अपनी साइटों पर ट्रैक होने वाले सामान के प्रकार यहाँ तय करें — कौन भरेगा यह भी यहीं तय होता है।',
     listTitle: 'सामान के प्रकार',
+    listHint: 'अपने सामान के प्रकार देखें और बदलें।',
     listEmpty: 'अभी कोई सामान नहीं जोड़ा गया — नीचे पहला जोड़ें।',
     addTitle: 'नया सामान जोड़ें',
+    addHint: 'मौजूदा सूची देखें, फिर नया सामान जोड़ें।',
     nameLabel: 'नाम',
     namePlaceholder: 'जैसे: सीमेंट',
     unitLabel: 'इकाई',
@@ -75,6 +96,8 @@ const UI = {
     toggleSupervisorLogs: 'सुपरवाइज़र भरता है',
     toggleDriverPicks: 'ड्राइवर चुन सकता है',
     toggleDriverViewOnly: 'ड्राइवर सिर्फ़ देखे',
+    entryTitle: 'सामग्री एंट्री',
+    entryHint: 'आज का सामान आया / इस्तेमाल हुआ दर्ज करें — जैसे सुपरवाइज़र करता है।',
   },
 } as const;
 
@@ -92,15 +115,45 @@ const CONFIG_TOGGLE_KEYS: Array<keyof MaterialTypeConfig> = ['supervisorLogs', '
 
 const DEFAULT_CONFIG: MaterialTypeConfig = { supervisorLogs: true, driverPicks: false, driverViewOnly: false };
 
-export function MaterialsScreen() {
+type MaterialsRole = 'OWNER' | 'SITE_MANAGER';
+type MaterialsSection = 'types' | 'add' | 'entry';
+
+export function MaterialsScreen({ role }: { role: MaterialsRole }) {
   const locale = useLocale();
   const ui = UI[locale];
   const queryClient = useQueryClient();
+  const { current: section, open: openSection, close: closeSection } = useSubPage<MaterialsSection>();
 
   const materialsQ = useQuery({ queryKey: ['materials'], queryFn: () => api<Material[]>('GET', '/materials') });
-  const [editingId, setEditingId] = useState<string | null>(null);
-
   const invalidate = () => void queryClient.invalidateQueries({ queryKey: ['materials'] });
+
+  if (section === 'types') {
+    return (
+      <div className="grid gap-4" data-testid="materials-screen">
+        <SubPageHeader title={ui.listTitle} onBack={closeSection} />
+        <MaterialTypesList ui={ui} materialsQ={materialsQ} invalidate={invalidate} />
+      </div>
+    );
+  }
+
+  if (section === 'add') {
+    return (
+      <div className="grid gap-4" data-testid="materials-screen">
+        <SubPageHeader title={ui.addTitle} onBack={closeSection} />
+        <CompactMaterialsList ui={ui} materialsQ={materialsQ} />
+        <CreateMaterialForm ui={ui} onCreated={invalidate} />
+      </div>
+    );
+  }
+
+  if (section === 'entry') {
+    return (
+      <div className="grid gap-4" data-testid="materials-screen">
+        <SubPageHeader title={ui.entryTitle} onBack={closeSection} />
+        <MaterialEntryScreen role={role} />
+      </div>
+    );
+  }
 
   return (
     <div className="grid gap-4" data-testid="materials-screen">
@@ -109,64 +162,150 @@ export function MaterialsScreen() {
           <CardTitle>{ui.title}</CardTitle>
           <CardDescription>{ui.subtitle}</CardDescription>
         </CardHeader>
-      </Card>
-
-      <Card data-testid="materials-list">
-        <CardHeader>
-          <CardTitle>{ui.listTitle}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {materialsQ.isPending ? (
-            <LoadingState />
-          ) : materialsQ.error ? (
-            <ErrorState error={materialsQ.error} onRetry={() => void materialsQ.refetch()} />
-          ) : !materialsQ.data || materialsQ.data.length === 0 ? (
-            <EmptyState label={ui.listEmpty} />
-          ) : (
-            <ul className="divide-y">
-              {materialsQ.data.map((mat) =>
-                editingId === mat.id ? (
-                  <li key={mat.id} className="py-3 first:pt-0 last:pb-0" data-testid={`material-row-${mat.id}`}>
-                    <EditMaterialForm ui={ui} material={mat} onDone={() => setEditingId(null)} onSaved={invalidate} />
-                  </li>
-                ) : (
-                  <li key={mat.id} className="py-3 first:pt-0 last:pb-0" data-testid={`material-row-${mat.id}`}>
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium">{mat.name}</p>
-                        <p className="truncate text-xs text-muted-foreground">{mat.uom}</p>
-                      </span>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        data-testid={`material-row-${mat.id}-edit`}
-                        onClick={() => setEditingId(mat.id)}
-                      >
-                        {ui.edit}
-                      </Button>
-                    </div>
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {CONFIG_TOGGLE_KEYS.filter((k) => (mat.config ?? DEFAULT_CONFIG)[k]).map((k) => (
-                        <span
-                          key={k}
-                          data-testid={`material-row-${mat.id}-badge-${k}`}
-                          className="rounded bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium text-primary"
-                        >
-                          {ui[CONFIG_TOGGLE_UI_KEY[k]]}
-                        </span>
-                      ))}
-                    </div>
-                  </li>
-                ),
-              )}
-            </ul>
-          )}
+        <CardContent className="grid gap-2">
+          <SectionCard title={ui.listTitle} hint={ui.listHint} testId="materials-open-types" onClick={() => openSection('types')} />
+          <SectionCard title={ui.addTitle} hint={ui.addHint} testId="materials-open-add" onClick={() => openSection('add')} />
+          <SectionCard title={ui.entryTitle} hint={ui.entryHint} testId="materials-open-entry" onClick={() => openSection('entry')} />
         </CardContent>
       </Card>
-
-      <CreateMaterialForm ui={ui} onCreated={invalidate} />
     </div>
+  );
+}
+
+function SectionCard({
+  title,
+  hint,
+  testId,
+  onClick,
+}: {
+  title: string;
+  hint: string;
+  testId: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="flex w-full items-center justify-between gap-3 rounded-lg border border-input px-3.5 py-3 text-left hover:bg-accent"
+      data-testid={testId}
+      onClick={onClick}
+    >
+      <span className="grid min-w-0 gap-0.5">
+        <span className="text-sm font-medium">{title}</span>
+        <span className="truncate text-xs text-muted-foreground">{hint}</span>
+      </span>
+      <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// (a) Material types — read + inline edit (unchanged from before the restructure)
+// ---------------------------------------------------------------------------
+
+function MaterialTypesList({
+  ui,
+  materialsQ,
+  invalidate,
+}: {
+  ui: UiText;
+  materialsQ: ReturnType<typeof useQuery<Material[]>>;
+  invalidate: () => void;
+}) {
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  return (
+    <Card data-testid="materials-list">
+      <CardHeader>
+        <CardTitle>{ui.listTitle}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {materialsQ.isPending ? (
+          <LoadingState />
+        ) : materialsQ.error ? (
+          <ErrorState error={materialsQ.error} onRetry={() => void materialsQ.refetch()} />
+        ) : !materialsQ.data || materialsQ.data.length === 0 ? (
+          <EmptyState label={ui.listEmpty} />
+        ) : (
+          <ul className="divide-y">
+            {materialsQ.data.map((mat) =>
+              editingId === mat.id ? (
+                <li key={mat.id} className="py-3 first:pt-0 last:pb-0" data-testid={`material-row-${mat.id}`}>
+                  <EditMaterialForm ui={ui} material={mat} onDone={() => setEditingId(null)} onSaved={invalidate} />
+                </li>
+              ) : (
+                <li key={mat.id} className="py-3 first:pt-0 last:pb-0" data-testid={`material-row-${mat.id}`}>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{mat.name}</p>
+                      <p className="truncate text-xs text-muted-foreground">{mat.uom}</p>
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      data-testid={`material-row-${mat.id}-edit`}
+                      onClick={() => setEditingId(mat.id)}
+                    >
+                      {ui.edit}
+                    </Button>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {CONFIG_TOGGLE_KEYS.filter((k) => (mat.config ?? DEFAULT_CONFIG)[k]).map((k) => (
+                      <span
+                        key={k}
+                        data-testid={`material-row-${mat.id}-badge-${k}`}
+                        className="rounded bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium text-primary"
+                      >
+                        {ui[CONFIG_TOGGLE_UI_KEY[k]]}
+                      </span>
+                    ))}
+                  </div>
+                </li>
+              ),
+            )}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// (b) Add material type — the CURRENT types list, compact + read-only, shown
+// above the create form (client: "will show the current material types
+// available and the form to create a new material type").
+// ---------------------------------------------------------------------------
+
+function CompactMaterialsList({ ui, materialsQ }: { ui: UiText; materialsQ: ReturnType<typeof useQuery<Material[]>> }) {
+  return (
+    <Card size="sm" data-testid="materials-compact-list">
+      <CardHeader>
+        <CardTitle>{ui.listTitle}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {materialsQ.isPending ? (
+          <LoadingState />
+        ) : materialsQ.error ? (
+          <ErrorState error={materialsQ.error} onRetry={() => void materialsQ.refetch()} />
+        ) : !materialsQ.data || materialsQ.data.length === 0 ? (
+          <EmptyState label={ui.listEmpty} />
+        ) : (
+          <ul className="divide-y">
+            {materialsQ.data.map((mat) => (
+              <li
+                key={mat.id}
+                className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0"
+                data-testid={`materials-compact-row-${mat.id}`}
+              >
+                <span className="truncate text-sm font-medium">{mat.name}</span>
+                <span className="shrink-0 text-xs text-muted-foreground">{mat.uom}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

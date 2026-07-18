@@ -66,8 +66,12 @@ const NAV_DEFS: NavDef[] = [
   { action: 'record.enter', labelKey: 'progress', path: '/progress', icon: NotebookPen, testId: 'nav-progress' },
   // The old combined Records screen stays routable at /records but is out of the menu.
   // { action: 'record.enter', labelKey: 'records', path: '/records', icon: NotebookPen },
-  // The SM's /site-manager/vehicle entry keeps its original label+testid untouched.
-  { action: 'vehicleLog.enter', labelKey: 'vehicleFuel', path: '/vehicle', icon: Fuel, roles: ['SITE_MANAGER'], testId: 'nav-vehicleLog-enter' },
+  // SM testing-feedback round 2: the combined /site-manager/vehicle page (fuel entry
+  // only) is replaced by the /site-manager/fuel hub (Fuel entry + Fuel monitor
+  // sub-pages — the monitor half reuses accountant-diesel-screen.tsx). Labelled "Fuel"
+  // per client wording (not "Vehicle/Fuel" or "Diesel") — reuses the DRIVER's
+  // `fuelEntry` label key (same EN/HI wording convention as the diesel-adjacent labels).
+  { action: 'vehicleLog.enter', labelKey: 'fuelEntry', path: '/fuel', icon: Fuel, roles: ['SITE_MANAGER'], testId: 'nav-fuel-sm' },
   // frozen.10 (DRV-2 nav restructure): DRIVER's own /driver/vehicle entry, relabeled
   // "Vehicle" (was shared "Vehicle/Fuel") now that the page also hosts the vehicle-change
   // request form + history (see driver/vehicle/page.tsx). Distinct testId since it shares
@@ -127,6 +131,11 @@ const NAV_DEFS: NavDef[] = [
   { action: 'record.enter', labelKey: 'materials', path: '/materials', icon: Boxes, roles: ['SUPERVISOR'], testId: 'nav-materials-supervisor' },
   // C7 diesel: the supervisor's bulk-stock + per-vehicle issuance forms (his side of the match).
   { action: 'record.enter', labelKey: 'diesel', path: '/diesel', icon: Fuel, roles: ['SUPERVISOR'], testId: 'nav-diesel' },
+  // Accountant restructure (2026-07-18): read-only diesel monitoring (stock/purchases/
+  // issuances/flags) for his own site(s) — no write actions, so gated on view.all not
+  // record.enter. Distinct testId since it shares the `view.all` action with several other
+  // ACCOUNTANT-only entries above (ledger/vendors).
+  { action: 'view.all', labelKey: 'diesel', path: '/diesel', icon: Fuel, roles: ['ACCOUNTANT'], testId: 'nav-diesel-accountant' },
   // Complaint box: four roles raise; SM/Owner read the inbox (OWNER-target rows never reach an SM).
   { action: 'view.all', labelKey: 'complaints', path: '/complaints', icon: MessageSquareWarning, roles: ['WORKER', 'DRIVER', 'SUPERVISOR', 'ACCOUNTANT'], testId: 'nav-complaints' },
   { action: 'view.all', labelKey: 'complaints', path: '/complaints', icon: MessageSquareWarning, roles: ['SITE_MANAGER', 'OWNER'], testId: 'nav-complaints-inbox' },

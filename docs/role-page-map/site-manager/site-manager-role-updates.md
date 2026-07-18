@@ -1,5 +1,12 @@
 # SITE_MANAGER role — client review updates (round: role-by-role audit)
 
+> **✅ BUILT (frozen.10/11) + post-audit round (client testing feedback, 2026-07-18 night):**
+> 1. **Materials → 3 sub-pages**: Material types · Add material type (current list shown above the form) · **Material entry** — the supervisor's IN/CONSUME form now shared by SM and OWNER (fallback rule: "whatever the supervisor files, SM/Owner can file"; backend gained an explicit OWNER allowance with an in-org site check).
+> 2. **SM never sees a site selector**: removed from fleet add-vehicle, expense, progress, insights, material entry (auto = his one site; Owner keeps pickers).
+> 3. **People: "Add login" + "Add worker" merged into one "Add member" form** — workers/drivers always create the person, optional "create app login too" toggle (hidden+forced ON for a SUPERVISOR caller — a person without a login would fall outside his crew scope); staff roles = mandatory login.
+> 4. **ID cards**: section renamed "Site team ID cards / साइट टीम ID कार्ड"; tapping a card opens the full detail (incl. NAME); pencil edit now also edits the person's name.
+> 5. *(round 2, same night)* **Requests** = form on top + lazy "Request history" (all statuses). **`/site-manager/fuel` replaces `/site-manager/vehicle`** (nav "Fuel"): two sub-pages — Fuel entry (the SM fuel form + recent) · Fuel monitor (stock, day-wise purchases ₹, truck-wise issuances + match chips, 🚩 flags — the accountant diesel monitor generalized). **Progress** (SM) = form on top + "Today's reports" (incl. supervisors') + lazy "Earlier reports". **Dashboard** (SM): inline diesel-check card removed (lives in Fuel monitor); Quick Actions expanded to 8 shortcuts (Fuel, Insights, Khata, People, Fleet, Materials, Reports, Complaints).
+
 > **Status: 📋 PENDING — DO NOT BUILD YET.** Part of the role-by-role client review (2026-07-18); all roles build together in one pass at the end. Tracker: [`../ROLE-AUDIT-TRACKER.md`](../ROLE-AUDIT-TRACKER.md).
 >
 > Current-state facts code-verified against `complaints-inbox-screen.tsx`, `complaint-screen.tsx`, `sm-settings-screen.tsx`, `ledger-screen.tsx`, `insights-screen.tsx`, `fleet-screen.tsx`, `people-screen.tsx`, `shared/src/db/schema.ts`, `shared/src/config.ts` (contracts `frozen.9`).

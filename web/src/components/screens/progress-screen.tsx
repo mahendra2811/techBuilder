@@ -35,6 +35,15 @@
  * the same reason expense-screen.tsx has none: creates are idempotent by
  * client-generated id (the backend-modules.md pattern), not
  * optimistic-concurrency updates.
+ *
+ * SM testing-feedback round 2: the SITE_MANAGER variant renders the form on top
+ * (default view, unchanged) then TWO lazy sections instead of the two eager
+ * cards below — "Today's reports" (query stays eager, it already powers the
+ * "covered" banner above the form, so revealing the list is an instant cache
+ * hit, never a second round trip — the accountant-diesel-screen.tsx idiom) and
+ * "Earlier reports" (the 7-day grouped history — genuinely lazy, its query
+ * only fires once revealed). The SUPERVISOR variant is UNTOUCHED — both cards
+ * stay eager exactly as before.
  */
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -45,7 +54,7 @@ import { ApiClientError, api, me } from '@/lib/api-client';
 import { addDays, formatBusinessDate, formatKolkataDateTime, todayKolkata } from '@/lib/business-date';
 import { uploadPhotos, uploadVoice } from '@/lib/media-upload';
 import { PHOTO_ONLY_NOTE_TEXT, apiErrorMessage, type Messages } from '@/lib/i18n/messages';
-import { useMessages } from '@/lib/i18n/locale-context';
+import { useLocale, useMessages } from '@/lib/i18n/locale-context';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -56,18 +65,64 @@ import { PhotoMultiField } from '@/components/entry/photo-multi-field';
 import { VoiceField } from '@/components/entry/voice-field';
 import { SitePicker } from '@/components/entry/site-picker';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
+import { LazyHistorySection, useLazySection } from '@/components/ui/lazy-history';
 
 type EntryRole = 'SITE_MANAGER' | 'SUPERVISOR';
 const MAX_SITE_PHOTOS = 20;
 const MAX_BILL_PHOTOS = 4;
 
+/** SM-only lazy-section title — distinct from the shared PROGRESS_UI.historyTitle
+ *  ("Last 7 days") that the SUPERVISOR variant keeps showing unchanged (module-local
+ *  bilingual const per convention — see khata-screen.tsx / accountant-diesel-screen.tsx). */
+const SM_EARLIER_UI = {
+  en: { title: 'Earlier reports' },
+  hi: { title: 'पुरानी रिपोर्ट' },
+} as const;
+
+/** SM-sweep: an SM's one site rendered as a fixed muted label — no select ever,
+ *  regardless of how many rows GET /sites happens to return (same defensive
+ *  pattern expense-screen.tsx already uses for the SUPERVISOR role). */
+function FixedSiteField({
+  site,
+  isLoading,
+  error,
+  onRetry,
+  testId,
+}: {
+  site: Site | undefined;
+  isLoading: boolean;
+  error: unknown;
+  onRetry: () => void;
+  testId: string;
+}) {
+  const m = useMessages();
+  if (isLoading) return <LoadingState />;
+  if (error) return <ErrorState error={error} onRetry={onRetry} />;
+  if (!site) return <EmptyState label={m.ENTRY_UI.noSites} />;
+  return (
+    <div className="grid gap-2">
+      <Label htmlFor={testId}>{m.ENTRY_UI.site}</Label>
+      <p
+        id={testId}
+        data-testid={testId}
+        className="flex h-8 items-center rounded-lg border border-input bg-muted/40 px-2.5 text-sm"
+      >
+        {site.name} ({site.code})
+      </p>
+    </div>
+  );
+}
+
 export function ProgressScreen({ role }: { role: EntryRole }) {
   const m = useMessages();
+  const locale = useLocale();
   const queryClient = useQueryClient();
   const today = useMemo(() => todayKolkata(), []);
 
   const [pickedSiteId, setPickedSiteId] = useState<UUID | ''>('');
   const [date, setDate] = useState<BusinessDate>(today);
+  // SM only — gates the "Earlier reports" query; unused (but harmless) for SUPERVISOR.
+  const earlierLazy = useLazySection();
 
   const meQ = useQuery({ queryKey: ['me'], queryFn: me });
   const sitesQ = useQuery({ queryKey: ['sites'], queryFn: () => api<Site[]>('GET', '/sites') });
@@ -98,7 +153,9 @@ export function ProgressScreen({ role }: { role: EntryRole }) {
   const historyQ = useQuery({
     queryKey: ['records', 'progress', siteId, historyFrom, today],
     queryFn: () => api<ProgressNote[]>('GET', `/records/progress?${historyQs}`),
-    enabled: siteId !== '',
+    // SM: genuinely lazy (only fires once the "Earlier reports" section is revealed).
+    // SUPERVISOR: unchanged — eager as soon as a site is resolved.
+    enabled: siteId !== '' && (role !== 'SITE_MANAGER' || earlierLazy.shown),
   });
 
   const invalidate = () => {
@@ -113,14 +170,27 @@ export function ProgressScreen({ role }: { role: EntryRole }) {
           <CardDescription>{m.PROGRESS_UI.subtitle}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
-          <SitePicker
-            sites={sites}
-            isLoading={sitesQ.isPending}
-            value={siteId}
-            onChange={setPickedSiteId}
-            error={sitesQ.error}
-            onRetry={() => void sitesQ.refetch()}
-          />
+          {role === 'SITE_MANAGER' ? (
+            // SM-sweep: an SM must never see a site selector — GET /sites is
+            // server-scoped to his one site, so it's auto-picked (shown as a
+            // fixed muted label, never a dropdown, regardless of list length).
+            <FixedSiteField
+              site={sites?.[0]}
+              isLoading={sitesQ.isPending}
+              error={sitesQ.error}
+              onRetry={() => void sitesQ.refetch()}
+              testId="progress-site-fixed"
+            />
+          ) : (
+            <SitePicker
+              sites={sites}
+              isLoading={sitesQ.isPending}
+              value={siteId}
+              onChange={setPickedSiteId}
+              error={sitesQ.error}
+              onRetry={() => void sitesQ.refetch()}
+            />
+          )}
           <DateField id="progress-date" testId="progress-date" value={date} onChange={setDate} max={today} />
 
           {/* Filing another report is NEVER blocked by this — informational only. */}
@@ -137,21 +207,62 @@ export function ProgressScreen({ role }: { role: EntryRole }) {
         </CardContent>
       </Card>
 
-      <TodaysReports
-        notes={todaysNotes}
-        isLoading={siteId !== '' && todayQ.isPending}
-        error={todayQ.error}
-        onRetry={() => void todayQ.refetch()}
-        userName={userName}
-      />
+      {role === 'SITE_MANAGER' ? (
+        <>
+          <Card size="sm" data-testid="progress-today-reports">
+            <CardContent className="pt-4">
+              <LazyHistorySection title={m.PROGRESS_UI.todaysReportsTitle} testId="progress-today-lazy">
+                <TodaysReportsBody
+                  notes={todaysNotes}
+                  isLoading={siteId !== '' && todayQ.isPending}
+                  error={todayQ.error}
+                  onRetry={() => void todayQ.refetch()}
+                  userName={userName}
+                />
+              </LazyHistorySection>
+            </CardContent>
+          </Card>
 
-      <ProgressHistory
-        notes={historyQ.data}
-        isLoading={siteId !== '' && historyQ.isPending}
-        error={historyQ.error}
-        onRetry={() => void historyQ.refetch()}
-        userName={userName}
-      />
+          <Card size="sm" data-testid="progress-history">
+            <CardContent className="pt-4">
+              <LazyHistorySection
+                title={SM_EARLIER_UI[locale].title}
+                shown={earlierLazy.shown}
+                onFirstShow={earlierLazy.show}
+                onRefresh={() => void historyQ.refetch()}
+                refreshing={historyQ.isFetching}
+                testId="progress-earlier-lazy"
+              >
+                <ProgressHistoryBody
+                  notes={historyQ.data}
+                  isLoading={historyQ.isPending}
+                  error={historyQ.error}
+                  onRetry={() => void historyQ.refetch()}
+                  userName={userName}
+                />
+              </LazyHistorySection>
+            </CardContent>
+          </Card>
+        </>
+      ) : (
+        <>
+          <TodaysReports
+            notes={todaysNotes}
+            isLoading={siteId !== '' && todayQ.isPending}
+            error={todayQ.error}
+            onRetry={() => void todayQ.refetch()}
+            userName={userName}
+          />
+
+          <ProgressHistory
+            notes={historyQ.data}
+            isLoading={siteId !== '' && historyQ.isPending}
+            error={historyQ.error}
+            onRetry={() => void historyQ.refetch()}
+            userName={userName}
+          />
+        </>
+      )}
     </div>
   );
 }
@@ -321,6 +432,34 @@ function ProgressForm({
 // Today's reports (who + time + text + attachment count)
 // ---------------------------------------------------------------------------
 
+/** Body-only content (loading/error/empty/list) — shared by the SUPERVISOR's eager
+ *  card below and the SM's lazy-wrapped section (see ProgressScreen). */
+function TodaysReportsBody({
+  notes,
+  isLoading,
+  error,
+  onRetry,
+  userName,
+}: {
+  notes: ProgressNote[];
+  isLoading: boolean;
+  error: unknown;
+  onRetry: () => void;
+  userName: (id: UUID) => string;
+}) {
+  const m = useMessages();
+  if (isLoading) return <LoadingState />;
+  if (error) return <ErrorState error={error} onRetry={onRetry} />;
+  if (notes.length === 0) return <EmptyState label={m.PROGRESS_UI.todaysReportsEmpty} />;
+  return (
+    <ul className="divide-y">
+      {notes.map((n) => (
+        <ReportRow key={n.id} note={n} userName={userName} testId={`progress-today-row-${n.id}`} />
+      ))}
+    </ul>
+  );
+}
+
 function TodaysReports({
   notes,
   isLoading,
@@ -341,19 +480,7 @@ function TodaysReports({
         <CardTitle>{m.PROGRESS_UI.todaysReportsTitle}</CardTitle>
       </CardHeader>
       <CardContent>
-        {isLoading ? (
-          <LoadingState />
-        ) : error ? (
-          <ErrorState error={error} onRetry={onRetry} />
-        ) : notes.length === 0 ? (
-          <EmptyState label={m.PROGRESS_UI.todaysReportsEmpty} />
-        ) : (
-          <ul className="divide-y">
-            {notes.map((n) => (
-              <ReportRow key={n.id} note={n} userName={userName} testId={`progress-today-row-${n.id}`} />
-            ))}
-          </ul>
-        )}
+        <TodaysReportsBody notes={notes} isLoading={isLoading} error={error} onRetry={onRetry} userName={userName} />
       </CardContent>
     </Card>
   );
@@ -362,6 +489,42 @@ function TodaysReports({
 // ---------------------------------------------------------------------------
 // Last-7-days history, grouped by day
 // ---------------------------------------------------------------------------
+
+/** Body-only content (loading/error/empty/grouped list) — shared by the SUPERVISOR's
+ *  eager card below and the SM's lazy-wrapped "Earlier reports" section. */
+function ProgressHistoryBody({
+  notes,
+  isLoading,
+  error,
+  onRetry,
+  userName,
+}: {
+  notes: ProgressNote[] | undefined;
+  isLoading: boolean;
+  error: unknown;
+  onRetry: () => void;
+  userName: (id: UUID) => string;
+}) {
+  const m = useMessages();
+  const groups = useMemo(() => groupByBusinessDate(notes ?? []), [notes]);
+  if (isLoading) return <LoadingState />;
+  if (error) return <ErrorState error={error} onRetry={onRetry} />;
+  if (groups.length === 0) return <EmptyState label={m.PROGRESS_UI.historyEmpty} />;
+  return (
+    <div className="grid gap-3">
+      {groups.map((g) => (
+        <div key={g.date}>
+          <p className="mb-1 text-xs font-medium text-muted-foreground">{formatBusinessDate(g.date)}</p>
+          <ul className="divide-y" data-testid={`progress-history-day-${g.date}`}>
+            {g.notes.map((n) => (
+              <ReportRow key={n.id} note={n} userName={userName} testId={`progress-history-row-${n.id}`} />
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function ProgressHistory({
   notes,
@@ -377,34 +540,13 @@ function ProgressHistory({
   userName: (id: UUID) => string;
 }) {
   const m = useMessages();
-  const groups = useMemo(() => groupByBusinessDate(notes ?? []), [notes]);
-
   return (
     <Card size="sm" data-testid="progress-history">
       <CardHeader>
         <CardTitle>{m.PROGRESS_UI.historyTitle}</CardTitle>
       </CardHeader>
       <CardContent>
-        {isLoading ? (
-          <LoadingState />
-        ) : error ? (
-          <ErrorState error={error} onRetry={onRetry} />
-        ) : groups.length === 0 ? (
-          <EmptyState label={m.PROGRESS_UI.historyEmpty} />
-        ) : (
-          <div className="grid gap-3">
-            {groups.map((g) => (
-              <div key={g.date}>
-                <p className="mb-1 text-xs font-medium text-muted-foreground">{formatBusinessDate(g.date)}</p>
-                <ul className="divide-y" data-testid={`progress-history-day-${g.date}`}>
-                  {g.notes.map((n) => (
-                    <ReportRow key={n.id} note={n} userName={userName} testId={`progress-history-row-${n.id}`} />
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        )}
+        <ProgressHistoryBody notes={notes} isLoading={isLoading} error={error} onRetry={onRetry} userName={userName} />
       </CardContent>
     </Card>
   );

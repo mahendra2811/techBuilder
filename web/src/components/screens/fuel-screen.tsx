@@ -1,7 +1,9 @@
 'use client';
 
 /**
- * Fuel entry (DRIVER — /driver/vehicle; SITE_MANAGER — /site-manager/vehicle).
+ * Fuel entry (DRIVER — /driver/vehicle; SITE_MANAGER — the "Fuel entry" sub-page of
+ * /site-manager/fuel, see site-manager/fuel/page.tsx — replaces the old combined
+ * /site-manager/vehicle page, SM testing-feedback round 2).
  * GET /vehicles is server-scoped per role (driver: assigned vehicle(s); SM:
  * their sites' fleet): exactly one renders as a fixed card, several as a
  * native select. `role` only widens the date picker to the role's backdating

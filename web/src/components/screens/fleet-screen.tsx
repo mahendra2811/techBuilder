@@ -6,7 +6,10 @@
  *       with type/site/driver names resolved client-side from the sibling lists,
  *   (b) an "add vehicle" form (site placement mirrors the backend scope rule:
  *       an SM must place a new vehicle on one of their own sites; the Owner may
- *       place it anywhere or leave it unassigned),
+ *       place it anywhere or leave it unassigned). SM-sweep: the SM never sees a
+ *       site select at all — GET /sites is server-scoped to his one site, so it's
+ *       auto-picked (shown as a fixed muted label); only the Owner gets the real
+ *       pickable site select (he's genuinely multi-site),
  *   (c) a small vehicle-type list + "add vehicle type" form — both roles hold
  *       `vehicle.manage`, so both may add a type (keeps the picker self-serve;
  *       no separate admin-only screen needed for this small a form).
@@ -250,13 +253,17 @@ function CreateVehicleForm({
   const [vehicleTypeId, setVehicleTypeId] = useState<UUID | ''>('');
   const [regNo, setRegNo] = useState('');
   const [name, setName] = useState('');
-  const [assignedSiteId, setAssignedSiteId] = useState<UUID | ''>('');
+  const [pickedSiteId, setPickedSiteId] = useState<UUID | ''>('');
   const [assignedDriverPersonId, setAssignedDriverPersonId] = useState<UUID | ''>('');
   const [status, setStatus] = useState<VehicleStatus>('IDLE');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState(false);
 
   const siteRequired = role === 'SITE_MANAGER';
+  // SM-sweep: an SM must never see a site selector — GET /sites returns exactly
+  // his one site, so it's auto-picked (derived, no picker at all). The Owner
+  // keeps the full pickable select (he's genuinely multi-site) — unchanged.
+  const assignedSiteId: UUID | '' = role === 'SITE_MANAGER' ? (sites?.[0]?.id ?? '') : pickedSiteId;
   // Drivers are the labour-master rows with skill DRIVER — the sensible subset
   // to offer here (any person could technically be picked, but the domain
   // intent of "driver" maps to that skill in the seed data + backend model).
@@ -268,7 +275,7 @@ function CreateVehicleForm({
       setSaved(true);
       setRegNo('');
       setName('');
-      setAssignedSiteId('');
+      setPickedSiteId('');
       setAssignedDriverPersonId('');
       setStatus('IDLE');
       setErrors({});
@@ -367,16 +374,33 @@ function CreateVehicleForm({
 
           <div className="grid gap-2">
             <Label htmlFor="vehicle-site">{m.FLEET_UI.site}</Label>
-            {sitesLoading ? (
+            {role === 'SITE_MANAGER' ? (
+              // SM-sweep: no site select — GET /sites is server-scoped to his one
+              // site, so it's auto-picked and shown as a fixed label (never a
+              // dropdown), matching the pattern used on his other entry screens.
+              sitesLoading ? (
+                <LoadingState />
+              ) : !sites || sites.length === 0 ? (
+                <EmptyState label={m.ENTRY_UI.noSites} />
+              ) : (
+                <p
+                  id="vehicle-site"
+                  data-testid="vehicle-site-fixed"
+                  className="flex h-8 items-center rounded-lg border border-input bg-muted/40 px-2.5 text-sm"
+                >
+                  {sites[0]!.name} ({sites[0]!.code})
+                </p>
+              )
+            ) : sitesLoading ? (
               <LoadingState />
             ) : (
               <NativeSelect
                 id="vehicle-site"
                 data-testid="vehicle-site"
-                value={assignedSiteId}
-                onChange={(e) => setAssignedSiteId(e.target.value)}
+                value={pickedSiteId}
+                onChange={(e) => setPickedSiteId(e.target.value)}
               >
-                <option value="">{siteRequired ? m.FLEET_UI.selectSite : m.FLEET_UI.noSite}</option>
+                <option value="">{m.FLEET_UI.noSite}</option>
                 {(sites ?? []).map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name} ({s.code})

@@ -20,6 +20,7 @@ import { formatBusinessDateShort, todayKolkata } from '@/lib/business-date';
 import { useMessages } from '@/lib/i18n/locale-context';
 import { formatPaise } from '@/lib/money';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
 import { ShowMore } from '@/components/ui/show-more';
 import { SitePicker } from '@/components/entry/site-picker';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
@@ -28,6 +29,39 @@ import { ProgressList, ExpenseList, RequestList } from '@/components/insights/re
 import { PeriodSummary } from '@/components/insights/period-summary';
 
 type InsightsRole = 'OWNER' | 'SITE_MANAGER';
+
+/** SM-sweep: an SM's one site rendered as a fixed muted label — no select ever,
+ *  regardless of how many rows GET /sites happens to return (same defensive
+ *  pattern expense-screen.tsx already uses for the SUPERVISOR role). The Owner
+ *  keeps the real pickable SitePicker below (he's genuinely multi-site). */
+function FixedSiteField({
+  site,
+  isLoading,
+  error,
+  onRetry,
+}: {
+  site: Site | undefined;
+  isLoading: boolean;
+  error: unknown;
+  onRetry: () => void;
+}) {
+  const m = useMessages();
+  if (isLoading) return <LoadingState />;
+  if (error) return <ErrorState error={error} onRetry={onRetry} />;
+  if (!site) return <EmptyState label={m.ENTRY_UI.noSites} />;
+  return (
+    <div className="grid gap-2">
+      <Label htmlFor="insights-site-fixed">{m.ENTRY_UI.site}</Label>
+      <p
+        id="insights-site-fixed"
+        data-testid="insights-site-fixed"
+        className="flex h-8 items-center rounded-lg border border-input bg-muted/40 px-2.5 text-sm"
+      >
+        {site.name} ({site.code})
+      </p>
+    </div>
+  );
+}
 
 export function InsightsScreen({ role }: { role: InsightsRole }) {
   const m = useMessages();
@@ -64,14 +98,23 @@ export function InsightsScreen({ role }: { role: InsightsRole }) {
           <CardDescription>{i.subtitle}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
-          <SitePicker
-            sites={sites}
-            isLoading={sitesQ.isPending}
-            value={siteId}
-            onChange={setPickedSiteId}
-            error={sitesQ.error}
-            onRetry={() => void sitesQ.refetch()}
-          />
+          {role === 'SITE_MANAGER' ? (
+            <FixedSiteField
+              site={sites?.[0]}
+              isLoading={sitesQ.isPending}
+              error={sitesQ.error}
+              onRetry={() => void sitesQ.refetch()}
+            />
+          ) : (
+            <SitePicker
+              sites={sites}
+              isLoading={sitesQ.isPending}
+              value={siteId}
+              onChange={setPickedSiteId}
+              error={sitesQ.error}
+              onRetry={() => void sitesQ.refetch()}
+            />
+          )}
           <DatePresets today={today} value={range} onChange={setRange} testIdPrefix="insights-date" />
         </CardContent>
       </Card>

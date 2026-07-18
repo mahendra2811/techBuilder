@@ -115,7 +115,7 @@ export const en = {
     people: "People",
     sites: "Sites",
     fleet: "Fleet",
-    vendors: "Shops",
+    vendors: "vendors",
     ledger: "Khata",
     insights: "Insights",
     settings: "Settings",
@@ -130,8 +130,10 @@ export const en = {
     damage: "Damage",
     // frozen.10 (DRV-1/DRV-5): driver-only Start-of-day/End-of-day forms page.
     meter: "Meter",
-    // frozen.10 (DRV-2 nav restructure): driver-only label for /driver/vehicle — the
-    // SM keeps `vehicleFuel` ("Vehicle / Fuel") for /site-manager/vehicle unchanged.
+    // frozen.10 (DRV-2 nav restructure): driver-only label for /driver/vehicle.
+    // `vehicleFuel` ("Vehicle / Fuel") is unused since SM testing-feedback round 2 —
+    // the SM's /site-manager/vehicle page was replaced by /site-manager/fuel, which
+    // reuses `fuelEntry` ("Fuel") below instead.
     vehicle: "Vehicle",
   },
 
@@ -707,6 +709,9 @@ export const en = {
     submitting: "Sending…",
     submitted: "Request sent.",
     myRequestsTitle: "My requests",
+    // SM testing-feedback round 2: the SM variant's history sits behind a lazy section
+    // with this title instead of the eager "My requests" card (DRIVER keeps that title).
+    historyTitle: "Request history",
     myRequestsEmpty: "You haven't sent any requests yet.",
     selectVehicle: "Select vehicle",
     noVehiclesInScope: "No vehicle available for your account.",
@@ -1004,14 +1009,14 @@ export const en = {
   /** Vendor / shop accounts — udhaar khata (WO-10): SM shop list + ledger + payments,
    *  plus the shared "paid by cash / on credit" selector on both expense forms. */
   VENDOR_UI: {
-    title: "Shops (Udhaar Khata)",
-    subtitle: "Shops you buy from on credit — track what's owed and record payments.",
-    listTitle: "Shops",
-    listEmpty: "No shops added yet.",
+    title: "vendors",
+    subtitle: "vendors you buy from on credit — track what's owed and record payments.",
+    listTitle: "vendors",
+    listEmpty: "No vendors added yet.",
     sellsUnknown: "General store",
     phoneUnknown: "No phone",
     viewLedger: "View khata",
-    backToList: "Back to shops",
+    backToList: "Back to vendors",
 
     addShopTitle: "Add a shop",
     nameLabel: "Shop name",
