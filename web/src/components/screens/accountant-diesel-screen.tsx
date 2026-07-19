@@ -29,23 +29,15 @@
  */
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import type {
-  FuelIssuance,
-  FuelMatchFlag,
-  FuelStockPurchase,
-  MaterialTxnStatus,
-  Site,
-  UUID,
-  Vehicle,
-} from '@techbuilder/contracts';
+import type { FuelIssuance, FuelMatchFlag, FuelStockPurchase, Site, UUID, Vehicle } from '@techbuilder/contracts';
 import { api } from '@/lib/api-client';
 import { formatBusinessDateShort } from '@/lib/business-date';
 import { useLocale } from '@/lib/i18n/locale-context';
-import { formatPaise } from '@/lib/money';
-import { cn } from '@/lib/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { LoadingState, EmptyState, ErrorState } from '@/components/entry/states';
 import { useLazySection, LazyHistorySection } from '@/components/ui/lazy-history';
+import { PurchaseRow } from '@/components/fuel-stock/purchase-row';
+import { IssuanceRow } from '@/components/fuel-stock/issuance-row';
 
 const UI = {
   en: {
@@ -97,27 +89,6 @@ const UI = {
 } as const;
 
 type UiText = Record<keyof (typeof UI)['en'], string>;
-
-function statusBadge(status: MaterialTxnStatus, ui: UiText): { label: string; tone: 'success' | 'warning' | 'error' } {
-  if (status === 'CONFIRMED') return { label: `✓ ${ui.statusConfirmed}`, tone: 'success' };
-  if (status === 'MISMATCH') return { label: `🚩 ${ui.statusMismatch}`, tone: 'error' };
-  return { label: ui.statusPending, tone: 'warning' };
-}
-
-function StatusPill({ tone, children }: { tone: 'success' | 'warning' | 'error'; children: React.ReactNode }) {
-  return (
-    <span
-      className={cn(
-        'shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium',
-        tone === 'success' && 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
-        tone === 'warning' && 'bg-amber-500/10 text-amber-800 dark:text-amber-400',
-        tone === 'error' && 'bg-destructive/10 text-destructive',
-      )}
-    >
-      {children}
-    </span>
-  );
-}
 
 export function AccountantDieselScreen({ role = 'ACCOUNTANT' }: { role?: 'ACCOUNTANT' | 'SITE_MANAGER' } = {}) {
   const locale = useLocale();
@@ -302,27 +273,13 @@ function RecentPurchasesSection({
           ) : (
             <ul className="divide-y" data-testid="acc-diesel-purchases-list">
               {sorted.map((row) => (
-                <li
+                <PurchaseRow
                   key={row.id}
-                  className="flex items-baseline justify-between gap-3 py-2 first:pt-0 last:pb-0"
-                  data-testid={`acc-diesel-purchase-${row.id}`}
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">
-                      {formatBusinessDateShort(row.businessDate)}
-                      {multiSite ? ` · ${siteLabelOf(row.siteId)}` : ''}
-                    </p>
-                    {row.note && <p className="truncate text-xs text-muted-foreground">{row.note}</p>}
-                  </div>
-                  <div className="flex shrink-0 flex-col items-end gap-1">
-                    <span className="text-sm font-medium tabular-nums">
-                      {row.litres} {ui.litresSuffix}
-                    </span>
-                    {row.amountPaise != null && (
-                      <span className="text-xs text-muted-foreground tabular-nums">{formatPaise(row.amountPaise)}</span>
-                    )}
-                  </div>
-                </li>
+                  row={row}
+                  litresSuffix={ui.litresSuffix}
+                  testIdPrefix="acc-diesel-purchase"
+                  siteLabel={multiSite ? siteLabelOf(row.siteId) : undefined}
+                />
               ))}
             </ul>
           )}
@@ -373,30 +330,17 @@ function RecentIssuancesSection({
             <EmptyState label={ui.issuancesEmpty} />
           ) : (
             <ul className="divide-y" data-testid="acc-diesel-issuances-list">
-              {sorted.map((row) => {
-                const badge = statusBadge(row.status, ui);
-                return (
-                  <li
-                    key={row.id}
-                    className="flex items-baseline justify-between gap-3 py-2 first:pt-0 last:pb-0"
-                    data-testid={`acc-diesel-issuance-${row.id}`}
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">
-                        {formatBusinessDateShort(row.businessDate)} · {regNoOf(row.vehicleId)}
-                        {multiSite ? ` · ${siteLabelOf(row.siteId)}` : ''}
-                      </p>
-                      {row.note && <p className="truncate text-xs text-muted-foreground">{row.note}</p>}
-                    </div>
-                    <div className="flex shrink-0 flex-col items-end gap-1">
-                      <span className="text-sm font-medium tabular-nums">
-                        {row.litres} {ui.litresSuffix}
-                      </span>
-                      <StatusPill tone={badge.tone}>{badge.label}</StatusPill>
-                    </div>
-                  </li>
-                );
-              })}
+              {sorted.map((row) => (
+                <IssuanceRow
+                  key={row.id}
+                  row={row}
+                  litresSuffix={ui.litresSuffix}
+                  testIdPrefix="acc-diesel-issuance"
+                  regNo={regNoOf(row.vehicleId)}
+                  siteLabel={multiSite ? siteLabelOf(row.siteId) : undefined}
+                  ui={ui}
+                />
+              ))}
             </ul>
           )}
         </LazyHistorySection>

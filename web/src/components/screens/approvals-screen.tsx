@@ -70,6 +70,20 @@ import { cn } from '@/lib/utils';
 type DecideRole = 'OWNER' | 'SITE_MANAGER' | 'SUPERVISOR' | 'ACCOUNTANT';
 type Filter = ApprovalStatus | 'ALL';
 
+/**
+ * Which request TYPES a non-Owner role may decide at all (Owner decides everything —
+ * handled separately in `canDecide`, never consults this table). Mirrors the backend's
+ * `assertDecideScope` exactly (see file header): Supervisor → his crew's vehicle
+ * switches only, never money; Accountant → money only; Site Manager → everything
+ * except money (the accountant/Owner decide that). The requester-scope check
+ * (`usersById.has`) stays a separate, uniform step in `canDecide` below.
+ */
+const CAN_DECIDE_TYPE: Record<Exclude<DecideRole, 'OWNER'>, (type: ApprovalRequest['type']) => boolean> = {
+  SUPERVISOR: (type) => type === 'VEHICLE_SWITCH',
+  ACCOUNTANT: (type) => type === 'EXPENSE_ADD',
+  SITE_MANAGER: (type) => type !== 'EXPENSE_ADD',
+};
+
 // Module-local — the frozen APPROVALS_UI catalog predates the two-tick verify/flag UI.
 const VERIFY_UI = {
   en: {
@@ -102,6 +116,10 @@ const VERIFY_UI = {
     smMoneyNote: 'पैसों की माँग अकाउंटेंट (या ओनर) तय करेंगे।',
   },
 } as const;
+
+// Widened to plain `string` per key — `VERIFY_UI[locale]` is a union of the en/hi
+// literal-string objects, and only the widened form is assignable from both.
+type VerifyUiText = Record<keyof (typeof VERIFY_UI)['en'], string>;
 
 export function ApprovalsScreen({ role }: { role: DecideRole }) {
   const m = useMessages();
@@ -140,19 +158,12 @@ export function ApprovalsScreen({ role }: { role: DecideRole }) {
     return fromPayload ?? usersById.get(r.requestedBy)?.assignedSiteId ?? null;
   };
 
-  /** Mirrors the backend decide rules (see file header). */
+  /** Mirrors the backend decide rules (see file header + CAN_DECIDE_TYPE above). */
   const canDecide = (r: ApprovalRequest): boolean => {
     if (r.status !== 'PENDING') return false;
     if (!myUserId || r.requestedBy === myUserId) return false;
     if (role === 'OWNER') return true;
-    // frozen.10 (SUP-6): the SUPERVISOR decides his crew's VEHICLE_SWITCH requests only — his
-    // GET /requests inbox is already server-filtered to own+crew VEHICLE_SWITCH, this mirrors
-    // the backend's assertDecideScope as defense-in-depth. Never money — that's the accountant's.
-    if (role === 'SUPERVISOR') return r.type === 'VEHICLE_SWITCH' && usersById.has(r.requestedBy);
-    // CW-3: the accountant decides money requests only (assertDecideScope server-side).
-    if (role === 'ACCOUNTANT' && r.type !== 'EXPENSE_ADD') return false;
-    // frozen.10 (SUP-6): the SM is fully out of the money loop — the accountant (or Owner) decides.
-    if (role === 'SITE_MANAGER' && r.type === 'EXPENSE_ADD') return false;
+    if (!CAN_DECIDE_TYPE[role](r.type)) return false;
     return usersById.has(r.requestedBy); // in-scope requester ⟺ present in scoped users list
   };
 
@@ -395,46 +406,17 @@ export function ApprovalsScreen({ role }: { role: DecideRole }) {
             return (
               <li key={r.id}>
                 <Card data-testid={`approval-card-${r.id}`}>
-                  <button
-                    type="button"
-                    className={cn('flex w-full items-start justify-between gap-2 px-(--card-spacing) text-left', !isPending && 'cursor-default')}
-                    data-testid={`approval-row-${r.id}`}
-                    aria-expanded={isPending ? isExpanded : undefined}
-                    aria-label={isPending ? (isExpanded ? m.APPROVALS_UI.collapseAria : m.APPROVALS_UI.expandAria) : undefined}
-                    onClick={isPending ? () => setExpandedId((cur) => (cur === r.id ? null : r.id)) : undefined}
-                  >
-                    <div className="grid min-w-0 flex-1 gap-0.5">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium" data-testid={`approval-type-${r.id}`}>
-                          {m.APPROVAL_TYPE_LABELS[r.type]}
-                        </span>
-                        <RequestStatusBadge status={r.status} />
-                        {showTickBadge && (
-                          <span
-                            data-testid={`approval-tick-${r.id}`}
-                            className={cn(
-                              'inline-block w-fit shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium',
-                              r.flagged
-                                ? 'bg-destructive/10 text-destructive'
-                                : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
-                            )}
-                          >
-                            {r.flagged ? verifyUi.flaggedBadge : verifyUi.verifiedBadge}
-                          </span>
-                        )}
-                      </div>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {nameOf(r.requestedBy)}
-                        {oneLiner ? ` · ${oneLiner}` : ''} · {formatKolkataDateTime(r.createdAt)}
-                      </p>
-                    </div>
-                    {isPending && (
-                      <ChevronDown
-                        className={cn('size-4 shrink-0 text-muted-foreground transition-transform', isExpanded && 'rotate-180')}
-                        aria-hidden="true"
-                      />
-                    )}
-                  </button>
+                  <RequestCardHeader
+                    r={r}
+                    m={m}
+                    verifyUi={verifyUi}
+                    nameOf={nameOf}
+                    oneLiner={oneLiner}
+                    isPending={isPending}
+                    isExpanded={isExpanded}
+                    showTickBadge={showTickBadge}
+                    onToggle={() => setExpandedId((cur) => (cur === r.id ? null : r.id))}
+                  />
 
                   {!isPending && (
                     <p className="px-(--card-spacing) pb-(--card-spacing) text-xs text-muted-foreground" data-testid={`approval-decided-${r.id}`}>
@@ -445,85 +427,27 @@ export function ApprovalsScreen({ role }: { role: DecideRole }) {
                   )}
 
                   {verifiable && verifyDone?.id !== r.id && (
-                    <div className="grid gap-2 px-(--card-spacing) pb-(--card-spacing)">
-                      {!verifyFlagging[r.id] ? (
-                        <div className="grid grid-cols-2 gap-2">
-                          <Button
-                            type="button"
-                            variant="destructive"
-                            size="sm"
-                            data-testid={`approval-verify-flag-${r.id}`}
-                            disabled={verifyBusy}
-                            onClick={() => setVerifyFlagging((f) => ({ ...f, [r.id]: true }))}
-                          >
-                            <Flag className="size-3.5" aria-hidden="true" />
-                            {verifyUi.flag}
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            className={cn('bg-emerald-600 text-white hover:bg-emerald-600/90')}
-                            data-testid={`approval-verify-ok-${r.id}`}
-                            disabled={verifyBusy}
-                            onClick={() => submitVerify(r, true)}
-                          >
-                            <Check className="size-3.5" aria-hidden="true" />
-                            {verifyBusy ? verifyUi.verifying : verifyUi.verify}
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="grid gap-2">
-                          <Textarea
-                            aria-label={verifyUi.flagNotePlaceholder}
-                            placeholder={verifyUi.flagNotePlaceholder}
-                            className="min-h-14"
-                            data-testid={`approval-verify-note-${r.id}`}
-                            value={verifyNotes[r.id] ?? ''}
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              setVerifyNotes((n) => ({ ...n, [r.id]: value }));
-                              setVerifyNoteErrors((err) => {
-                                if (!(r.id in err)) return err;
-                                const next = { ...err };
-                                delete next[r.id];
-                                return next;
-                              });
-                            }}
-                          />
-                          {verifyNoteErrors[r.id] && (
-                            <p className="text-sm text-destructive" role="alert" data-testid={`approval-verify-note-error-${r.id}`}>
-                              {verifyNoteErrors[r.id]}
-                            </p>
-                          )}
-                          <div className="grid grid-cols-2 gap-2">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              data-testid={`approval-verify-flag-cancel-${r.id}`}
-                              onClick={() => setVerifyFlagging((f) => ({ ...f, [r.id]: false }))}
-                            >
-                              {verifyUi.cancel}
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="destructive"
-                              size="sm"
-                              data-testid={`approval-verify-flag-submit-${r.id}`}
-                              disabled={verifyBusy}
-                              onClick={() => submitVerify(r, false)}
-                            >
-                              {verifyBusy ? verifyUi.verifying : verifyUi.flagSubmit}
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-                      {verifyServerError && verify.variables?.id === r.id && (
-                        <Notice tone="error" testId={`approval-verify-error-${r.id}`}>
-                          {verifyServerError}
-                        </Notice>
-                      )}
-                    </div>
+                    <VerifyFlagPanel
+                      r={r}
+                      verifyUi={verifyUi}
+                      verifyBusy={verifyBusy}
+                      flagging={!!verifyFlagging[r.id]}
+                      onStartFlag={() => setVerifyFlagging((f) => ({ ...f, [r.id]: true }))}
+                      onCancelFlag={() => setVerifyFlagging((f) => ({ ...f, [r.id]: false }))}
+                      onSubmitVerify={(ok) => submitVerify(r, ok)}
+                      note={verifyNotes[r.id] ?? ''}
+                      onNoteChange={(value) => {
+                        setVerifyNotes((n) => ({ ...n, [r.id]: value }));
+                        setVerifyNoteErrors((err) => {
+                          if (!(r.id in err)) return err;
+                          const next = { ...err };
+                          delete next[r.id];
+                          return next;
+                        });
+                      }}
+                      noteError={verifyNoteErrors[r.id]}
+                      serverError={verifyServerError && verify.variables?.id === r.id ? verifyServerError : null}
+                    />
                   )}
 
                   {verifyDone?.id === r.id && (
@@ -559,69 +483,25 @@ export function ApprovalsScreen({ role }: { role: DecideRole }) {
                       )}
 
                       {decidable && (
-                        <div className="grid gap-2">
-                          {r.type === 'EXPENSE_ADD' && (
-                            <div className="grid gap-1.5">
-                              <Label htmlFor={`approval-category-${r.id}`}>{m.APPROVALS_UI.finalCategoryLabel}</Label>
-                              <NativeSelect
-                                id={`approval-category-${r.id}`}
-                                data-testid={`approval-category-${r.id}`}
-                                value={categoryFor(r)}
-                                onChange={(e) =>
-                                  setCategoryOverrides((c) => ({ ...c, [r.id]: e.target.value as ExpenseCategory }))
-                                }
-                              >
-                                {EXPENSE_CATEGORIES.map((cat) => (
-                                  <option key={cat} value={cat}>
-                                    {m.EXPENSE_CATEGORY_LABELS[cat]}
-                                  </option>
-                                ))}
-                              </NativeSelect>
-                            </div>
-                          )}
-                          <Textarea
-                            aria-label={m.APPROVALS_UI.commentLabel}
-                            placeholder={m.APPROVALS_UI.commentPlaceholder}
-                            className="min-h-16"
-                            data-testid={`approval-comment-${r.id}`}
-                            value={comments[r.id] ?? ''}
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              setComments((c) => ({ ...c, [r.id]: value }));
-                              setRejectErrors((err) => {
-                                if (!(r.id in err)) return err;
-                                const next = { ...err };
-                                delete next[r.id];
-                                return next;
-                              });
-                            }}
-                          />
-                          {rejectErrors[r.id] && (
-                            <p className="text-sm text-destructive" role="alert" data-testid={`approval-reject-error-${r.id}`}>
-                              {rejectErrors[r.id]}
-                            </p>
-                          )}
-                          <div className="grid grid-cols-2 gap-2">
-                            <Button
-                              type="button"
-                              variant="destructive"
-                              data-testid={`approval-reject-${r.id}`}
-                              disabled={busy}
-                              onClick={() => submitDecision(r, false)}
-                            >
-                              {busy ? m.APPROVALS_UI.deciding : m.APPROVALS_UI.reject}
-                            </Button>
-                            <Button
-                              type="button"
-                              className={cn('bg-emerald-600 text-white hover:bg-emerald-600/90')}
-                              data-testid={`approval-approve-${r.id}`}
-                              disabled={busy}
-                              onClick={() => submitDecision(r, true)}
-                            >
-                              {busy ? m.APPROVALS_UI.deciding : m.APPROVALS_UI.approve}
-                            </Button>
-                          </div>
-                        </div>
+                        <DecidePanel
+                          r={r}
+                          m={m}
+                          category={categoryFor(r)}
+                          onCategoryChange={(cat) => setCategoryOverrides((c) => ({ ...c, [r.id]: cat }))}
+                          comment={comments[r.id] ?? ''}
+                          onCommentChange={(value) => {
+                            setComments((c) => ({ ...c, [r.id]: value }));
+                            setRejectErrors((err) => {
+                              if (!(r.id in err)) return err;
+                              const next = { ...err };
+                              delete next[r.id];
+                              return next;
+                            });
+                          }}
+                          rejectError={rejectErrors[r.id]}
+                          busy={busy}
+                          onDecide={(approve) => submitDecision(r, approve)}
+                        />
                       )}
                     </CardContent>
                   )}
@@ -631,6 +511,247 @@ export function ApprovalsScreen({ role }: { role: DecideRole }) {
           }}
         />
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// One request row's pieces — kept in this file (not split across files) since
+// this IS the single shared component for all 4 deciding roles, not duplicated
+// elsewhere. The split here is about making one large row readable, not
+// de-duplicating across files (see CAN_DECIDE_TYPE above for the role-capability
+// table this component already consults).
+// ---------------------------------------------------------------------------
+
+function RequestCardHeader({
+  r,
+  m,
+  verifyUi,
+  nameOf,
+  oneLiner,
+  isPending,
+  isExpanded,
+  showTickBadge,
+  onToggle,
+}: {
+  r: ApprovalRequest;
+  m: ReturnType<typeof useMessages>;
+  verifyUi: VerifyUiText;
+  nameOf: (id: UUID) => string;
+  oneLiner: string;
+  isPending: boolean;
+  isExpanded: boolean;
+  showTickBadge: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={cn('flex w-full items-start justify-between gap-2 px-(--card-spacing) text-left', !isPending && 'cursor-default')}
+      data-testid={`approval-row-${r.id}`}
+      aria-expanded={isPending ? isExpanded : undefined}
+      aria-label={isPending ? (isExpanded ? m.APPROVALS_UI.collapseAria : m.APPROVALS_UI.expandAria) : undefined}
+      onClick={isPending ? onToggle : undefined}
+    >
+      <div className="grid min-w-0 flex-1 gap-0.5">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium" data-testid={`approval-type-${r.id}`}>
+            {m.APPROVAL_TYPE_LABELS[r.type]}
+          </span>
+          <RequestStatusBadge status={r.status} />
+          {showTickBadge && (
+            <span
+              data-testid={`approval-tick-${r.id}`}
+              className={cn(
+                'inline-block w-fit shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium',
+                r.flagged ? 'bg-destructive/10 text-destructive' : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
+              )}
+            >
+              {r.flagged ? verifyUi.flaggedBadge : verifyUi.verifiedBadge}
+            </span>
+          )}
+        </div>
+        <p className="truncate text-xs text-muted-foreground">
+          {nameOf(r.requestedBy)}
+          {oneLiner ? ` · ${oneLiner}` : ''} · {formatKolkataDateTime(r.createdAt)}
+        </p>
+      </div>
+      {isPending && (
+        <ChevronDown
+          className={cn('size-4 shrink-0 text-muted-foreground transition-transform', isExpanded && 'rotate-180')}
+          aria-hidden="true"
+        />
+      )}
+    </button>
+  );
+}
+
+function VerifyFlagPanel({
+  r,
+  verifyUi,
+  verifyBusy,
+  flagging,
+  onStartFlag,
+  onCancelFlag,
+  onSubmitVerify,
+  note,
+  onNoteChange,
+  noteError,
+  serverError,
+}: {
+  r: ApprovalRequest;
+  verifyUi: VerifyUiText;
+  verifyBusy: boolean;
+  flagging: boolean;
+  onStartFlag: () => void;
+  onCancelFlag: () => void;
+  onSubmitVerify: (ok: boolean) => void;
+  note: string;
+  onNoteChange: (value: string) => void;
+  noteError: string | undefined;
+  serverError: string | null;
+}) {
+  return (
+    <div className="grid gap-2 px-(--card-spacing) pb-(--card-spacing)">
+      {!flagging ? (
+        <div className="grid grid-cols-2 gap-2">
+          <Button
+            type="button"
+            variant="destructive"
+            size="sm"
+            data-testid={`approval-verify-flag-${r.id}`}
+            disabled={verifyBusy}
+            onClick={onStartFlag}
+          >
+            <Flag className="size-3.5" aria-hidden="true" />
+            {verifyUi.flag}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            className={cn('bg-emerald-600 text-white hover:bg-emerald-600/90')}
+            data-testid={`approval-verify-ok-${r.id}`}
+            disabled={verifyBusy}
+            onClick={() => onSubmitVerify(true)}
+          >
+            <Check className="size-3.5" aria-hidden="true" />
+            {verifyBusy ? verifyUi.verifying : verifyUi.verify}
+          </Button>
+        </div>
+      ) : (
+        <div className="grid gap-2">
+          <Textarea
+            aria-label={verifyUi.flagNotePlaceholder}
+            placeholder={verifyUi.flagNotePlaceholder}
+            className="min-h-14"
+            data-testid={`approval-verify-note-${r.id}`}
+            value={note}
+            onChange={(e) => onNoteChange(e.target.value)}
+          />
+          {noteError && (
+            <p className="text-sm text-destructive" role="alert" data-testid={`approval-verify-note-error-${r.id}`}>
+              {noteError}
+            </p>
+          )}
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              data-testid={`approval-verify-flag-cancel-${r.id}`}
+              onClick={onCancelFlag}
+            >
+              {verifyUi.cancel}
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              data-testid={`approval-verify-flag-submit-${r.id}`}
+              disabled={verifyBusy}
+              onClick={() => onSubmitVerify(false)}
+            >
+              {verifyBusy ? verifyUi.verifying : verifyUi.flagSubmit}
+            </Button>
+          </div>
+        </div>
+      )}
+      {serverError && (
+        <Notice tone="error" testId={`approval-verify-error-${r.id}`}>
+          {serverError}
+        </Notice>
+      )}
+    </div>
+  );
+}
+
+function DecidePanel({
+  r,
+  m,
+  category,
+  onCategoryChange,
+  comment,
+  onCommentChange,
+  rejectError,
+  busy,
+  onDecide,
+}: {
+  r: ApprovalRequest;
+  m: ReturnType<typeof useMessages>;
+  category: ExpenseCategory;
+  onCategoryChange: (cat: ExpenseCategory) => void;
+  comment: string;
+  onCommentChange: (value: string) => void;
+  rejectError: string | undefined;
+  busy: boolean;
+  onDecide: (approve: boolean) => void;
+}) {
+  return (
+    <div className="grid gap-2">
+      {r.type === 'EXPENSE_ADD' && (
+        <div className="grid gap-1.5">
+          <Label htmlFor={`approval-category-${r.id}`}>{m.APPROVALS_UI.finalCategoryLabel}</Label>
+          <NativeSelect
+            id={`approval-category-${r.id}`}
+            data-testid={`approval-category-${r.id}`}
+            value={category}
+            onChange={(e) => onCategoryChange(e.target.value as ExpenseCategory)}
+          >
+            {EXPENSE_CATEGORIES.map((cat) => (
+              <option key={cat} value={cat}>
+                {m.EXPENSE_CATEGORY_LABELS[cat]}
+              </option>
+            ))}
+          </NativeSelect>
+        </div>
+      )}
+      <Textarea
+        aria-label={m.APPROVALS_UI.commentLabel}
+        placeholder={m.APPROVALS_UI.commentPlaceholder}
+        className="min-h-16"
+        data-testid={`approval-comment-${r.id}`}
+        value={comment}
+        onChange={(e) => onCommentChange(e.target.value)}
+      />
+      {rejectError && (
+        <p className="text-sm text-destructive" role="alert" data-testid={`approval-reject-error-${r.id}`}>
+          {rejectError}
+        </p>
+      )}
+      <div className="grid grid-cols-2 gap-2">
+        <Button type="button" variant="destructive" data-testid={`approval-reject-${r.id}`} disabled={busy} onClick={() => onDecide(false)}>
+          {busy ? m.APPROVALS_UI.deciding : m.APPROVALS_UI.reject}
+        </Button>
+        <Button
+          type="button"
+          className={cn('bg-emerald-600 text-white hover:bg-emerald-600/90')}
+          data-testid={`approval-approve-${r.id}`}
+          disabled={busy}
+          onClick={() => onDecide(true)}
+        >
+          {busy ? m.APPROVALS_UI.deciding : m.APPROVALS_UI.approve}
+        </Button>
+      </div>
     </div>
   );
 }

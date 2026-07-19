@@ -5,7 +5,8 @@
  * /site-manager/vehicle page. Landing view = 2 tappable section cards (vendors-screen /
  * khata-screen list→detail style, `useSubPage`), each its own sub-page:
  *   a. Fuel entry   — the SM's existing odometer/litres/amount/date/receipt form + recent
- *      entries list (reuses `<FuelScreen role="SITE_MANAGER" />` verbatim, no duplication).
+ *      entries list (reuses `<FuelScreen />` verbatim, no duplication — SM is this
+ *      screen's only caller since the Driver got its own page in frozen.10).
  *   b. Fuel monitor — the full site-wide diesel picture: current stock, day-wise purchases,
  *      truck-wise issuances with match-status chips, and 🚩 match flags (reuses
  *      `<AccountantDieselScreen role="SITE_MANAGER" />` — the accountant's own
@@ -48,7 +49,7 @@ export default function Page() {
     return (
       <div className="grid gap-4" data-testid="sm-fuel-entry-section">
         <SubPageHeader title={ui.entry.title} onBack={close} />
-        <FuelScreen role="SITE_MANAGER" />
+        <FuelScreen />
       </div>
     );
   }

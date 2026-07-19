@@ -31,17 +31,15 @@ import type {
   CreateFuelStockPurchaseInput,
   FuelIssuance,
   FuelStockPurchase,
-  MaterialTxnStatus,
   Site,
   UUID,
   Vehicle,
 } from '@techbuilder/contracts';
 import { ApiClientError, api } from '@/lib/api-client';
-import { formatBusinessDateShort, minEntryDate, todayKolkata } from '@/lib/business-date';
+import { minEntryDate, todayKolkata } from '@/lib/business-date';
 import { apiErrorMessage } from '@/lib/i18n/messages';
 import { useLocale, useMessages } from '@/lib/i18n/locale-context';
-import { formatPaise, rupeesToPaise } from '@/lib/money';
-import { cn } from '@/lib/utils';
+import { rupeesToPaise } from '@/lib/money';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -51,6 +49,8 @@ import { DateField } from '@/components/entry/date-field';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
 import { SubPageHeader, useSubPage } from '@/components/ui/sub-page';
 import { useLazySection, LazyHistorySection } from '@/components/ui/lazy-history';
+import { PurchaseRow } from '@/components/fuel-stock/purchase-row';
+import { IssuanceRow } from '@/components/fuel-stock/issuance-row';
 
 const UI = {
   en: {
@@ -128,27 +128,6 @@ const UI = {
 // Widened to plain `string` per key — `UI[locale]` is a union of the `en`/`hi`
 // literal-string objects, and only the widened form is assignable from both.
 type UiText = Record<keyof (typeof UI)['en'], string>;
-
-function statusBadge(status: MaterialTxnStatus, ui: UiText): { label: string; tone: 'success' | 'warning' | 'error' } {
-  if (status === 'CONFIRMED') return { label: `✓ ${ui.statusConfirmed}`, tone: 'success' };
-  if (status === 'MISMATCH') return { label: `🚩 ${ui.statusMismatch}`, tone: 'error' };
-  return { label: ui.statusPending, tone: 'warning' };
-}
-
-function StatusPill({ tone, children }: { tone: 'success' | 'warning' | 'error'; children: React.ReactNode }) {
-  return (
-    <span
-      className={cn(
-        'shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium',
-        tone === 'success' && 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
-        tone === 'warning' && 'bg-amber-500/10 text-amber-800 dark:text-amber-400',
-        tone === 'error' && 'bg-destructive/10 text-destructive',
-      )}
-    >
-      {children}
-    </span>
-  );
-}
 
 type DieselSection = 'buy' | 'issue';
 
@@ -653,24 +632,7 @@ function RecentPurchasesSection({ ui }: { ui: UiText }) {
           ) : (
             <ul className="divide-y" data-testid="diesel-purchases-list">
               {sorted.map((row) => (
-                <li
-                  key={row.id}
-                  className="flex items-baseline justify-between gap-3 py-2 first:pt-0 last:pb-0"
-                  data-testid={`diesel-purchase-${row.id}`}
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{formatBusinessDateShort(row.businessDate)}</p>
-                    {row.note && <p className="truncate text-xs text-muted-foreground">{row.note}</p>}
-                  </div>
-                  <div className="flex shrink-0 flex-col items-end gap-1">
-                    <span className="text-sm font-medium tabular-nums">
-                      {row.litres} {ui.litresSuffix}
-                    </span>
-                    {row.amountPaise != null && (
-                      <span className="text-xs text-muted-foreground tabular-nums">{formatPaise(row.amountPaise)}</span>
-                    )}
-                  </div>
-                </li>
+                <PurchaseRow key={row.id} row={row} litresSuffix={ui.litresSuffix} testIdPrefix="diesel-purchase" />
               ))}
             </ul>
           )}
@@ -708,29 +670,16 @@ function RecentIssuancesSection({ ui, regNoOf }: { ui: UiText; regNoOf: (id: UUI
             <EmptyState label={ui.issuancesEmpty} />
           ) : (
             <ul className="divide-y" data-testid="diesel-issuances-list">
-              {sorted.map((row) => {
-                const badge = statusBadge(row.status, ui);
-                return (
-                  <li
-                    key={row.id}
-                    className="flex items-baseline justify-between gap-3 py-2 first:pt-0 last:pb-0"
-                    data-testid={`diesel-issuance-${row.id}`}
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">
-                        {formatBusinessDateShort(row.businessDate)} · {regNoOf(row.vehicleId)}
-                      </p>
-                      {row.note && <p className="truncate text-xs text-muted-foreground">{row.note}</p>}
-                    </div>
-                    <div className="flex shrink-0 flex-col items-end gap-1">
-                      <span className="text-sm font-medium tabular-nums">
-                        {row.litres} {ui.litresSuffix}
-                      </span>
-                      <StatusPill tone={badge.tone}>{badge.label}</StatusPill>
-                    </div>
-                  </li>
-                );
-              })}
+              {sorted.map((row) => (
+                <IssuanceRow
+                  key={row.id}
+                  row={row}
+                  litresSuffix={ui.litresSuffix}
+                  testIdPrefix="diesel-issuance"
+                  regNo={regNoOf(row.vehicleId)}
+                  ui={ui}
+                />
+              ))}
             </ul>
           )}
         </LazyHistorySection>

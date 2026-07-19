@@ -27,7 +27,7 @@ import { Truck } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { uuidv7 } from 'uuidv7';
-import type { CreateFuelLogInput, FuelLog, MaterialTxnStatus, UUID, VehicleSnapshot } from '@techbuilder/contracts';
+import type { CreateFuelLogInput, FuelLog, UUID, VehicleSnapshot } from '@techbuilder/contracts';
 import { ApiClientError, api } from '@/lib/api-client';
 import { addDays, todayKolkata } from '@/lib/business-date';
 import { uploadPhoto } from '@/lib/media-upload';
@@ -43,6 +43,7 @@ import { Separator } from '@/components/ui/separator';
 import { PhotoField } from '@/components/entry/photo-field';
 import { RecentEntries, type RecentRow } from '@/components/entry/recent-entries';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
+import { materialTxnStatusBadge } from '@/components/fuel-stock/status-badge';
 
 /** Module-local bilingual strings (repo convention: messages catalogs are for
  * NAV_LABELS only — screen copy stays local, mirrors DRIVER_FUEL_UI in the
@@ -73,15 +74,6 @@ const DRIVER_FUEL_PAGE_UI = {
 // Widened to plain `string` per key, same reasoning as the shared fuel-screen.tsx:
 // `DRIVER_FUEL_PAGE_UI[locale]` is a union of the en/hi literal-string objects.
 type DriverFuelPageUi = Record<keyof (typeof DRIVER_FUEL_PAGE_UI)['en'], string>;
-
-function fuelStatusBadge(
-  status: MaterialTxnStatus,
-  ui: DriverFuelPageUi,
-): { label: string; tone: 'success' | 'warning' | 'error' } {
-  if (status === 'CONFIRMED') return { label: `✓ ${ui.statusConfirmed}`, tone: 'success' };
-  if (status === 'MISMATCH') return { label: `🚩 ${ui.statusMismatch}`, tone: 'error' };
-  return { label: ui.statusPending, tone: 'warning' };
-}
 
 // `paid` is closed over (component `useState`, NOT a registered RHF field) — cross-field
 // "amount required only if paid" validation without needing react-hook-form's `watch()`
@@ -338,7 +330,7 @@ export function DriverFuelScreen() {
                 primary: `${f.litres} L`,
                 secondary: f.amountPaise != null ? formatPaise(f.amountPaise) : '—',
                 tertiary: `${f.businessDate} · ${f.litres} L · ${f.reading}`,
-                badge: fuelStatusBadge(f.status, ui),
+                badge: materialTxnStatusBadge(f.status, ui),
               }),
             )}
           />

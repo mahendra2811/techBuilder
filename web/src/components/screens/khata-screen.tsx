@@ -32,14 +32,12 @@ import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { ChevronRight } from 'lucide-react';
 import { uuidv7 } from 'uuidv7';
-import { EXPENSE_CATEGORIES } from '@techbuilder/contracts';
 import type {
   CashTransfer,
   CashTransferKind,
   CreateCashTransferInput,
   LedgerRollupRow,
   MoneyTag,
-  Role,
   UUID,
   User,
 } from '@techbuilder/contracts';
@@ -47,8 +45,7 @@ import { ApiClientError, api, me } from '@/lib/api-client';
 import { todayKolkata, addDays } from '@/lib/business-date';
 import { apiErrorMessage } from '@/lib/i18n/messages';
 import { useLocale, useMessages } from '@/lib/i18n/locale-context';
-import { formatPaise, formatSignedPaise, rupeesToPaise } from '@/lib/money';
-import { cn } from '@/lib/utils';
+import { rupeesToPaise } from '@/lib/money';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -57,34 +54,17 @@ import { NativeSelect } from '@/components/ui/native-select';
 import { ShowMore } from '@/components/ui/show-more';
 import { DateField } from '@/components/entry/date-field';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
-import { TagBadge } from '@/components/my-money-card';
 import { SubPageHeader, useSubPage } from '@/components/ui/sub-page';
 import { LazyHistorySection, useLazySection } from '@/components/ui/lazy-history';
 import { DatePresets, type DateRange } from '@/components/insights/date-presets';
+import { candidateRoles } from '@/components/khata/target-roles';
+import { resolveUserName } from '@/components/khata/resolve-user-name';
+import { TransferRow } from '@/components/khata/transfer-row';
+import { RollupRows } from '@/components/khata/rollup-rows';
 
 export type KhataRole = 'ACCOUNTANT' | 'SITE_MANAGER';
 type Slice = 'give' | 'receive' | 'salary';
 type SectionKey = Slice | 'rollup';
-
-/** Roles BELOW each caller — who they may hand cash to (mirrors ledger-screen's TARGET_ROLES). */
-const TARGET_ROLES: Record<KhataRole, readonly Role[]> = {
-  ACCOUNTANT: ['SITE_MANAGER', 'SUPERVISOR', 'DRIVER', 'WORKER'],
-  SITE_MANAGER: ['SUPERVISOR', 'DRIVER', 'WORKER'],
-};
-
-/**
- * BUG FIX (2026-07-18): Round 2 made the SUPERVISOR NOT a cash node for WORK-tagged
- * transfers — the backend (`cash-transfers.service.ts` `create()`) throws FORBIDDEN
- * the moment either party of a `tag==='WORK'` transfer is a SUPERVISOR ("Supervisors
- * are outside the work-cash chain (Round 2) — money requests only"). `TARGET_ROLES`
- * above still lists SUPERVISOR (correctly — he IS a valid salary/personal recipient),
- * so the give/receive (work-cash) forms were offering him as a person option too,
- * and picking him 403'd with the generic "outside your scope or date window" message.
- * Salary (`tag==='SALARY'`) has no such restriction — only WORK needs the exclusion.
- */
-function candidateRoles(role: KhataRole, tag: MoneyTag): readonly Role[] {
-  return tag === 'WORK' ? TARGET_ROLES[role].filter((r) => r !== 'SUPERVISOR') : TARGET_ROLES[role];
-}
 
 // Module-local bilingual UI (per convention — the frozen message catalogs
 // predate this 3-sub-page + rollup split; generic bits like person/amount/note
@@ -527,45 +507,16 @@ async function fetchSliceHistory(slice: Slice, opts: { limit: number; from?: str
   return { items, maybeMore: salary.length >= opts.limit || personal.length >= opts.limit };
 }
 
-function resolveUserName(id: UUID, users: User[] | undefined, mePayload: { user: User } | undefined): string {
-  const listed = users?.find((u) => u.id === id)?.name;
-  if (listed) return listed;
-  if (mePayload?.user.id === id) return mePayload.user.name;
-  return `${id.slice(0, 8)}…`;
-}
-
-function KindChip({ kind }: { kind: CashTransferKind }) {
-  const m = useMessages();
+function khataTransferRow(t: CashTransfer, userName: (id: UUID) => string, locale: 'en' | 'hi') {
   return (
-    <span
-      data-testid={`khata-kind-chip-${kind}`}
-      className={cn(
-        'inline-block w-fit shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium',
-        kind === 'GIVE' ? 'bg-primary/10 text-primary' : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
-      )}
-    >
-      {kind === 'GIVE' ? m.LEDGER_UI.kindChipGive : m.LEDGER_UI.kindChipReturn}
-    </span>
-  );
-}
-
-function TransferRow({ t, userName }: { t: CashTransfer; userName: (id: UUID) => string }) {
-  const locale = useLocale();
-  return (
-    <li className="grid gap-1 py-3 first:pt-0 last:pb-0" data-testid={`khata-transfer-row-${t.id}`}>
-      <div className="flex items-baseline justify-between gap-3">
-        <p className="min-w-0 truncate text-sm font-medium">
-          {userName(t.fromUserId)} → {userName(t.toUserId)}
-        </p>
-        <p className="shrink-0 text-sm font-semibold tabular-nums">{formatPaise(t.amountPaise)}</p>
-      </div>
-      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-        <KindChip kind={t.kind} />
-        <TagBadge tag={t.tag} ui={TAG_LABELS[locale]} />
-        <span>{t.businessDate}</span>
-        {t.note && <span className="min-w-0 truncate">· {t.note}</span>}
-      </p>
-    </li>
+    <TransferRow
+      key={t.id}
+      t={t}
+      userName={userName}
+      rowTestIdPrefix="khata-transfer-row"
+      kindChipTestIdPrefix="khata-kind-chip"
+      tagLabels={TAG_LABELS[locale]}
+    />
   );
 }
 
@@ -604,11 +555,7 @@ function SliceHistory({ slice, usersQ, onViewAll }: { slice: Slice; usersQ: User
             <EmptyState label={ui.historyEmpty} />
           ) : (
             <div className="grid gap-3">
-              <ul className="divide-y">
-                {historyQ.data.items.map((t) => (
-                  <TransferRow key={t.id} t={t} userName={userName} />
-                ))}
-              </ul>
+              <ul className="divide-y">{historyQ.data.items.map((t) => khataTransferRow(t, userName, locale))}</ul>
               {historyQ.data.maybeMore && (
                 <Button
                   type="button"
@@ -695,7 +642,7 @@ function FullHistoryPage({ slice, usersQ, onBack }: { slice: Slice; usersQ: User
               as="ul"
               className="divide-y"
               testIdPrefix={`khata-full-${slice}`}
-              renderItem={(t) => <TransferRow key={t.id} t={t} userName={userName} />}
+              renderItem={(t) => khataTransferRow(t, userName, locale)}
             />
           )}
         </CardContent>
@@ -740,50 +687,11 @@ function RollupSubPage({ title, subtitle, onClose }: { title: string; subtitle: 
             ) : !rollupQ.data || rollupQ.data.length === 0 ? (
               <EmptyState label={m.LEDGER_UI.rollupEmpty} />
             ) : (
-              <ul className="divide-y">
-                {rollupQ.data.map((row) => (
-                  <li key={row.userId} className="grid gap-2 py-3 first:pt-0 last:pb-0" data-testid={`khata-rollup-row-${row.userId}`}>
-                    <div className="flex items-baseline justify-between gap-3">
-                      <p className="min-w-0 truncate text-sm font-medium">
-                        {row.name} <span className="text-xs font-normal text-muted-foreground">{m.ROLE_LABELS[row.role]}</span>
-                      </p>
-                      <p
-                        className={cn('shrink-0 text-sm font-bold tabular-nums', row.balancePaise < 0 && 'text-destructive')}
-                        data-testid={`khata-rollup-balance-${row.userId}`}
-                      >
-                        {formatSignedPaise(row.balancePaise)}
-                      </p>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {m.LEDGER_UI.rollupReceived} {formatPaise(row.receivedPaise)} · {m.LEDGER_UI.rollupGiven}{' '}
-                      {formatPaise(row.givenPaise)} · {m.LEDGER_UI.rollupSpent} {formatPaise(row.spentPaise)}
-                    </p>
-                    <RollupCategoryChips byCategory={row.byCategory} />
-                  </li>
-                ))}
-              </ul>
+              <RollupRows rows={rollupQ.data} testIdPrefix="khata-rollup" />
             )}
           </LazyHistorySection>
         </CardContent>
       </Card>
     </div>
-  );
-}
-
-function RollupCategoryChips({ byCategory }: { byCategory: LedgerRollupRow['byCategory'] }) {
-  const m = useMessages();
-  // Frozen enum order keeps the chips stable regardless of server key order.
-  const chips = EXPENSE_CATEGORIES.map((c) => ({ category: c, paise: byCategory[c] })).filter(
-    (x): x is { category: (typeof EXPENSE_CATEGORIES)[number]; paise: number } => x.paise !== undefined && x.paise > 0,
-  );
-  if (chips.length === 0) return null;
-  return (
-    <p className="flex flex-wrap gap-1">
-      {chips.map(({ category, paise }) => (
-        <span key={category} className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground" data-testid={`khata-rollup-cat-${category}`}>
-          {m.EXPENSE_CATEGORY_LABELS[category]} {formatPaise(paise)}
-        </span>
-      ))}
-    </p>
   );
 }

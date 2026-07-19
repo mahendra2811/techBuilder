@@ -36,23 +36,12 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { uuidv7 } from 'uuidv7';
-import { EXPENSE_CATEGORIES } from '@techbuilder/contracts';
-import type {
-  CashTransfer,
-  CashTransferKind,
-  CreateCashTransferInput,
-  LedgerRollupRow,
-  MoneyTag,
-  Role,
-  UUID,
-  User,
-} from '@techbuilder/contracts';
+import type { CashTransfer, CashTransferKind, CreateCashTransferInput, LedgerRollupRow, MoneyTag, UUID, User } from '@techbuilder/contracts';
 import { ApiClientError, api, me } from '@/lib/api-client';
 import { todayKolkata } from '@/lib/business-date';
 import { apiErrorMessage } from '@/lib/i18n/messages';
 import { useLocale, useMessages } from '@/lib/i18n/locale-context';
-import { formatPaise, formatSignedPaise, rupeesToPaise } from '@/lib/money';
-import { cn } from '@/lib/utils';
+import { rupeesToPaise } from '@/lib/money';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -61,17 +50,12 @@ import { NativeSelect } from '@/components/ui/native-select';
 import { ShowMore } from '@/components/ui/show-more';
 import { DateField } from '@/components/entry/date-field';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
-import { TagBadge } from '@/components/my-money-card';
+import { candidateRoles, type MoneyGiverRole } from '@/components/khata/target-roles';
+import { resolveUserName } from '@/components/khata/resolve-user-name';
+import { TransferRow } from '@/components/khata/transfer-row';
+import { RollupRows } from '@/components/khata/rollup-rows';
 
-type LedgerRole = Extract<Role, 'OWNER' | 'SITE_MANAGER' | 'SUPERVISOR' | 'ACCOUNTANT'>;
-
-/** Roles BELOW each caller — who they may hand cash to (mirrors the backend). */
-const TARGET_ROLES: Record<LedgerRole, readonly Role[]> = {
-  OWNER: ['SITE_MANAGER', 'SUPERVISOR', 'DRIVER', 'WORKER'],
-  SITE_MANAGER: ['SUPERVISOR', 'DRIVER', 'WORKER'],
-  SUPERVISOR: ['WORKER'],
-  ACCOUNTANT: ['SITE_MANAGER', 'SUPERVISOR', 'DRIVER', 'WORKER'],
-};
+type LedgerRole = MoneyGiverRole;
 
 // Module-local — the frozen LEDGER_UI catalog predates the Round 2 tag picker
 // (OWNER + ACCOUNTANT only) and the <TagBadge> on history rows.
@@ -145,15 +129,10 @@ function TransferForm({ role, usersQ }: { role: LedgerRole; usersQ: ReturnType<t
     if (next !== 'WORK') setKind('GIVE');
   };
 
-  const candidates = useMemo(
-    // Round 2: SUPERVISORS are outside the WORK-cash chain (the server 403s such transfers) —
-    // offer them only for SALARY/PERSONAL draws. Same fix as khata-screen's candidateRoles.
-    () =>
-      (usersQ.data ?? []).filter(
-        (u) => u.active && TARGET_ROLES[role].includes(u.role) && !(tag === 'WORK' && u.role === 'SUPERVISOR'),
-      ),
-    [usersQ.data, role, tag],
-  );
+  const candidates = useMemo(() => {
+    const roles = candidateRoles(role, tag);
+    return (usersQ.data ?? []).filter((u) => u.active && roles.includes(u.role));
+  }, [usersQ.data, role, tag]);
 
   const amountPaise = (() => {
     const n = Number(amountRupees);
@@ -368,23 +347,6 @@ function TransferForm({ role, usersQ }: { role: LedgerRole; usersQ: ReturnType<t
 // (b) Transfers history
 // ---------------------------------------------------------------------------
 
-function KindChip({ kind }: { kind: CashTransferKind }) {
-  const m = useMessages();
-  return (
-    <span
-      data-testid={`transfer-kind-chip-${kind}`}
-      className={cn(
-        'inline-block w-fit shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium',
-        kind === 'GIVE'
-          ? 'bg-primary/10 text-primary'
-          : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
-      )}
-    >
-      {kind === 'GIVE' ? m.LEDGER_UI.kindChipGive : m.LEDGER_UI.kindChipReturn}
-    </span>
-  );
-}
-
 function TransfersHistory({ usersQ }: { usersQ: ReturnType<typeof useQuery<User[]>> }) {
   const m = useMessages();
   const locale = useLocale();
@@ -393,15 +355,7 @@ function TransfersHistory({ usersQ }: { usersQ: ReturnType<typeof useQuery<User[
     queryFn: () => api<CashTransfer[]>('GET', '/cash-transfers'),
   });
   const meQ = useQuery({ queryKey: ['me'], queryFn: me });
-
-  // Best-effort name resolution: /users list → self (/me) → shortened id
-  // (a transfer row may reference a user outside the caller's /users scope).
-  const userName = (id: UUID): string => {
-    const listed = usersQ.data?.find((u) => u.id === id)?.name;
-    if (listed) return listed;
-    if (meQ.data?.user.id === id) return meQ.data.user.name;
-    return `${id.slice(0, 8)}…`;
-  };
+  const userName = (id: UUID) => resolveUserName(id, usersQ.data, meQ.data);
 
   return (
     <Card data-testid="cash-transfers-history">
@@ -423,20 +377,14 @@ function TransfersHistory({ usersQ }: { usersQ: ReturnType<typeof useQuery<User[
             className="divide-y"
             testIdPrefix="cash-transfers-history"
             renderItem={(t) => (
-              <li key={t.id} className="grid gap-1 py-3 first:pt-0 last:pb-0" data-testid={`transfer-row-${t.id}`}>
-                <div className="flex items-baseline justify-between gap-3">
-                  <p className="min-w-0 truncate text-sm font-medium">
-                    {userName(t.fromUserId)} → {userName(t.toUserId)}
-                  </p>
-                  <p className="shrink-0 text-sm font-semibold tabular-nums">{formatPaise(t.amountPaise)}</p>
-                </div>
-                <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                  <KindChip kind={t.kind} />
-                  <TagBadge tag={t.tag} ui={TAG_PICKER_UI[locale]} />
-                  <span>{t.businessDate}</span>
-                  {t.note && <span className="min-w-0 truncate">· {t.note}</span>}
-                </p>
-              </li>
+              <TransferRow
+                key={t.id}
+                t={t}
+                userName={userName}
+                rowTestIdPrefix="transfer-row"
+                kindChipTestIdPrefix="transfer-kind-chip"
+                tagLabels={TAG_PICKER_UI[locale]}
+              />
             )}
           />
         )}
@@ -470,53 +418,9 @@ function RollupSection() {
         ) : !rollupQ.data || rollupQ.data.length === 0 ? (
           <EmptyState label={m.LEDGER_UI.rollupEmpty} />
         ) : (
-          <ul className="divide-y">
-            {rollupQ.data.map((row) => (
-              <li key={row.userId} className="grid gap-2 py-3 first:pt-0 last:pb-0" data-testid={`rollup-row-${row.userId}`}>
-                <div className="flex items-baseline justify-between gap-3">
-                  <p className="min-w-0 truncate text-sm font-medium">
-                    {row.name}{' '}
-                    <span className="text-xs font-normal text-muted-foreground">{m.ROLE_LABELS[row.role]}</span>
-                  </p>
-                  <p
-                    className={cn('shrink-0 text-sm font-bold tabular-nums', row.balancePaise < 0 && 'text-destructive')}
-                    data-testid={`rollup-balance-${row.userId}`}
-                  >
-                    {formatSignedPaise(row.balancePaise)}
-                  </p>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {m.LEDGER_UI.rollupReceived} {formatPaise(row.receivedPaise)} · {m.LEDGER_UI.rollupGiven}{' '}
-                  {formatPaise(row.givenPaise)} · {m.LEDGER_UI.rollupSpent} {formatPaise(row.spentPaise)}
-                </p>
-                <ByCategoryChips byCategory={row.byCategory} />
-              </li>
-            ))}
-          </ul>
+          <RollupRows rows={rollupQ.data} testIdPrefix="rollup" />
         )}
       </CardContent>
     </Card>
-  );
-}
-
-function ByCategoryChips({ byCategory }: { byCategory: LedgerRollupRow['byCategory'] }) {
-  const m = useMessages();
-  // Frozen enum order keeps the chips stable regardless of server key order.
-  const chips = EXPENSE_CATEGORIES.map((c) => ({ category: c, paise: byCategory[c] })).filter(
-    (x): x is { category: (typeof EXPENSE_CATEGORIES)[number]; paise: number } => x.paise !== undefined && x.paise > 0,
-  );
-  if (chips.length === 0) return null;
-  return (
-    <p className="flex flex-wrap gap-1">
-      {chips.map(({ category, paise }) => (
-        <span
-          key={category}
-          className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground"
-          data-testid={`rollup-cat-${category}`}
-        >
-          {m.EXPENSE_CATEGORY_LABELS[category]} {formatPaise(paise)}
-        </span>
-      ))}
-    </p>
   );
 }
