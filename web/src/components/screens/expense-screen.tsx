@@ -42,7 +42,7 @@ import {
   type Vendor,
 } from '@techbuilder/contracts';
 import { ApiClientError, api, me } from '@/lib/api-client';
-import { addDays, minEntryDate, todayKolkata } from '@/lib/business-date';
+import { addDays, backdateDaysFor, todayKolkata } from '@/lib/business-date';
 import { uploadPhotos, uploadVoice } from '@/lib/media-upload';
 import { apiErrorOf } from '@/lib/i18n/messages';
 import { useLocale, useMessages } from '@/lib/i18n/locale-context';
@@ -54,7 +54,7 @@ import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
-import { DateField } from '@/components/entry/date-field';
+import { DateSelect } from '@/components/entry/date-select';
 import { PhotoMultiField } from '@/components/entry/photo-multi-field';
 import { VoiceField } from '@/components/entry/voice-field';
 import { RecentEntries } from '@/components/entry/recent-entries';
@@ -93,7 +93,6 @@ export function ExpenseScreen({ role }: { role: EntryRole }) {
   const local = LOCAL_UI[locale];
   const queryClient = useQueryClient();
   const today = useMemo(() => todayKolkata(), []);
-  const minDate = minEntryDate(role, today);
 
   const [date, setDate] = useState<BusinessDate>(today);
 
@@ -166,7 +165,7 @@ export function ExpenseScreen({ role }: { role: EntryRole }) {
               </p>
             )}
           </div>
-          <DateField id="expense-date" testId="expense-date" value={date} onChange={setDate} min={minDate} max={today} />
+          <DateSelect id="expense-date" testId="expense-date" value={date} onChange={setDate} today={today} backdateDays={backdateDaysFor(role)} />
 
           <Separator />
 

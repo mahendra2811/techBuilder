@@ -340,6 +340,18 @@ export class VehiclesService {
       if (ctx.role === 'SUPERVISOR' && (!driverUser.crewId || !ctx.crewIds.includes(driverUser.crewId))) {
         forbidScope('That driver is not in your crew');
       }
+      // frozen.12: sites are independent — an SM can only allot a driver who belongs to their OWN
+      // site. (Previously only the VEHICLE's site was checked, so a Site-B manager could pull in a
+      // Site-A driver surfaced by the old org-wide /people list.)
+      if (ctx.role === 'SITE_MANAGER') {
+        const [driverPerson] = await tx
+          .select({ siteId: schema.people.siteId })
+          .from(schema.people)
+          .where(and(eq(schema.people.id, driverPersonId), isNull(schema.people.deletedAt)));
+        if (!driverPerson?.siteId || !ctx.siteIds.includes(driverPerson.siteId)) {
+          forbidScope('That driver belongs to another site');
+        }
+      }
 
       // Who is being displaced off this vehicle (for the notification)?
       const displacedPersonId = target.assignedDriverPersonId;

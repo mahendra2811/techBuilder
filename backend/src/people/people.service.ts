@@ -13,6 +13,16 @@ export class PeopleService {
 
   async create(p: Principal, input: CreatePersonInput): Promise<Person> {
     return this.dbs.runInTenant(p.orgId, async (tx) => {
+      const ctx = await loadScope(tx, p);
+      // frozen.12: the person's site is SERVER-set (sites are independent). An OWNER may place a
+      // person on any site (or leave it unassigned); everyone else is forced to their OWN site so
+      // a Site-B manager can never seed a person that a Site-A manager would then see.
+      const siteId =
+        ctx.role === 'OWNER'
+          ? (input.siteId ?? null)
+          : input.siteId && ctx.siteIds.includes(input.siteId)
+            ? input.siteId
+            : (ctx.siteIds[0] ?? null);
       const [row] = await tx
         .insert(schema.people)
         .values({
@@ -23,6 +33,7 @@ export class PeopleService {
           skill: input.skill ?? null,
           defaultWagePaise: input.defaultWagePaise ?? null,
           active: true,
+          siteId,
           createdBy: p.userId,
           updatedBy: p.userId,
           // Round 2 (C6): onboarder (SM/Supervisor/Owner — whoever holds `user.create`) sets
@@ -132,11 +143,16 @@ export class PeopleService {
   async list(p: Principal): Promise<Person[]> {
     return this.dbs.runInTenant(p.orgId, async (tx) => {
       const ctx = await loadScope(tx, p);
-      // WP-1: Owner + SM see the org labour master (allocation needs the full list);
-      // TH sees own crew; Driver/Worker see only their own person row.
+      // Scope (frozen.12): sites are independent, so SM + ACCOUNTANT see only their OWN site(s)'
+      // labour master (by people.siteId) — never the other site's drivers/workers. Owner sees the
+      // whole org (allocation across sites). Supervisor is tighter still (own crew only);
+      // Driver/Worker see just their own person row.
       let scope: SQL | undefined;
-      if (ctx.role === 'SUPERVISOR') scope = inSet(schema.people.id, ctx.crewPersonIds);
-      else if (ctx.role === 'DRIVER' || ctx.role === 'WORKER') {
+      if (ctx.role === 'SITE_MANAGER' || ctx.role === 'ACCOUNTANT') {
+        scope = inSet(schema.people.siteId, ctx.siteIds);
+      } else if (ctx.role === 'SUPERVISOR') {
+        scope = inSet(schema.people.id, ctx.crewPersonIds);
+      } else if (ctx.role === 'DRIVER' || ctx.role === 'WORKER') {
         scope = ctx.personId ? (eq(schema.people.id, ctx.personId) as SQL) : sql`false`;
       }
       const rows = await tx
@@ -167,5 +183,6 @@ function mapPerson(r: typeof schema.people.$inferSelect): Person {
     // frozen.8 (Round-2 guardian/ID-card fields) — plain passthrough; no create/edit UI yet.
     guardianName: r.guardianName ?? null,
     guardianPhone: r.guardianPhone ?? null,
+    siteId: r.siteId ?? null, // frozen.12
   };
 }

@@ -38,7 +38,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { uuidv7 } from 'uuidv7';
 import type { CashTransfer, CashTransferKind, CreateCashTransferInput, LedgerRollupRow, MoneyTag, UUID, User } from '@techbuilder/contracts';
 import { api, me } from '@/lib/api-client';
-import { todayKolkata } from '@/lib/business-date';
+import { backdateDaysFor, todayKolkata } from '@/lib/business-date';
 import { apiErrorOf } from '@/lib/i18n/messages';
 import { useLocale, useMessages } from '@/lib/i18n/locale-context';
 import { rupeesToPaise } from '@/lib/money';
@@ -48,7 +48,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
 import { ShowMore } from '@/components/ui/show-more';
-import { DateField } from '@/components/entry/date-field';
+import { DateSelect } from '@/components/entry/date-select';
 import { LoadingState, EmptyState, ErrorState } from '@/components/entry/states';
 import { FormStatus } from '@/components/entry/form-status';
 import { QueryBoundary } from '@/components/ui/query-boundary';
@@ -317,7 +317,7 @@ function TransferForm({ role, usersQ }: { role: LedgerRole; usersQ: ReturnType<t
               )}
             </div>
 
-            <DateField id="transfer-date" testId="transfer-date" value={date} onChange={setDate} max={today} />
+            <DateSelect id="transfer-date" testId="transfer-date" value={date} onChange={setDate} today={today} backdateDays={backdateDaysFor(role)} />
 
             <div className="grid gap-2">
               <Label htmlFor="transfer-note">{m.LEDGER_UI.noteLabel}</Label>

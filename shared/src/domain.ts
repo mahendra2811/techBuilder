@@ -80,6 +80,9 @@ export interface Person extends AuditFields {
   /** Round 2 (C6): ID-card family details — SM/Owner-only edit after onboarding. */
   guardianName: string | null;
   guardianPhone: string | null;
+  /** frozen.12: the site this person belongs to (sites are independent — labour master is
+   *  site-scoped for SM/Accountant). Server-set at creation; null = unassigned (Owner-created). */
+  siteId: UUID | null;
 }
 
 export interface Crew extends AuditFields {

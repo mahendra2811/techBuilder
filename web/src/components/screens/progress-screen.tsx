@@ -51,7 +51,7 @@ import { uuidv7 } from 'uuidv7';
 import { Paperclip } from 'lucide-react';
 import type { BusinessDate, CreateProgressNoteInput, ProgressNote, Site, User, UUID } from '@techbuilder/contracts';
 import { api, me } from '@/lib/api-client';
-import { addDays, formatBusinessDate, formatKolkataDateTime, todayKolkata } from '@/lib/business-date';
+import { addDays, backdateDaysFor, formatBusinessDate, formatKolkataDateTime, todayKolkata } from '@/lib/business-date';
 import { uploadPhotos, uploadVoice } from '@/lib/media-upload';
 import { PHOTO_ONLY_NOTE_TEXT, apiErrorOf, type Messages } from '@/lib/i18n/messages';
 import { useLocale, useMessages } from '@/lib/i18n/locale-context';
@@ -60,7 +60,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
-import { DateField } from '@/components/entry/date-field';
+import { DateSelect } from '@/components/entry/date-select';
 import { PhotoMultiField } from '@/components/entry/photo-multi-field';
 import { VoiceField } from '@/components/entry/voice-field';
 import { SitePicker } from '@/components/entry/site-picker';
@@ -192,7 +192,7 @@ export function ProgressScreen({ role }: { role: EntryRole }) {
               onRetry={() => void sitesQ.refetch()}
             />
           )}
-          <DateField id="progress-date" testId="progress-date" value={date} onChange={setDate} max={today} />
+          <DateSelect id="progress-date" testId="progress-date" value={date} onChange={setDate} today={today} backdateDays={backdateDaysFor(role)} />
 
           {/* Filing another report is NEVER blocked by this — informational only. */}
           {latestToday && (

@@ -1,6 +1,6 @@
 {
   "name": "@techbuilder/contracts",
-  "version": "1.0.0-frozen.11",
+  "version": "1.0.0-frozen.12",
   "private": true,
   "description": "techBuilder Contracts Pack — FROZEN single source of truth (enums, types, OrgConfig, DB schema + RLS, API contract, adapter interfaces). Consumed by backend + frontend engine. Do not edit without a version bump + cross-team sign-off.",
   "main": "dist/index.js",

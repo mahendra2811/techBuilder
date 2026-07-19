@@ -13,7 +13,7 @@
  * dashboard uses for its counts — no new endpoint. Each section carries an anchor id so the
  * dashboard's brief cards can deep-link straight to it (e.g. /accountant/verify#expenses).
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, Flag } from 'lucide-react';
 import type {
@@ -31,9 +31,11 @@ import { apiErrorOf } from '@/lib/i18n/messages';
 import { useLocale, useMessages } from '@/lib/i18n/locale-context';
 import { formatPaise } from '@/lib/money';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
+import { SectionCard } from '@/components/ui/section-card';
+import { SubPageHeader, useSubPage } from '@/components/ui/sub-page';
 import { cn } from '@/lib/utils';
 
 // Module-local — the frozen i18n catalogs carry no accountant-verify copy yet.
@@ -81,11 +83,30 @@ const UI = {
 } as const;
 type Ui = { [K in keyof typeof UI.en]: string };
 
+type VerifySection = 'expenses' | 'transfers' | 'vendor-payments';
+const SECTION_KEYS: readonly VerifySection[] = ['expenses', 'transfers', 'vendor-payments'];
+
+/**
+ * Landing = three tappable section cards (Expenses / Cash transfers / Vendor payments), each with
+ * its pending count; tapping opens that queue as a sub-page (same hub→sub-page pattern as khata/
+ * fuel/people). The dashboard brief cards deep-link with a hash
+ * (/accountant/verify#expenses|#transfers|#vendor-payments) — on mount we open the matching
+ * sub-page so those links land straight on the right queue.
+ */
 export function AccountantVerifyScreen() {
   const m = useMessages();
   const locale = useLocale();
   const ui = UI[locale];
   const queryClient = useQueryClient();
+  const { current, open, close } = useSubPage<VerifySection>();
+
+  // Deep-link from the dashboard brief cards (#expenses / #transfers / #vendor-payments).
+  useEffect(() => {
+    const hash = window.location.hash.slice(1) as VerifySection;
+    if (SECTION_KEYS.includes(hash)) open(hash);
+    // Run once on mount — `open` is stable and we only honor the initial hash.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const queueQ = useQuery({
     queryKey: ['accountant-queue'],
@@ -94,7 +115,6 @@ export function AccountantVerifyScreen() {
   const usersQ = useQuery({ queryKey: ['users'], queryFn: () => api<User[]>('GET', '/users') });
 
   const nameOf = (id: UUID) => usersQ.data?.find((u) => u.id === id)?.name ?? `${id.slice(0, 8)}…`;
-
   const invalidateQueue = () => void queryClient.invalidateQueries({ queryKey: ['accountant-queue'] });
 
   if (queueQ.isPending) {
@@ -106,106 +126,116 @@ export function AccountantVerifyScreen() {
   const q = queueQ.data;
   if (!q) return null;
 
+  const sectionMeta: Record<VerifySection, { title: string; count: number }> = {
+    expenses: { title: ui.expensesTitle, count: q.unverifiedExpenses.length },
+    transfers: { title: ui.transfersTitle, count: q.unverifiedTransfers.length },
+    'vendor-payments': { title: ui.vendorTitle, count: q.unverifiedVendorPayments.length },
+  };
+
+  const expensesList = (
+    <ul className="grid gap-3">
+      {q.unverifiedExpenses.map((e: Expense) => (
+        <VerifyRow
+          key={e.id}
+          id={e.id}
+          endpoint={`/records/expense/${e.id}/verify`}
+          ui={ui}
+          onDone={invalidateQueue}
+          primary={
+            <>
+              <span className="min-w-0 truncate text-sm font-medium">{m.EXPENSE_CATEGORY_LABELS[e.category]}</span>
+              <span className="shrink-0 text-sm font-semibold tabular-nums">{formatPaise(e.amountPaise)}</span>
+            </>
+          }
+          secondary={`${ui.fromLabel} ${nameOf(e.enteredBy)} · ${formatBusinessDate(e.businessDate)}${e.remark ? ` · ${e.remark}` : ''}`}
+        />
+      ))}
+    </ul>
+  );
+
+  const transfersList = (
+    <ul className="grid gap-3">
+      {q.unverifiedTransfers.map((t: CashTransfer) => (
+        <VerifyRow
+          key={t.id}
+          id={t.id}
+          endpoint={`/cash-transfers/${t.id}/verify`}
+          ui={ui}
+          onDone={invalidateQueue}
+          primary={
+            <>
+              <span className="min-w-0 truncate text-sm font-medium">
+                {nameOf(t.fromUserId)} {ui.transferArrow} {nameOf(t.toUserId)}
+              </span>
+              <span className="shrink-0 text-sm font-semibold tabular-nums">{formatPaise(t.amountPaise)}</span>
+            </>
+          }
+          secondary={`${formatBusinessDate(t.businessDate)}${t.note ? ` · ${t.note}` : ''}`}
+        />
+      ))}
+    </ul>
+  );
+
+  const vendorList = (
+    <ul className="grid gap-3">
+      {q.unverifiedVendorPayments.map((v: VendorPayment) => (
+        <VerifyRow
+          key={v.id}
+          id={v.id}
+          endpoint={`/vendors/payments/${v.id}/verify`}
+          ui={ui}
+          onDone={invalidateQueue}
+          primary={
+            <>
+              <span className="min-w-0 truncate text-sm font-medium">
+                {v.kind === 'PAYMENT' ? ui.vendorKindPayment : ui.vendorKindReceipt}
+              </span>
+              <span className="shrink-0 text-sm font-semibold tabular-nums">{formatPaise(v.amountPaise)}</span>
+            </>
+          }
+          secondary={`${formatBusinessDate(v.businessDate)}${v.note ? ` · ${v.note}` : ''}`}
+        />
+      ))}
+    </ul>
+  );
+
+  const sectionBody: Record<VerifySection, React.ReactNode> = {
+    expenses: q.unverifiedExpenses.length === 0 ? <EmptyState label={ui.empty} /> : expensesList,
+    transfers: q.unverifiedTransfers.length === 0 ? <EmptyState label={ui.empty} /> : transfersList,
+    'vendor-payments': q.unverifiedVendorPayments.length === 0 ? <EmptyState label={ui.empty} /> : vendorList,
+  };
+
+  // ---- sub-page: one queue ----
+  if (current) {
+    return (
+      <div className="grid gap-4" data-testid={`verify-${current}`}>
+        <SubPageHeader title={sectionMeta[current].title} onBack={close} />
+        <Card>
+          <CardContent className="pt-4">{sectionBody[current]}</CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // ---- landing: section cards with counts ----
   return (
     <div className="grid gap-4" data-testid="accountant-verify">
-      <div>
-        <h1 className="text-lg font-semibold">{ui.title}</h1>
-        <p className="text-sm text-muted-foreground">{ui.subtitle}</p>
-      </div>
-
-      <Card id="expenses" data-testid="verify-expenses">
+      <Card>
         <CardHeader>
-          <CardTitle>{ui.expensesTitle}</CardTitle>
+          <CardTitle>{ui.title}</CardTitle>
+          <CardDescription>{ui.subtitle}</CardDescription>
         </CardHeader>
-        <CardContent>
-          {q.unverifiedExpenses.length === 0 ? (
-            <EmptyState label={ui.empty} />
-          ) : (
-            <ul className="grid gap-3">
-              {q.unverifiedExpenses.map((e: Expense) => (
-                <VerifyRow
-                  key={e.id}
-                  id={e.id}
-                  endpoint={`/records/expense/${e.id}/verify`}
-                  ui={ui}
-                  onDone={invalidateQueue}
-                  primary={
-                    <>
-                      <span className="min-w-0 truncate text-sm font-medium">{m.EXPENSE_CATEGORY_LABELS[e.category]}</span>
-                      <span className="shrink-0 text-sm font-semibold tabular-nums">{formatPaise(e.amountPaise)}</span>
-                    </>
-                  }
-                  secondary={`${ui.fromLabel} ${nameOf(e.enteredBy)} · ${formatBusinessDate(e.businessDate)}${e.remark ? ` · ${e.remark}` : ''}`}
-                />
-              ))}
-            </ul>
-          )}
-        </CardContent>
       </Card>
 
-      <Card id="transfers" data-testid="verify-transfers">
-        <CardHeader>
-          <CardTitle>{ui.transfersTitle}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {q.unverifiedTransfers.length === 0 ? (
-            <EmptyState label={ui.empty} />
-          ) : (
-            <ul className="grid gap-3">
-              {q.unverifiedTransfers.map((t: CashTransfer) => (
-                <VerifyRow
-                  key={t.id}
-                  id={t.id}
-                  endpoint={`/cash-transfers/${t.id}/verify`}
-                  ui={ui}
-                  onDone={invalidateQueue}
-                  primary={
-                    <>
-                      <span className="min-w-0 truncate text-sm font-medium">
-                        {nameOf(t.fromUserId)} {ui.transferArrow} {nameOf(t.toUserId)}
-                      </span>
-                      <span className="shrink-0 text-sm font-semibold tabular-nums">{formatPaise(t.amountPaise)}</span>
-                    </>
-                  }
-                  secondary={`${formatBusinessDate(t.businessDate)}${t.note ? ` · ${t.note}` : ''}`}
-                />
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card id="vendor-payments" data-testid="verify-vendor-payments">
-        <CardHeader>
-          <CardTitle>{ui.vendorTitle}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {q.unverifiedVendorPayments.length === 0 ? (
-            <EmptyState label={ui.empty} />
-          ) : (
-            <ul className="grid gap-3">
-              {q.unverifiedVendorPayments.map((v: VendorPayment) => (
-                <VerifyRow
-                  key={v.id}
-                  id={v.id}
-                  endpoint={`/vendors/payments/${v.id}/verify`}
-                  ui={ui}
-                  onDone={invalidateQueue}
-                  primary={
-                    <>
-                      <span className="min-w-0 truncate text-sm font-medium">
-                        {v.kind === 'PAYMENT' ? ui.vendorKindPayment : ui.vendorKindReceipt}
-                      </span>
-                      <span className="shrink-0 text-sm font-semibold tabular-nums">{formatPaise(v.amountPaise)}</span>
-                    </>
-                  }
-                  secondary={`${formatBusinessDate(v.businessDate)}${v.note ? ` · ${v.note}` : ''}`}
-                />
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+      {SECTION_KEYS.map((key) => (
+        <SectionCard
+          key={key}
+          testId={`verify-section-${key}`}
+          title={sectionMeta[key].title}
+          count={sectionMeta[key].count}
+          onOpen={() => open(key)}
+        />
+      ))}
     </div>
   );
 }

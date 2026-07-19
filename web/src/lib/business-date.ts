@@ -74,3 +74,15 @@ export function minEntryDate(role: Role, today: BusinessDate): BusinessDate | un
   const limit = BACKDATE_LIMIT_DAYS[role];
   return limit === undefined ? undefined : addDays(today, -limit);
 }
+
+/**
+ * Days-back a role may file a record for — the count that drives the <DateSelect> dropdown.
+ * MUST match the backend RECORD_CREATE_BACKDATE_LIMIT_DAYS so every offered option is accepted
+ * (SUPERVISOR 1 = today+yesterday, SITE_MANAGER 7, DRIVER 2). OWNER is unlimited server-side; a
+ * dropdown can't be infinite, so it's capped to a sensible 7 for the picker (Owner rarely
+ * backdates, and can be given a wider affordance later if needed).
+ */
+const OWNER_PICKER_BACKDATE = 7;
+export function backdateDaysFor(role: Role): number {
+  return BACKDATE_LIMIT_DAYS[role] ?? OWNER_PICKER_BACKDATE;
+}

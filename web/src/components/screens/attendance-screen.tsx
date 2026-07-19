@@ -31,14 +31,14 @@ import type {
   UUID,
 } from '@techbuilder/contracts';
 import { api, me } from '@/lib/api-client';
-import { minEntryDate, todayKolkata } from '@/lib/business-date';
+import { backdateDaysFor, todayKolkata } from '@/lib/business-date';
 import { apiErrorOf } from '@/lib/i18n/messages';
 import { useMessages } from '@/lib/i18n/locale-context';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
-import { DateField } from '@/components/entry/date-field';
+import { DateSelect } from '@/components/entry/date-select';
 import { SitePicker } from '@/components/entry/site-picker';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
 import { cn } from '@/lib/utils';
@@ -176,7 +176,7 @@ export function AttendanceScreen({ role }: { role: EntryRole }) {
         </CardHeader>
         <CardContent className="grid gap-4">
           <div className="grid grid-cols-2 items-end gap-3">
-            <DateField
+            <DateSelect
               id="attendance-date"
               testId="attendance-date"
               value={date}
@@ -184,8 +184,8 @@ export function AttendanceScreen({ role }: { role: EntryRole }) {
                 mark.reset();
                 setDate(d);
               }}
-              min={minEntryDate(role, today)}
-              max={today}
+              today={today}
+              backdateDays={backdateDaysFor(role)}
             />
             <Button
               type="button"

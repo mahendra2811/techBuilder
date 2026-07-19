@@ -48,27 +48,42 @@ export class DbService implements OnModuleDestroy {
    */
   async assertRlsEnforced(): Promise<void> {
     const logger = new Logger('DbService');
-    const tables = [...TENANT_TABLES] as string[];
-    const rows = (
-      await this.db.execute(sql`
-        SELECT c.relname AS name
-        FROM pg_class c
-        JOIN pg_namespace n ON n.oid = c.relnamespace
-        WHERE n.nspname = 'public'
-          AND c.relkind = 'r'
-          AND c.relname = ANY(${tables})
-          AND (
-            NOT c.relforcerowsecurity
-            OR NOT EXISTS (
-              SELECT 1 FROM pg_policy p WHERE p.polrelid = c.oid AND p.polname = 'tenant_isolation'
+    // Pass the table list as ONE comma-delimited string param and rebuild the array server-side
+    // with string_to_array — drizzle's sql template otherwise expands a JS array into a
+    // parenthesised tuple `($1,…,$n)`, which `= ANY(...)` rejects ("requires array on right side").
+    // Table names are ASCII identifiers, so there is no comma to escape.
+    const tableList = [...TENANT_TABLES].join(',');
+    const isProd = loadEnv().NODE_ENV === 'production';
+    let rows: Array<{ name: string }>;
+    try {
+      rows = (
+        await this.db.execute(sql`
+          SELECT c.relname AS name
+          FROM pg_class c
+          JOIN pg_namespace n ON n.oid = c.relnamespace
+          WHERE n.nspname = 'public'
+            AND c.relkind = 'r'
+            AND c.relname = ANY(string_to_array(${tableList}, ','))
+            AND (
+              NOT c.relforcerowsecurity
+              OR NOT EXISTS (
+                SELECT 1 FROM pg_policy p WHERE p.polrelid = c.oid AND p.polname = 'tenant_isolation'
+              )
             )
-          )
-      `)
-    ).rows as Array<{ name: string }>;
+        `)
+      ).rows as Array<{ name: string }>;
+    } catch (err) {
+      // A failed CHECK query is an infra problem, not proof of a hole. Fail closed in production
+      // (don't serve if we can't confirm isolation); warn + continue elsewhere so a local DB
+      // hiccup never blocks dev.
+      if (isProd) throw err;
+      logger.warn(`Could not verify RLS enforcement (continuing in dev): ${String(err)}`);
+      return;
+    }
     if (rows.length === 0) return;
     const missing = rows.map((r) => r.name).join(', ');
     const msg = `RLS NOT enforced on: ${missing}. Run \`npm run db:rls\` (or \`db:deploy\`) before serving traffic.`;
-    if (loadEnv().NODE_ENV === 'production') throw new Error(msg);
+    if (isProd) throw new Error(msg);
     logger.warn(msg);
   }
 

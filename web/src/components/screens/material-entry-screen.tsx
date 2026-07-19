@@ -32,7 +32,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { uuidv7 } from 'uuidv7';
 import type { CreateMaterialTxnInput, Material, MaterialTxn, MaterialTxnType, Site, UUID } from '@techbuilder/contracts';
 import { api } from '@/lib/api-client';
-import { addDays, minEntryDate, todayKolkata } from '@/lib/business-date';
+import { addDays, backdateDaysFor, todayKolkata } from '@/lib/business-date';
 import { apiErrorOf, type UiStrings } from '@/lib/i18n/messages';
 import { useLocale, useMessages } from '@/lib/i18n/locale-context';
 import { Button } from '@/components/ui/button';
@@ -41,7 +41,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
 import { Textarea } from '@/components/ui/textarea';
-import { DateField } from '@/components/entry/date-field';
+import { DateSelect } from '@/components/entry/date-select';
 import { SitePicker } from '@/components/entry/site-picker';
 import { LoadingState, EmptyState, ErrorState } from '@/components/entry/states';
 import { FormStatus } from '@/components/entry/form-status';
@@ -109,7 +109,6 @@ export function MaterialEntryScreen({ role }: { role: MaterialEntryRole }) {
   const ui = UI[locale];
   const queryClient = useQueryClient();
   const today = todayKolkata();
-  const minDate = minEntryDate(role, today);
 
   const [date, setDate] = useState(today);
   const [pickedSiteId, setPickedSiteId] = useState<UUID | ''>('');
@@ -166,7 +165,7 @@ export function MaterialEntryScreen({ role }: { role: MaterialEntryRole }) {
             </div>
           )}
 
-          <DateField id="material-entry-date" testId="material-entry-date" value={date} onChange={setDate} min={minDate} max={today} />
+          <DateSelect id="material-entry-date" testId="material-entry-date" value={date} onChange={setDate} today={today} backdateDays={backdateDaysFor(role)} />
 
           {materialsQ.isPending ? (
             <LoadingState />

@@ -11,13 +11,14 @@ const LoginSchema = z.object({ username: z.string().min(1), password: z.string()
 const RefreshSchema = z.object({ refreshToken: z.string().min(1), deviceId: z.string().min(1) });
 const ChangePwSchema = z.object({ currentPassword: z.string().min(1), newPassword: z.string().min(8) });
 
-// Tighter than the global 120/min cap: blunts credential stuffing against these
-// unauthenticated routes. NOTE (architecture): the web talks to this API server-to-server
-// through the Next.js proxy, which does NOT forward the real client IP — so in normal
-// operation this caps LOGIN ATTEMPTS ORG-WIDE (everyone shares the proxy's IP), and caps a
-// direct-to-origin attacker by their own IP. 30/min is safe for pilot scale; the COMPLETE
-// per-client defense is edge rate-limiting (real IP) + a per-account lockout — tracked follow-up.
-const AUTH_THROTTLE = { default: { ttl: 60_000, limit: 30 } };
+// Tighter than the global cap: blunts credential stuffing against these unauthenticated routes.
+// NOTE (architecture): the web talks to this API server-to-server through the Next.js proxy, which
+// does NOT forward the real client IP — so this caps auth attempts ORG-WIDE (everyone shares the
+// proxy's IP), incl. the silent token refreshes every page load can trigger. 30/min was too tight
+// (blocked normal multi-user/multi-role use); 100/min still caps a direct-to-origin attacker while
+// never biting legit traffic. The COMPLETE per-client defense is edge rate-limiting (real IP) + a
+// per-account lockout — tracked follow-up.
+const AUTH_THROTTLE = { default: { ttl: 60_000, limit: 100 } };
 
 @Controller('auth')
 export class AuthController {

@@ -59,6 +59,9 @@ export interface CreatePersonInput {
   /** Round 2 (C6): set once at onboarding by whoever creates the person. */
   guardianName?: string;
   guardianPhone?: string;
+  /** frozen.12: preferred site for this person. Only honored for an OWNER caller; for
+   *  SM/Supervisor/Accountant the server forces the creator's own site (site independence). */
+  siteId?: UUID;
 }
 
 /** Round 2: person edit. Guardian/phone changes are stripped server-side unless the caller is SM (own site) / Owner. */

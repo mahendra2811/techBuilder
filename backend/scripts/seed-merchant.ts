@@ -295,6 +295,20 @@ async function main(): Promise<void> {
         });
       }
 
+      // ---------- frozen.12: derive people.site_id from linkage ----------
+      // People are inserted before crews/users/vehicles exist, so their site can't be set inline.
+      // Now that all linkage is in place, back-derive it (same COALESCE as scripts/backfill-
+      // people-site.ts) so a freshly-onboarded merchant is already site-independent: an SM only
+      // ever sees their own site's labour master. Anyone with no linkage stays null (Owner-only).
+      await tx.execute(sql`
+        UPDATE people p SET site_id = COALESCE(
+          (SELECT u.assigned_site_id FROM users u WHERE u.person_id = p.id AND u.org_id = p.org_id AND u.deleted_at IS NULL AND u.assigned_site_id IS NOT NULL LIMIT 1),
+          (SELECT c.site_id FROM crew_members cm JOIN crews c ON c.id = cm.crew_id AND c.org_id = p.org_id WHERE cm.person_id = p.id AND cm.org_id = p.org_id AND c.deleted_at IS NULL LIMIT 1),
+          (SELECT v.assigned_site_id FROM vehicles v WHERE v.assigned_driver_person_id = p.id AND v.org_id = p.org_id AND v.deleted_at IS NULL AND v.assigned_site_id IS NOT NULL LIMIT 1)
+        )
+        WHERE p.org_id = ${orgId} AND p.site_id IS NULL AND p.deleted_at IS NULL
+      `);
+
       // ---------- summary ----------
       // eslint-disable-next-line no-console
       console.log(

@@ -339,6 +339,7 @@ function mapPerson(r: typeof schema.people.$inferSelect): Person {
     // frozen.8 (Round-2 guardian/ID-card fields) — plain passthrough; no create/edit UI yet.
     guardianName: r.guardianName ?? null,
     guardianPhone: r.guardianPhone ?? null,
+    siteId: r.siteId ?? null, // frozen.12
   };
 }
 

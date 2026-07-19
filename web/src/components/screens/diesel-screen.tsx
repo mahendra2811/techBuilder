@@ -36,7 +36,7 @@ import type {
   Vehicle,
 } from '@techbuilder/contracts';
 import { api } from '@/lib/api-client';
-import { minEntryDate, todayKolkata } from '@/lib/business-date';
+import { backdateDaysFor, todayKolkata } from '@/lib/business-date';
 import { apiErrorOf, type UiStrings } from '@/lib/i18n/messages';
 import { useLocale, useMessages } from '@/lib/i18n/locale-context';
 import { rupeesToPaise } from '@/lib/money';
@@ -45,7 +45,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
-import { DateField } from '@/components/entry/date-field';
+import { DateSelect } from '@/components/entry/date-select';
 import { LoadingState, EmptyState, ErrorState } from '@/components/entry/states';
 import { FormStatus } from '@/components/entry/form-status';
 import { SubPageHeader, useSubPage } from '@/components/ui/sub-page';
@@ -315,7 +315,6 @@ function BuyStockForm({
   const [saved, setSaved] = useState(false);
 
   const siteId: UUID | '' = site?.id ?? '';
-  const minDate = minEntryDate('SUPERVISOR', today);
 
   const create = useMutation({
     mutationFn: (input: CreateFuelStockPurchaseInput) => api<FuelStockPurchase>('POST', '/fuel-stock/purchases', input),
@@ -414,7 +413,7 @@ function BuyStockForm({
             </p>
           )}
 
-          <DateField id="diesel-buy-date" testId="diesel-buy-date" value={date} onChange={setDate} min={minDate} max={today} />
+          <DateSelect id="diesel-buy-date" testId="diesel-buy-date" value={date} onChange={setDate} today={today} backdateDays={backdateDaysFor('SUPERVISOR')} />
 
           <div className="grid gap-2">
             <Label htmlFor="diesel-buy-note">{ui.noteLabel}</Label>
@@ -463,7 +462,6 @@ function IssueToVehicleForm({
 
   const vehicleId: UUID | '' = pickedVehicleId !== '' ? pickedVehicleId : (vehicles[0]?.id ?? '');
   const vehicleLabel = (v: Vehicle) => (v.name ? `${v.regNo} · ${v.name}` : v.regNo);
-  const minDate = minEntryDate('SUPERVISOR', today);
 
   const create = useMutation({
     mutationFn: (input: CreateFuelIssuanceInput) => api<FuelIssuance>('POST', '/fuel-stock/issuances', input),
@@ -559,7 +557,7 @@ function IssueToVehicleForm({
             </p>
           )}
 
-          <DateField id="diesel-issue-date" testId="diesel-issue-date" value={date} onChange={setDate} min={minDate} max={today} />
+          <DateSelect id="diesel-issue-date" testId="diesel-issue-date" value={date} onChange={setDate} today={today} backdateDays={backdateDaysFor('SUPERVISOR')} />
 
           <div className="grid gap-2">
             <Label htmlFor="diesel-issue-note">{ui.noteLabel}</Label>

@@ -20,7 +20,7 @@ import { z } from 'zod';
 import { uuidv7 } from 'uuidv7';
 import type { BusinessDate, CreateFuelLogInput, FuelLog, UUID, Vehicle } from '@techbuilder/contracts';
 import { api } from '@/lib/api-client';
-import { addDays, minEntryDate, todayKolkata } from '@/lib/business-date';
+import { addDays, backdateDaysFor, todayKolkata } from '@/lib/business-date';
 import { uploadPhoto } from '@/lib/media-upload';
 import { apiErrorOf, type Messages } from '@/lib/i18n/messages';
 import { useMessages } from '@/lib/i18n/locale-context';
@@ -31,7 +31,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
 import { Separator } from '@/components/ui/separator';
-import { DateField } from '@/components/entry/date-field';
+import { DateSelect } from '@/components/entry/date-select';
 import { PhotoField } from '@/components/entry/photo-field';
 import { RecentEntries, type RecentRow } from '@/components/entry/recent-entries';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
@@ -229,13 +229,13 @@ export function FuelScreen() {
               )}
             </div>
 
-            <DateField
+            <DateSelect
               id="fuel-date"
               testId="fuel-date"
               value={date}
               onChange={setDate}
-              min={minEntryDate('SITE_MANAGER', today)}
-              max={today}
+              today={today}
+              backdateDays={backdateDaysFor('SITE_MANAGER')}
             />
 
             <PhotoField file={photo} onChange={setPhoto} testId="fuel-photo" />

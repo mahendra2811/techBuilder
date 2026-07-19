@@ -12,10 +12,12 @@ const CreatePersonSchema = z.object({
   name: z.string().min(1),
   phone: z.string().optional(),
   skill: z.enum(['UNSKILLED', 'SEMI_SKILLED', 'SKILLED', 'OPERATOR', 'DRIVER']).optional(),
-  defaultWagePaise: z.number().int().optional(),
+  defaultWagePaise: z.number().int().positive().optional(),
   // Round 2 (C6): onboarder sets guardian/ID-card fields once at creation.
   guardianName: z.string().max(120).optional(),
   guardianPhone: z.string().max(20).optional(),
+  // frozen.12: preferred site (only honored for an OWNER caller; server forces own-site otherwise).
+  siteId: z.string().uuid().optional(),
 });
 
 // Round 2 (CW-4): all optional — the service decides field-by-field who may actually change

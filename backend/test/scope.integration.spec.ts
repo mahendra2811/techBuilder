@@ -16,6 +16,7 @@ import { ApprovalsService } from '../src/approvals/approvals.service';
 import { WageService } from '../src/wage/wage.service';
 import { DashboardsService } from '../src/dashboards/dashboards.service';
 import { SyncService } from '../src/sync/sync.service';
+import { PeopleService } from '../src/people/people.service';
 import { businessDateNow, addDays } from '../src/common/business-date';
 
 const HAS_DB = !!process.env.DATABASE_URL;
@@ -60,6 +61,7 @@ describe.skipIf(!HAS_DB)('scope enforcement acceptance (live DB, RLS app role)',
   let wage: WageService;
   let dashboards: DashboardsService;
   let sync: SyncService;
+  let people: PeopleService;
 
   beforeAll(async () => {
     dbs = new DbService();
@@ -69,6 +71,7 @@ describe.skipIf(!HAS_DB)('scope enforcement acceptance (live DB, RLS app role)',
     wage = new WageService(dbs);
     dashboards = new DashboardsService(dbs);
     sync = new SyncService(dbs);
+    people = new PeopleService(dbs);
 
     const config = parseOrgConfig({
       brand: { name: 'ScopeTest Co', primaryColor: '#111111' },
@@ -89,10 +92,11 @@ describe.skipIf(!HAS_DB)('scope enforcement acceptance (live DB, RLS app role)',
         { id: siteB, orgId, name: 'Site B', code: 'B', siteManagerId: smBId, ...audit(ownerId) },
       ]);
       await tx.insert(schema.people).values([
-        { id: pW1, orgId, name: 'Worker One', skill: 'UNSKILLED', defaultWagePaise: 50_000, active: true, ...audit(ownerId) },
-        { id: pW2, orgId, name: 'Worker Two', skill: 'UNSKILLED', defaultWagePaise: 50_000, active: true, ...audit(ownerId) },
-        { id: pD, orgId, name: 'Driver Person', skill: 'DRIVER', defaultWagePaise: 60_000, active: true, ...audit(ownerId) },
-        { id: pOutside, orgId, name: 'Outside Person', skill: 'UNSKILLED', defaultWagePaise: 50_000, active: true, ...audit(ownerId) },
+        // frozen.12: people carry a siteId — siteA crew/driver vs siteB "outside" person.
+        { id: pW1, orgId, siteId: siteA, name: 'Worker One', skill: 'UNSKILLED', defaultWagePaise: 50_000, active: true, ...audit(ownerId) },
+        { id: pW2, orgId, siteId: siteA, name: 'Worker Two', skill: 'UNSKILLED', defaultWagePaise: 50_000, active: true, ...audit(ownerId) },
+        { id: pD, orgId, siteId: siteA, name: 'Driver Person', skill: 'DRIVER', defaultWagePaise: 60_000, active: true, ...audit(ownerId) },
+        { id: pOutside, orgId, siteId: siteB, name: 'Outside Person', skill: 'UNSKILLED', defaultWagePaise: 50_000, active: true, ...audit(ownerId) },
       ]);
       await tx.insert(schema.crews).values({ id: crewA1, orgId, siteId: siteA, supervisorUserId: thId, name: 'Crew A1', ...audit(ownerId) });
       await tx.insert(schema.crewMembers).values([
@@ -186,6 +190,21 @@ describe.skipIf(!HAS_DB)('scope enforcement acceptance (live DB, RLS app role)',
   it('SM(A) dashboard completeness is limited to site A', async () => {
     const dash = await dashboards.getOwnerDashboard(SM_A(), { from: addDays(TODAY, -2), to: TODAY });
     expect(dash.completeness.every((c) => c.scopeId === siteA)).toBe(true);
+  });
+
+  // ---- frozen.12: labour master (/people) is site-scoped — sites are fully independent ----
+  it('SM(A) sees only site A people — the site B person (incl. any driver) is invisible', async () => {
+    const rows = await people.list(SM_A());
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((r) => r.siteId === siteA)).toBe(true);
+    expect(rows.some((r) => r.id === pOutside)).toBe(false); // the site B person never appears
+    expect(rows.some((r) => r.id === pD)).toBe(true); // site A driver's person does
+  });
+
+  it('OWNER still sees the whole org labour master (cross-site allocation)', async () => {
+    const rows = await people.list(OWNER());
+    expect(rows.some((r) => r.id === pOutside)).toBe(true);
+    expect(rows.some((r) => r.id === pW1)).toBe(true);
   });
 
   // ---- Round 2: attendance is OUT of the app for the SUPERVISOR (matrix dropped attendance.mark) ----

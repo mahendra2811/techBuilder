@@ -753,6 +753,9 @@ function AddMemberForm({
         ...(phone.trim() ? { phone: phone.trim() } : {}),
         ...(skill ? { skill } : {}),
         ...(wageRupees.trim() && Number.isFinite(wage) && wage > 0 ? { defaultWagePaise: rupeesToPaise(wage) } : {}),
+        // frozen.12: place the person on the resolved site (Owner's pick / SM's own site); the
+        // server forces the creator's own site for non-Owners regardless, so this is just intent.
+        ...(resolvedSiteId ? { siteId: resolvedSiteId } : {}),
       };
       if (willCreateLogin) {
         const userInput: CreateUserInput = {

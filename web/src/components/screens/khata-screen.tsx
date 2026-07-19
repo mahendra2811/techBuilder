@@ -51,7 +51,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
 import { ShowMore } from '@/components/ui/show-more';
-import { DateField } from '@/components/entry/date-field';
+import { DateSelect } from '@/components/entry/date-select';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
 import { QueryBoundary } from '@/components/ui/query-boundary';
 import { SectionCard } from '@/components/ui/section-card';
@@ -266,11 +266,10 @@ function MoneyForm({
   const m = useMessages();
   const queryClient = useQueryClient();
   const today = useMemo(() => todayKolkata(), []);
-  // Client rule: the khata entry date fields offer exactly THREE days — today,
-  // yesterday, day-before (today−2..today). The server has no window on the
-  // ledger (see cash-transfers.service.ts create()'s "no back-limit" comment),
-  // so this is a UX-only cap, not a validation the server would otherwise reject.
-  const minDate = useMemo(() => addDays(today, -2), [today]);
+  // Client rule: the khata entry date dropdown offers exactly THREE days — today,
+  // yesterday, day-before (backdateDays=2). The server has no window on the ledger
+  // (see cash-transfers.service.ts create()'s "no back-limit" comment), so this is a
+  // UX-only cap, not a validation the server would otherwise reject.
   const testIdPrefix = `khata-${slice}`;
 
   const [toUserId, setToUserId] = useState<UUID | ''>('');
@@ -396,13 +395,13 @@ function MoneyForm({
               )}
             </div>
 
-            <DateField
+            <DateSelect
               id={`${testIdPrefix}-date`}
               testId={`${testIdPrefix}-date`}
               value={date}
               onChange={setDate}
-              min={minDate}
-              max={today}
+              today={today}
+              backdateDays={2}
             />
 
             <div className="grid gap-2">

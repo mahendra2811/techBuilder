@@ -126,8 +126,12 @@ export const people = pgTable(
     /** Round 2 (C6): ID-card family details — set once at onboarding; edited by SM/Owner ONLY. */
     guardianName: text('guardian_name'),
     guardianPhone: text('guardian_phone'),
+    /** frozen.12 (2026-07-19): the site this person belongs to — sites are fully independent, so
+     *  an SM/Accountant only ever sees the labour master of their OWN site(s). Set server-side at
+     *  creation from the creator's scope (nullable: an Owner may create an unassigned person). */
+    siteId: uuid('site_id'),
   },
-  (t) => [index('people_org_idx').on(t.orgId)],
+  (t) => [index('people_org_idx').on(t.orgId), index('people_site_idx').on(t.orgId, t.siteId)],
 );
 
 export const users = pgTable(

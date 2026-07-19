@@ -27,6 +27,7 @@ import {
   NotebookPen,
   Send,
   Settings,
+  ShieldCheck,
   Store,
   Truck,
   Users,
@@ -111,6 +112,11 @@ const NAV_DEFS: NavDef[] = [
   { action: 'config.manage', labelKey: 'settings', path: '/settings', icon: Settings },
   // WO-13: date-wise insights — "pick a day, see everything" (S-1/T-1/O-1). Service-gated scopes.
   { action: 'view.all', labelKey: 'insights', path: '/insights', icon: FileSpreadsheet, roles: ['OWNER', 'SITE_MANAGER'], testId: 'nav-insights' },
+  // Accountant Verification desk — his core work queue: the three "awaiting your tick" money
+  // queues (expenses · cash transfers · vendor payments), each a sub-page with ✓/🚩 actions.
+  // Was only reachable from dashboard deep-link cards; now a first-class nav entry. Gated on
+  // view.all (he holds it) + role-filtered to ACCOUNTANT; the verify endpoints stay guarded server-side.
+  { action: 'view.all', labelKey: 'verify', path: '/verify', icon: ShieldCheck, roles: ['ACCOUNTANT'], testId: 'nav-verify' },
   // WO-9: money ledger (khata) — give/receive-back cash + rollup. Round 2: the ACCOUNTANT is the
   // cash desk — his ledger page mounts the same screen (rollup stays SM/Owner server-side).
   { action: 'view.all', labelKey: 'ledger', path: '/ledger', icon: Wallet, roles: ['OWNER', 'SITE_MANAGER', 'ACCOUNTANT'], testId: 'nav-ledger' },

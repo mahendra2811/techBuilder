@@ -37,10 +37,13 @@ import { HealthController } from './health.controller';
   controllers: [HealthController],
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    // Global baseline rate limit (120 req / 60s / IP). Auth routes tighten this with a
-    // per-route @Throttle (see auth.controller.ts) to blunt credential stuffing. The
-    // ThrottlerGuard is registered as an APP_GUARD below so every route is covered by default.
-    ThrottlerModule.forRoot({ throttlers: [{ name: 'default', ttl: 60_000, limit: 120 }] }),
+    // Global rate limit — a RUNAWAY/DoS backstop only, deliberately loose. The web talks to this
+    // API server-to-server through the Next.js proxy, which does NOT forward the client IP, so a
+    // per-IP limit is really PER-ORG (everyone shares the proxy's IP). A tight cap here throttled
+    // the whole org's normal traffic (dashboards fan out many calls); 3000/min never bites real
+    // use but still stops a runaway loop. Auth routes keep a tighter per-route @Throttle
+    // (auth.controller.ts) to blunt credential stuffing. ThrottlerGuard is the APP_GUARD below.
+    ThrottlerModule.forRoot({ throttlers: [{ name: 'default', ttl: 60_000, limit: 3000 }] }),
     DbModule,
     AuthModule,
     UsersModule,
