@@ -22,7 +22,7 @@ import { Check } from 'lucide-react';
 import type { MoneyTag, MyMoney } from '@techbuilder/contracts';
 import { formatBusinessDate } from '@/lib/business-date';
 import { formatPaise } from '@/lib/money';
-import { cn } from '@/lib/utils';
+import { Pill } from '@/components/ui/pill';
 import { ShowMore } from '@/components/ui/show-more';
 import { EmptyState } from '@/components/entry/states';
 
@@ -59,15 +59,9 @@ export function TagBadge({ tag, ui }: { tag: MoneyTag; ui?: { tagSalary: string;
   if (tag !== 'SALARY' && tag !== 'PERSONAL') return null;
   const labels = ui ?? { tagSalary: 'Salary', tagPersonal: 'Personal' };
   return (
-    <span
-      data-testid={`my-money-tag-${tag}`}
-      className={cn(
-        'inline-block w-fit shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium',
-        tag === 'SALARY' ? 'bg-primary/10 text-primary' : 'bg-amber-500/15 text-amber-800 dark:text-amber-400',
-      )}
-    >
+    <Pill tone={tag === 'SALARY' ? 'primary' : 'warning'} testId={`my-money-tag-${tag}`}>
       {tag === 'SALARY' ? labels.tagSalary : labels.tagPersonal}
-    </span>
+    </Pill>
   );
 }
 

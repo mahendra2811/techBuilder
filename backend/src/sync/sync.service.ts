@@ -48,6 +48,33 @@ const ACTION_OF: Record<string, Action> = {
   trip: 'vehicleLog.enter',
 };
 
+/**
+ * Server-owned columns a client sync payload must NEVER supply — stripped on CREATE and UPDATE.
+ * Letting these through was a two-tick money bypass: a crafted `expense` event could arrive
+ * already `verifiedAt`/`flagged:false`/`void:false` (a self-verified, immutable spend with no
+ * accountant tick), a `fuel` event `status:'CONFIRMED'` (faking the diesel match), or a
+ * `material-txn` `finalized:true` (a driver pick masquerading as a supervisor-final record).
+ * Such state is only ever set by the dedicated server paths (decide, verify, void, the diesel
+ * matcher, resolve), never by the writer.
+ *
+ * PER-ENTITY on purpose: `status` is server-owned match state for fuel/material-txn, but it is the
+ * CORE user datum for attendance (PRESENT/ABSENT) — a blanket strip broke attendance sync.
+ */
+const UNIVERSAL_STRIP = ['version', 'createdAt', 'updatedAt', 'deletedAt'] as const;
+const SERVER_OWNED_BY_ENTITY: Record<string, readonly string[]> = {
+  expense: ['verifiedBy', 'verifiedAt', 'flagged', 'flagNote', 'void'],
+  fuel: ['status', 'matchedIssuanceId', 'matchedFuelLogId'],
+  'material-txn': ['status', 'finalized', 'enteredRole'],
+  issue: ['status', 'resolvedBy', 'resolutionNote', 'closingNote'], // resolve/close are server paths
+};
+
+function stripServerOwned(entityType: string, payload: Record<string, unknown>): Record<string, unknown> {
+  const clean = { ...payload };
+  for (const k of UNIVERSAL_STRIP) delete clean[k];
+  for (const k of SERVER_OWNED_BY_ENTITY[entityType] ?? []) delete clean[k];
+  return clean;
+}
+
 
 @Injectable()
 export class SyncService {
@@ -93,19 +120,42 @@ export class SyncService {
             ev.entityType === 'attendance' ? ATTENDANCE_BACKDATE_LIMIT_DAYS : RECORD_CREATE_BACKDATE_LIMIT_DAYS,
           );
         }
+        // Strip any server-owned column the client tried to supply (verification/void/
+        // match/finalized state) BEFORE spreading — closes the two-tick money bypass.
+        const clean = stripServerOwned(ev.entityType, payload);
         const attribution: Record<string, unknown> = { orgId: p.orgId, createdBy: p.userId, updatedBy: p.userId };
         if (ev.entityType === 'attendance') attribution['markedBy'] = p.userId;
         if (ev.entityType === 'progress' || ev.entityType === 'expense') attribution['enteredBy'] = p.userId;
+        // material-txn: the server sets finality from the writer's role (SUPERVISOR = final,
+        // DRIVER pick = data-only), exactly like records.createMaterialTxn — never the client.
+        if (ev.entityType === 'material-txn') {
+          attribution['enteredRole'] = ctx.role;
+          attribution['finalized'] = ctx.role !== 'DRIVER';
+        }
         await tx
           .insert(table)
-          .values({ ...payload, ...attribution } as never)
+          .values({ ...clean, ...attribution } as never)
           .onConflictDoNothing();
       } else {
         // UPDATE / VOID: same WP-3 guard as the REST path — creator-only within the window,
-        // Owner override. (No attribution rewrite: updatedBy = the caller.)
-        await assertEditAllowed(tx, ctx, t, payload['id'] as string);
+        // Owner override, AND (like records.updateRecord) no edits once accountant-verified.
+        await assertEditAllowed(tx, ctx, t, ev.entityType, payload['id'] as string);
         if (ev.op === 'UPDATE') {
-          const { id: _id, orgId: _org, createdBy: _cb, enteredBy: _eb, markedBy: _mb, version: _v, businessDate: _bd, ...rest } = payload;
+          // Also drop the scope keys (siteId/vehicleId/personId): re-pointing a record to another
+          // scope stays in-org so RLS won't stop it — same rule as records.updateRecord's
+          // IMMUTABLE_PATCH_FIELDS. To move a record, void + re-create it.
+          const {
+            id: _id,
+            orgId: _org,
+            createdBy: _cb,
+            enteredBy: _eb,
+            markedBy: _mb,
+            businessDate: _bd,
+            siteId: _si,
+            vehicleId: _vi,
+            personId: _pi,
+            ...rest
+          } = stripServerOwned(ev.entityType, payload);
           await tx
             .update(table)
             .set({ ...rest, updatedBy: p.userId, updatedAt: new Date() } as never)
@@ -161,8 +211,9 @@ async function assertPayloadScope(
     return;
   }
   // progress / expense / material-txn / issue — site-stamped (issue may be vehicle-stamped)
-  // Round 2: the sync path enforces the SUPERVISOR ₹0 direct-expense rule too (no bypass —
-  // same rule as records.createExpense; his spends are money requests to the accountant).
+  // SUP-9 (aligned to the web + records.createExpense, 2026-07-19): the SUPERVISOR never books an
+  // expense directly through any channel — his spends are always EXPENSE_ADD requests the
+  // accountant decides. Same guard as records.createExpense.
   if (entityType === 'expense' && ctx.role === 'SUPERVISOR') {
     throw new ApiException(
       'VALIDATION_FAILED',
@@ -175,20 +226,37 @@ async function assertPayloadScope(
   else if (entityType !== 'issue') throw new ApiException('VALIDATION_FAILED', `${entityType} requires siteId`);
 }
 
-/** WP-3 (sync flavor): creator-only edit/void within business-day +1; Owner override. */
+/** WP-3 (sync flavor): creator-only edit/void within business-day +1; Owner override. Mirrors
+ *  records.assertEditAllowed, INCLUDING the two-tick rule: accountant-verified money is permanent. */
 async function assertEditAllowed(
   tx: Tx,
   ctx: ScopeContext,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   t: any,
+  entityType: string,
   id: string | undefined,
 ): Promise<void> {
   if (!id) throw new ApiException('VALIDATION_FAILED', 'payload.id required for update/void');
   const [row] = (await tx
-    .select({ createdBy: t.createdBy, businessDate: t.businessDate, deletedAt: t.deletedAt })
+    .select({
+      createdBy: t.createdBy,
+      businessDate: t.businessDate,
+      deletedAt: t.deletedAt,
+      // Only the expense family carries verification columns.
+      ...(entityType === 'expense' ? { verifiedAt: t.verifiedAt } : {}),
+    })
     .from(t)
-    .where(eq(t.id, id))) as Array<{ createdBy: string | null; businessDate: string; deletedAt: Date | null }>;
+    .where(eq(t.id, id))) as Array<{
+    createdBy: string | null;
+    businessDate: string;
+    deletedAt: Date | null;
+    verifiedAt?: Date | null;
+  }>;
   if (!row || row.deletedAt) throw new ApiException('NOT_FOUND', 'record not found');
+  // Round 2 two-tick: accountant-verified money is PERMANENT — no edit/void for ANYONE (incl. Owner).
+  if (row.verifiedAt) {
+    throw new ApiException('CONFLICT', 'This entry is accountant-verified and permanent — it cannot be changed');
+  }
   if (ctx.role === 'OWNER') return;
   if (row.createdBy !== ctx.userId) forbidScope('Only the creator may edit/void this record (Owner override required)');
   const today = businessDateNow(new Date(), await loadEodCutoff(tx));

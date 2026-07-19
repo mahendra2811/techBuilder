@@ -297,14 +297,14 @@ describe.skipIf(!HAS_DB)('scope enforcement acceptance (live DB, RLS app role)',
   });
 
   // ---- Phase 4 → frozen.10: record-CREATION backdating windows ----
-  // frozen.10 (D1/SUP-9/DRV-4): supervisor books ≤ his limit within today+yesterday; SM keeps 7d;
-  // the driver's fuel log is today-ONLY.
-  it('record creation obeys frozen.10 rules: SUPERVISOR ≤1d under-limit, SM ≤7d, driver fuel today-only', async () => {
+  // SUP-9 (aligned to the web 2026-07-19): the SUPERVISOR never books an expense directly (request-only,
+  // any amount → OVER_DIRECT_LIMIT). SM keeps the 7-day window; the driver's fuel log is today-ONLY.
+  it('record creation obeys the rules: SUPERVISOR expense request-only, SM ≤7d, driver fuel today-only', async () => {
     const mkExpense = (p: Principal, businessDate: string) =>
       records.createExpense(p, { id: uuidv7(), siteId: siteA, category: 'MISC', amountPaise: 500, businessDate });
 
-    await expect(mkExpense(TH(), addDays(TODAY, -1))).resolves.toBeDefined(); // yesterday, under-limit → books
-    await expect(mkExpense(TH(), addDays(TODAY, -2))).rejects.toMatchObject({ code: 'FORBIDDEN' }); // beyond 1d window
+    // Supervisor is refused regardless of date/amount — spends are accountant-decided requests.
+    await expect(mkExpense(TH(), TODAY)).rejects.toMatchObject({ code: 'VALIDATION_FAILED', fields: { amountPaise: 'OVER_DIRECT_LIMIT' } });
     await expect(mkExpense(SM_A(), addDays(TODAY, -5))).resolves.toBeDefined();
     await expect(mkExpense(SM_A(), addDays(TODAY, -10))).rejects.toMatchObject({ code: 'FORBIDDEN' });
     await expect(mkExpense(SM_A(), addDays(TODAY, 1))).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
@@ -333,7 +333,7 @@ describe.skipIf(!HAS_DB)('scope enforcement acceptance (live DB, RLS app role)',
     ]);
     expect(results[0]).toMatchObject({ ok: false, errorCode: 'FORBIDDEN' });
 
-    // frozen.10: a supervisor's sync expense obeys the same two-tier rule — over-limit is refused.
+    // SUP-9: a supervisor's sync expense is refused outright (request-only, same as the REST path).
     const supResults = await sync.pushBatch(TH(), [
       {
         outboxId: 'ob-p4b',

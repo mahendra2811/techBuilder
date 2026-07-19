@@ -50,10 +50,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { uuidv7 } from 'uuidv7';
 import { Paperclip } from 'lucide-react';
 import type { BusinessDate, CreateProgressNoteInput, ProgressNote, Site, User, UUID } from '@techbuilder/contracts';
-import { ApiClientError, api, me } from '@/lib/api-client';
+import { api, me } from '@/lib/api-client';
 import { addDays, formatBusinessDate, formatKolkataDateTime, todayKolkata } from '@/lib/business-date';
 import { uploadPhotos, uploadVoice } from '@/lib/media-upload';
-import { PHOTO_ONLY_NOTE_TEXT, apiErrorMessage, type Messages } from '@/lib/i18n/messages';
+import { PHOTO_ONLY_NOTE_TEXT, apiErrorOf, type Messages } from '@/lib/i18n/messages';
 import { useLocale, useMessages } from '@/lib/i18n/locale-context';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -65,6 +65,7 @@ import { PhotoMultiField } from '@/components/entry/photo-multi-field';
 import { VoiceField } from '@/components/entry/voice-field';
 import { SitePicker } from '@/components/entry/site-picker';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
+import { FormStatus } from '@/components/entry/form-status';
 import { LazyHistorySection, useLazySection } from '@/components/ui/lazy-history';
 
 type EntryRole = 'SITE_MANAGER' | 'SUPERVISOR';
@@ -363,11 +364,7 @@ function ProgressForm({
   };
 
   const serverError =
-    mutation.error instanceof ApiClientError
-      ? apiErrorMessage(m, mutation.error.code)
-      : mutation.error
-        ? apiErrorMessage(m)
-        : null;
+    apiErrorOf(m, mutation.error);
 
   return (
     <form className="grid gap-4" noValidate onSubmit={onSubmit}>
@@ -405,16 +402,7 @@ function ProgressForm({
 
       {voiceEnabled && <VoiceField value={voiceBlob} onChange={setVoiceBlob} testId="progress-voice" />}
 
-      {serverError && (
-        <Notice tone="error" testId="progress-error">
-          {serverError}
-        </Notice>
-      )}
-      {saved && (
-        <Notice tone="success" testId="progress-saved">
-          {m.PROGRESS_UI.saved}
-        </Notice>
-      )}
+              <FormStatus error={serverError} saved={saved} savedLabel={m.PROGRESS_UI.saved} testIdPrefix="progress" />
       {photoWarning && (
         <Notice tone="warning" testId="progress-photo-warning">
           {m.PROGRESS_UI.photoNotUploaded}

@@ -55,7 +55,7 @@ import type {
 } from '@techbuilder/contracts';
 import { ApiClientError, api, me } from '@/lib/api-client';
 import { formatKolkataDateTime } from '@/lib/business-date';
-import { apiErrorMessage } from '@/lib/i18n/messages';
+import { apiErrorMessage, apiErrorOf, type UiStrings } from '@/lib/i18n/messages';
 import { useLocale, useMessages } from '@/lib/i18n/locale-context';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -65,6 +65,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ShowMore } from '@/components/ui/show-more';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
 import { PayloadSummary, RequestStatusBadge, payloadOneLiner } from '@/components/requests/request-bits';
+import { Pill } from '@/components/ui/pill';
 import { cn } from '@/lib/utils';
 
 type DecideRole = 'OWNER' | 'SITE_MANAGER' | 'SUPERVISOR' | 'ACCOUNTANT';
@@ -117,9 +118,7 @@ const VERIFY_UI = {
   },
 } as const;
 
-// Widened to plain `string` per key — `VERIFY_UI[locale]` is a union of the en/hi
-// literal-string objects, and only the widened form is assignable from both.
-type VerifyUiText = Record<keyof (typeof VERIFY_UI)['en'], string>;
+type VerifyUiText = UiStrings<typeof VERIFY_UI>;
 
 export function ApprovalsScreen({ role }: { role: DecideRole }) {
   const m = useMessages();
@@ -291,7 +290,7 @@ export function ApprovalsScreen({ role }: { role: DecideRole }) {
   };
 
   const verifyServerError =
-    verify.error instanceof ApiClientError ? apiErrorMessage(m, verify.error.code) : verify.error ? apiErrorMessage(m) : null;
+    apiErrorOf(m, verify.error);
 
   const serverError =
     decide.error instanceof ApiClientError &&
@@ -560,15 +559,9 @@ function RequestCardHeader({
           </span>
           <RequestStatusBadge status={r.status} />
           {showTickBadge && (
-            <span
-              data-testid={`approval-tick-${r.id}`}
-              className={cn(
-                'inline-block w-fit shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium',
-                r.flagged ? 'bg-destructive/10 text-destructive' : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
-              )}
-            >
+            <Pill tone={r.flagged ? 'error' : 'success'} testId={`approval-tick-${r.id}`}>
               {r.flagged ? verifyUi.flaggedBadge : verifyUi.verifiedBadge}
-            </span>
+            </Pill>
           )}
         </div>
         <p className="truncate text-xs text-muted-foreground">

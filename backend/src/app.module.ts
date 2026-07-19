@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { APP_FILTER, APP_INTERCEPTOR, Reflector } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, Reflector } from '@nestjs/core';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { DbModule } from './db/db.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
@@ -36,6 +37,10 @@ import { HealthController } from './health.controller';
   controllers: [HealthController],
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    // Global baseline rate limit (120 req / 60s / IP). Auth routes tighten this with a
+    // per-route @Throttle (see auth.controller.ts) to blunt credential stuffing. The
+    // ThrottlerGuard is registered as an APP_GUARD below so every route is covered by default.
+    ThrottlerModule.forRoot({ throttlers: [{ name: 'default', ttl: 60_000, limit: 120 }] }),
     DbModule,
     AuthModule,
     UsersModule,
@@ -66,6 +71,7 @@ import { HealthController } from './health.controller';
   ],
   providers: [
     Reflector,
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
     { provide: APP_INTERCEPTOR, useClass: TransformInterceptor },
   ],

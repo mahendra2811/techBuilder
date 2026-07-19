@@ -28,6 +28,9 @@ const sha256 = (s: string): string => createHash('sha256').update(s).digest('hex
 @Injectable()
 export class AuthService {
   private readonly env = loadEnv();
+  /** A throwaway hash used to keep the "user not found" path as costly as the "found" path,
+   *  so login response time can't be used to enumerate valid usernames (computed once, cached). */
+  private dummyHashPromise?: Promise<string>;
   constructor(
     private readonly dbs: DbService,
     private readonly jwt: JwtService,
@@ -36,7 +39,12 @@ export class AuthService {
   async login(input: LoginInput): Promise<AuthSession> {
     const res = await this.dbs.raw.execute(sql`select * from auth_lookup(${input.username})`);
     const row = (res as unknown as { rows: Row[] }).rows[0];
-    if (!row) throw new ApiException('UNAUTHENTICATED', 'Invalid username or password');
+    if (!row) {
+      // Run a real scrypt verify against a dummy hash so an unknown username costs the same as a
+      // known one (no timing side-channel for username enumeration), then fail identically.
+      await verifyPassword(input.password, await this.dummyHash());
+      throw new ApiException('UNAUTHENTICATED', 'Invalid username or password');
+    }
     const ok = await verifyPassword(input.password, row.password_hash as string);
     if (!ok) throw new ApiException('UNAUTHENTICATED', 'Invalid username or password');
 
@@ -50,19 +58,38 @@ export class AuthService {
   async refresh(refreshToken: string, deviceId: string): Promise<{ accessToken: string; refreshToken: string }> {
     const [userId, orgId] = refreshToken.split('.');
     if (!userId || !orgId) throw new ApiException('UNAUTHENTICATED', 'Malformed refresh token');
-    return this.dbs.runInTenant(orgId, async (tx) => {
-      const [tok] = await tx
-        .select()
-        .from(schema.refreshTokens)
-        .where(and(eq(schema.refreshTokens.userId, userId), eq(schema.refreshTokens.deviceId, deviceId)));
-      if (!tok || tok.revokedAt || tok.tokenHash !== sha256(refreshToken) || tok.expiresAt < new Date()) {
-        throw new ApiException('UNAUTHENTICATED', 'Invalid refresh token');
-      }
-      const [u] = await tx.select().from(schema.users).where(eq(schema.users.id, userId));
-      if (!u) throw new ApiException('UNAUTHENTICATED', 'User not found');
-      await tx.update(schema.refreshTokens).set({ revokedAt: new Date() }).where(eq(schema.refreshTokens.id, tok.id));
-      return this.issueTokens(userId, orgId, u.role, deviceId, tx);
-    });
+    // Decide inside a transaction that is allowed to COMMIT (so the revoke below persists —
+    // throwing inside the tx would roll it back), then throw/return based on the outcome.
+    const outcome = await this.dbs.runInTenant(
+      orgId,
+      async (
+        tx,
+      ): Promise<
+        { kind: 'ok'; tokens: { accessToken: string; refreshToken: string } } | { kind: 'reject' } | { kind: 'inactive' }
+      > => {
+        const [tok] = await tx
+          .select()
+          .from(schema.refreshTokens)
+          .where(and(eq(schema.refreshTokens.userId, userId), eq(schema.refreshTokens.deviceId, deviceId)));
+        if (!tok || tok.revokedAt || tok.tokenHash !== sha256(refreshToken) || tok.expiresAt < new Date()) {
+          return { kind: 'reject' };
+        }
+        const [u] = await tx.select().from(schema.users).where(eq(schema.users.id, userId));
+        if (!u) return { kind: 'reject' };
+        // A deactivated/soft-deleted user must NOT keep minting access tokens until the refresh
+        // TTL (30 days) expires — revoke every device's token and reject so terminated access is
+        // immediate (bounded by the 15-min access TTL, not the refresh TTL).
+        if (!u.active || u.deletedAt) {
+          await tx.update(schema.refreshTokens).set({ revokedAt: new Date() }).where(eq(schema.refreshTokens.userId, userId));
+          return { kind: 'inactive' };
+        }
+        await tx.update(schema.refreshTokens).set({ revokedAt: new Date() }).where(eq(schema.refreshTokens.id, tok.id));
+        const tokens = await this.issueTokens(userId, orgId, u.role, deviceId, tx);
+        return { kind: 'ok', tokens };
+      },
+    );
+    if (outcome.kind === 'ok') return outcome.tokens;
+    throw new ApiException('UNAUTHENTICATED', outcome.kind === 'inactive' ? 'Account is inactive' : 'Invalid refresh token');
   }
 
   async logout(orgId: string, userId: string, deviceId: string): Promise<void> {
@@ -169,6 +196,10 @@ export class AuthService {
   }
 
   // --- helpers ---
+  private dummyHash(): Promise<string> {
+    return (this.dummyHashPromise ??= hashPassword('unused-timing-equalizer'));
+  }
+
   private async issueTokens(
     userId: string,
     orgId: string,

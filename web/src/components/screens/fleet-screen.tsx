@@ -38,15 +38,18 @@ import type {
   VehicleType,
 } from '@techbuilder/contracts';
 import { ApiClientError, api } from '@/lib/api-client';
-import { apiErrorMessage } from '@/lib/i18n/messages';
+import { apiErrorOf } from '@/lib/i18n/messages';
 import { useLocale, useMessages } from '@/lib/i18n/locale-context';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
+import { Pill } from '@/components/ui/pill';
+import { QueryBoundary } from '@/components/ui/query-boundary';
+import { SectionCard } from '@/components/ui/section-card';
 import { SubPageHeader, useSubPage } from '@/components/ui/sub-page';
-import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
+import { LoadingState, EmptyState, Notice } from '@/components/entry/states';
 
 type FleetRole = 'OWNER' | 'SITE_MANAGER';
 type FleetSection = 'addVehicle' | 'types';
@@ -108,8 +111,8 @@ export function FleetScreen({ role }: { role: FleetRole }) {
           <CardDescription>{m.FLEET_UI.subtitle}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-2">
-          <SectionCard title={m.FLEET_UI.addVehicleTitle} hint={ui.addVehicleHint} testId="fleet-open-add-vehicle" onClick={() => openSection('addVehicle')} />
-          <SectionCard title={m.FLEET_UI.typesTitle} hint={ui.typesHint} testId="fleet-open-types" onClick={() => openSection('types')} />
+          <SectionCard variant="row" title={m.FLEET_UI.addVehicleTitle} subtitle={ui.addVehicleHint} testId="fleet-open-add-vehicle" onOpen={() => openSection('addVehicle')} />
+          <SectionCard variant="row" title={m.FLEET_UI.typesTitle} subtitle={ui.typesHint} testId="fleet-open-types" onOpen={() => openSection('types')} />
         </CardContent>
       </Card>
 
@@ -124,32 +127,6 @@ export function FleetScreen({ role }: { role: FleetRole }) {
   );
 }
 
-function SectionCard({
-  title,
-  hint,
-  testId,
-  onClick,
-}: {
-  title: string;
-  hint: string;
-  testId: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      className="flex w-full items-center justify-between gap-3 rounded-lg border border-input px-3.5 py-3 text-left hover:bg-accent"
-      data-testid={testId}
-      onClick={onClick}
-    >
-      <span className="grid min-w-0 gap-0.5">
-        <span className="text-sm font-medium">{title}</span>
-        <span className="truncate text-xs text-muted-foreground">{hint}</span>
-      </span>
-      <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-    </button>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // (a) Vehicle list
@@ -181,48 +158,44 @@ function VehicleList({
         <CardTitle>{m.FLEET_UI.listTitle}</CardTitle>
       </CardHeader>
       <CardContent>
-        {vehiclesQ.isPending ? (
-          <LoadingState />
-        ) : vehiclesQ.error ? (
-          <ErrorState error={vehiclesQ.error} onRetry={() => void vehiclesQ.refetch()} />
-        ) : !vehiclesQ.data || vehiclesQ.data.length === 0 ? (
-          <EmptyState label={m.FLEET_UI.listEmpty} />
-        ) : (
-          <ul className="divide-y">
-            {vehiclesQ.data.map((v) => (
-              <li key={v.id}>
-                <Link
-                  href={`${basePath}/${v.id}`}
-                  data-testid={`vehicle-row-${v.id}`}
-                  className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
-                >
-                  <div className="grid min-w-0 flex-1 gap-1">
-                    <div className="flex items-baseline justify-between gap-3">
-                      <p className="min-w-0 truncate text-sm font-medium">
-                        {v.regNo}
-                        {v.name && <span className="ml-1.5 font-normal text-muted-foreground">· {v.name}</span>}
+        <QueryBoundary query={vehiclesQ} emptyLabel={m.FLEET_UI.listEmpty}>
+          {(vehicles) => (
+            <ul className="divide-y">
+              {vehicles.map((v) => (
+                <li key={v.id}>
+                  <Link
+                    href={`${basePath}/${v.id}`}
+                    data-testid={`vehicle-row-${v.id}`}
+                    className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
+                  >
+                    <div className="grid min-w-0 flex-1 gap-1">
+                      <div className="flex items-baseline justify-between gap-3">
+                        <p className="min-w-0 truncate text-sm font-medium">
+                          {v.regNo}
+                          {v.name && <span className="ml-1.5 font-normal text-muted-foreground">· {v.name}</span>}
+                        </p>
+                        <Pill tone="neutral" className="font-normal">
+                          {m.VEHICLE_STATUS_LABELS[v.status]}
+                        </Pill>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {typeName(v.vehicleTypeId) ?? '—'}
+                        {trackingMode(v.vehicleTypeId) &&
+                          ` (${m.VEHICLE_TRACKING_MODE_LABELS[trackingMode(v.vehicleTypeId)!]})`}
                       </p>
-                      <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
-                        {m.VEHICLE_STATUS_LABELS[v.status]}
-                      </span>
+                      <p className="text-xs text-muted-foreground">
+                        {m.FLEET_UI.assignedSite}: {siteName(v.assignedSiteId) ?? m.FLEET_UI.noSite}
+                        {' · '}
+                        {m.FLEET_UI.assignedDriver}: {driverName(v.assignedDriverPersonId) ?? m.FLEET_UI.noDriver}
+                      </p>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      {typeName(v.vehicleTypeId) ?? '—'}
-                      {trackingMode(v.vehicleTypeId) &&
-                        ` (${m.VEHICLE_TRACKING_MODE_LABELS[trackingMode(v.vehicleTypeId)!]})`}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {m.FLEET_UI.assignedSite}: {siteName(v.assignedSiteId) ?? m.FLEET_UI.noSite}
-                      {' · '}
-                      {m.FLEET_UI.assignedDriver}: {driverName(v.assignedDriverPersonId) ?? m.FLEET_UI.noDriver}
-                    </p>
-                  </div>
-                  <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
+                    <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </QueryBoundary>
       </CardContent>
     </Card>
   );
@@ -308,12 +281,7 @@ function CreateVehicleForm({
 
   const dupRegNo =
     create.error instanceof ApiClientError && (create.error.code === 'DUPLICATE' || create.error.fields?.regNo);
-  const serverError =
-    !dupRegNo && create.error instanceof ApiClientError
-      ? apiErrorMessage(m, create.error.code)
-      : !dupRegNo && create.error
-        ? apiErrorMessage(m)
-        : null;
+  const serverError = dupRegNo ? null : apiErrorOf(m, create.error);
 
   return (
     <Card data-testid="create-vehicle">
@@ -481,24 +449,20 @@ function VehicleTypeList({ vehicleTypesQ }: { vehicleTypesQ: ReturnType<typeof u
         <CardTitle>{m.FLEET_UI.typesTitle}</CardTitle>
       </CardHeader>
       <CardContent>
-        {vehicleTypesQ.isPending ? (
-          <LoadingState />
-        ) : vehicleTypesQ.error ? (
-          <ErrorState error={vehicleTypesQ.error} onRetry={() => void vehicleTypesQ.refetch()} />
-        ) : !vehicleTypesQ.data || vehicleTypesQ.data.length === 0 ? (
-          <EmptyState label={m.FLEET_UI.typesEmpty} />
-        ) : (
-          <ul className="divide-y">
-            {vehicleTypesQ.data.map((t) => (
-              <li key={t.id} className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0" data-testid={`vehicle-type-row-${t.id}`}>
-                <span className="text-sm font-medium">{t.name}</span>
-                <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
-                  {m.VEHICLE_TRACKING_MODE_LABELS[t.trackingMode]}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
+        <QueryBoundary query={vehicleTypesQ} emptyLabel={m.FLEET_UI.typesEmpty}>
+          {(types) => (
+            <ul className="divide-y">
+              {types.map((t) => (
+                <li key={t.id} className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0" data-testid={`vehicle-type-row-${t.id}`}>
+                  <span className="text-sm font-medium">{t.name}</span>
+                  <Pill tone="neutral" className="font-normal">
+                    {m.VEHICLE_TRACKING_MODE_LABELS[t.trackingMode]}
+                  </Pill>
+                </li>
+              ))}
+            </ul>
+          )}
+        </QueryBoundary>
       </CardContent>
     </Card>
   );
@@ -535,7 +499,7 @@ function CreateVehicleTypeForm() {
   };
 
   const serverError =
-    create.error instanceof ApiClientError ? apiErrorMessage(m, create.error.code) : create.error ? apiErrorMessage(m) : null;
+    apiErrorOf(m, create.error);
 
   return (
     <Card size="sm" data-testid="create-vehicle-type">

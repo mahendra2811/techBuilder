@@ -7,8 +7,9 @@
  *     crew's VEHICLE_SWITCH only; EXPENSE_ADD is the ACCOUNTANT's alone (SM is fully out of the
  *     money loop now); an ACCOUNTANT approval materializes + auto-verifies the expense (his own
  *     decision IS the tick).
- *  2. Supervisor two-tier expense (RecordsService.createExpense, SUP-9) — direct booking up to
- *     the org's thDirectLimitPaise (₹25,000 default), OVER_DIRECT_LIMIT above it.
+ *  2. Supervisor expense is REQUEST-ONLY (RecordsService.createExpense, SUP-9 aligned to the web
+ *     2026-07-19) — no direct booking at any amount; every spend rejects with OVER_DIRECT_LIMIT
+ *     so the web form routes it as an accountant-decided EXPENSE_ADD request.
  *  3. Driver fuel rules (RecordsService.createFuelLog, DRV-4/D1) — today-only (no backdating),
  *     amountPaise omitted ⇒ from site stock (paidByDriver=false), supplied ⇒ paidByDriver=true.
  *  4. Complaints (ComplaintsService, SUP-1) — org-scoped sequential complaintNo; an SM may raise
@@ -219,21 +220,19 @@ describe.skipIf(!HAS_DB)('frozen.10 — decider map, supervisor two-tier money, 
   });
 
   // ---------------------------------------------------------------------------------------
-  // 2. Supervisor two-tier expense (SUP-9).
+  // 2. Supervisor expense is REQUEST-ONLY (SUP-9, aligned to the web 2026-07-19).
+  //    The earlier two-tier "≤₹25k books direct" rule was removed: a supervisor never books an
+  //    expense directly through any channel — every spend is an EXPENSE_ADD request the accountant
+  //    decides. Both a sub-limit and an over-limit amount now reject with OVER_DIRECT_LIMIT (the
+  //    field code the web form converts on to switch to the request flow).
   // ---------------------------------------------------------------------------------------
-  it('2a. supervisor direct expense ≤ ₹25,000 books directly, unverified', async () => {
-    const exp = await records.createExpense(SUP(), {
-      id: uuidv7(),
-      siteId: siteA,
-      category: 'MISC',
-      amountPaise: 1_000_000, // ₹10,000 — under the default ₹25,000 limit
-      businessDate: TODAY,
-    });
-    expect(exp.amountPaise).toBe(1_000_000);
-    expect(exp.verifiedAt).toBeNull();
+  it('2a. supervisor direct expense (sub-limit) is refused — request-only', async () => {
+    await expect(
+      records.createExpense(SUP(), { id: uuidv7(), siteId: siteA, category: 'MISC', amountPaise: 1_000_000, businessDate: TODAY }),
+    ).rejects.toMatchObject({ code: 'VALIDATION_FAILED', fields: { amountPaise: 'OVER_DIRECT_LIMIT' } });
   });
 
-  it('2b. supervisor direct expense > ₹25,000 → VALIDATION_FAILED / OVER_DIRECT_LIMIT', async () => {
+  it('2b. supervisor direct expense (any larger amount) is refused too', async () => {
     await expect(
       records.createExpense(SUP(), { id: uuidv7(), siteId: siteA, category: 'MISC', amountPaise: 3_000_000, businessDate: TODAY }),
     ).rejects.toMatchObject({ code: 'VALIDATION_FAILED', fields: { amountPaise: 'OVER_DIRECT_LIMIT' } });

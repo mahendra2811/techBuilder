@@ -30,9 +30,9 @@ import type {
   Site,
   UUID,
 } from '@techbuilder/contracts';
-import { ApiClientError, api, me } from '@/lib/api-client';
+import { api, me } from '@/lib/api-client';
 import { minEntryDate, todayKolkata } from '@/lib/business-date';
-import { apiErrorMessage } from '@/lib/i18n/messages';
+import { apiErrorOf } from '@/lib/i18n/messages';
 import { useMessages } from '@/lib/i18n/locale-context';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -165,7 +165,7 @@ export function AttendanceScreen({ role }: { role: EntryRole }) {
   };
 
   const serverError =
-    mark.error instanceof ApiClientError ? apiErrorMessage(m, mark.error.code) : mark.error ? apiErrorMessage(m) : null;
+    apiErrorOf(m, mark.error);
 
   return (
     <div className="grid gap-4" data-testid="attendance-screen">

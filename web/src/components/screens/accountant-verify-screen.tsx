@@ -25,9 +25,9 @@ import type {
   VendorPayment,
   VerifyInput,
 } from '@techbuilder/contracts';
-import { ApiClientError, api } from '@/lib/api-client';
+import { api } from '@/lib/api-client';
 import { formatBusinessDate } from '@/lib/business-date';
-import { apiErrorMessage } from '@/lib/i18n/messages';
+import { apiErrorOf } from '@/lib/i18n/messages';
 import { useLocale, useMessages } from '@/lib/i18n/locale-context';
 import { formatPaise } from '@/lib/money';
 import { Button } from '@/components/ui/button';
@@ -244,11 +244,7 @@ function VerifyRow({
   });
 
   const serverError =
-    verify.error instanceof ApiClientError
-      ? apiErrorMessage(m, verify.error.code)
-      : verify.error
-        ? apiErrorMessage(m)
-        : null;
+    apiErrorOf(m, verify.error);
 
   return (
     <li className="grid gap-2 rounded-lg border border-input p-3" data-testid={`verify-row-${id}`}>

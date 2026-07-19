@@ -31,9 +31,9 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { uuidv7 } from 'uuidv7';
 import type { CreateMaterialTxnInput, Material, MaterialTxn, MaterialTxnType, Site, UUID } from '@techbuilder/contracts';
-import { ApiClientError, api } from '@/lib/api-client';
+import { api } from '@/lib/api-client';
 import { addDays, minEntryDate, todayKolkata } from '@/lib/business-date';
-import { apiErrorMessage } from '@/lib/i18n/messages';
+import { apiErrorOf, type UiStrings } from '@/lib/i18n/messages';
 import { useLocale, useMessages } from '@/lib/i18n/locale-context';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -43,7 +43,8 @@ import { NativeSelect } from '@/components/ui/native-select';
 import { Textarea } from '@/components/ui/textarea';
 import { DateField } from '@/components/entry/date-field';
 import { SitePicker } from '@/components/entry/site-picker';
-import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
+import { LoadingState, EmptyState, ErrorState } from '@/components/entry/states';
+import { FormStatus } from '@/components/entry/form-status';
 import { useLazySection, LazyHistorySection } from '@/components/ui/lazy-history';
 
 export type MaterialEntryRole = 'SUPERVISOR' | 'SITE_MANAGER' | 'OWNER';
@@ -99,9 +100,7 @@ const UI = {
   },
 } as const;
 
-// Widened to plain `string` per key (not the literal `en` type) — `UI[locale]` is a union of
-// the `en`/`hi` literal-string objects, and only the widened form is assignable from both.
-type UiText = Record<keyof (typeof UI)['en'], string>;
+type UiText = UiStrings<typeof UI>;
 
 const isOtherMaterial = (mat: Material | undefined) => (mat?.name ?? '').trim().toLowerCase() === 'other';
 
@@ -254,7 +253,7 @@ function MaterialEntryForm({
   };
 
   const serverError =
-    create.error instanceof ApiClientError ? apiErrorMessage(m, create.error.code) : create.error ? apiErrorMessage(m) : null;
+    apiErrorOf(m, create.error);
 
   return (
     <form className="grid gap-4" noValidate onSubmit={onSubmit}>
@@ -360,16 +359,7 @@ function MaterialEntryForm({
             </div>
           )}
 
-          {serverError && (
-            <Notice tone="error" testId="material-entry-error">
-              {serverError}
-            </Notice>
-          )}
-          {saved && (
-            <Notice tone="success" testId="material-entry-saved">
-              {ui.saved}
-            </Notice>
-          )}
+                      <FormStatus error={serverError} saved={saved} savedLabel={ui.saved} testIdPrefix="material-entry" />
 
           <Button type="submit" data-testid="material-entry-submit" disabled={create.isPending || !siteId}>
             {create.isPending ? ui.saving : ui.submit}

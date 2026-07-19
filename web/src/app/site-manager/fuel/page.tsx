@@ -16,9 +16,9 @@
  * nav entry (lib/nav.ts) points here labelled "Fuel" (NAV_LABELS.fuelEntry) — the client
  * explicitly wants the word "Fuel", not "Diesel"/"Vehicle".
  */
-import { ChevronRight } from 'lucide-react';
 import { useLocale } from '@/lib/i18n/locale-context';
 import { Card, CardContent } from '@/components/ui/card';
+import { SectionCard } from '@/components/ui/section-card';
 import { SubPageHeader, useSubPage } from '@/components/ui/sub-page';
 import { FuelScreen } from '@/components/screens/fuel-screen';
 import { AccountantDieselScreen } from '@/components/screens/accountant-diesel-screen';
@@ -88,36 +88,3 @@ export default function Page() {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Landing view — tappable section card (module-local per convention, same
-// shape as khata-screen.tsx's SectionCard — not shared across screens today).
-// ---------------------------------------------------------------------------
-
-function SectionCard({
-  testId,
-  title,
-  subtitle,
-  onOpen,
-}: {
-  testId: string;
-  title: string;
-  subtitle: string;
-  onOpen: () => void;
-}) {
-  return (
-    <Card data-testid={testId}>
-      <button
-        type="button"
-        className="flex w-full items-center justify-between gap-3 p-4 text-left"
-        data-testid={`${testId}-open`}
-        onClick={onOpen}
-      >
-        <span className="min-w-0">
-          <p className="text-sm font-medium">{title}</p>
-          <p className="text-xs text-muted-foreground">{subtitle}</p>
-        </span>
-        <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-      </button>
-    </Card>
-  );
-}

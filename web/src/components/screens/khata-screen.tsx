@@ -30,7 +30,6 @@
  */
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
-import { ChevronRight } from 'lucide-react';
 import { uuidv7 } from 'uuidv7';
 import type {
   CashTransfer,
@@ -41,9 +40,9 @@ import type {
   UUID,
   User,
 } from '@techbuilder/contracts';
-import { ApiClientError, api, me } from '@/lib/api-client';
+import { api, me } from '@/lib/api-client';
 import { todayKolkata, addDays } from '@/lib/business-date';
-import { apiErrorMessage } from '@/lib/i18n/messages';
+import { apiErrorOf } from '@/lib/i18n/messages';
 import { useLocale, useMessages } from '@/lib/i18n/locale-context';
 import { rupeesToPaise } from '@/lib/money';
 import { Button } from '@/components/ui/button';
@@ -54,8 +53,10 @@ import { NativeSelect } from '@/components/ui/native-select';
 import { ShowMore } from '@/components/ui/show-more';
 import { DateField } from '@/components/entry/date-field';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
+import { QueryBoundary } from '@/components/ui/query-boundary';
+import { SectionCard } from '@/components/ui/section-card';
 import { SubPageHeader, useSubPage } from '@/components/ui/sub-page';
-import { LazyHistorySection, useLazySection } from '@/components/ui/lazy-history';
+import { LazyQuerySection } from '@/components/ui/lazy-history';
 import { DatePresets, type DateRange } from '@/components/insights/date-presets';
 import { candidateRoles } from '@/components/khata/target-roles';
 import { resolveUserName } from '@/components/khata/resolve-user-name';
@@ -191,39 +192,6 @@ export function KhataScreen({ role }: { role: KhataRole }) {
       )}
       <SectionCard testId="khata-section-rollup" title={ui.rollup.title} subtitle={ui.rollup.subtitle} onOpen={() => open('rollup')} />
     </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Landing view — tappable section card
-// ---------------------------------------------------------------------------
-
-function SectionCard({
-  testId,
-  title,
-  subtitle,
-  onOpen,
-}: {
-  testId: string;
-  title: string;
-  subtitle: string;
-  onOpen: () => void;
-}) {
-  return (
-    <Card data-testid={testId}>
-      <button
-        type="button"
-        className="flex w-full items-center justify-between gap-3 p-4 text-left"
-        data-testid={`${testId}-open`}
-        onClick={onOpen}
-      >
-        <span className="min-w-0">
-          <p className="text-sm font-medium">{title}</p>
-          <p className="text-xs text-muted-foreground">{subtitle}</p>
-        </span>
-        <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-      </button>
-    </Card>
   );
 }
 
@@ -368,7 +336,7 @@ function MoneyForm({
   };
 
   const serverError =
-    create.error instanceof ApiClientError ? apiErrorMessage(m, create.error.code) : create.error ? apiErrorMessage(m) : null;
+    apiErrorOf(m, create.error);
 
   return (
     <Card data-testid={`${testIdPrefix}-form`}>
@@ -528,35 +496,23 @@ function SliceHistory({ slice, usersQ, onViewAll }: { slice: Slice; usersQ: User
   const locale = useLocale();
   const ui = UI[locale];
   const meQ = useQuery({ queryKey: ['me'], queryFn: me });
-  const { shown, show } = useLazySection();
-  const historyQ = useQuery({
-    queryKey: ['khata-history', slice],
-    queryFn: () => fetchSliceHistory(slice, { limit: 40 }),
-    enabled: shown,
-  });
   const userName = (id: UUID) => resolveUserName(id, usersQ.data, meQ.data);
 
   return (
     <Card data-testid={`khata-${slice}-history`}>
       <CardContent className="pt-4">
-        <LazyHistorySection
+        <LazyQuerySection
           title={ui.historyTitle}
-          shown={shown}
-          onFirstShow={show}
-          onRefresh={() => void historyQ.refetch()}
-          refreshing={historyQ.isFetching}
           testId={`khata-${slice}-lazy-history`}
+          queryKey={['khata-history', slice]}
+          queryFn={() => fetchSliceHistory(slice, { limit: 40 })}
+          emptyLabel={ui.historyEmpty}
+          isEmpty={(d) => d.items.length === 0}
         >
-          {historyQ.isPending ? (
-            <LoadingState />
-          ) : historyQ.error ? (
-            <ErrorState error={historyQ.error} onRetry={() => void historyQ.refetch()} />
-          ) : !historyQ.data || historyQ.data.items.length === 0 ? (
-            <EmptyState label={ui.historyEmpty} />
-          ) : (
+          {(history) => (
             <div className="grid gap-3">
-              <ul className="divide-y">{historyQ.data.items.map((t) => khataTransferRow(t, userName, locale))}</ul>
-              {historyQ.data.maybeMore && (
+              <ul className="divide-y">{history.items.map((t) => khataTransferRow(t, userName, locale))}</ul>
+              {history.maybeMore && (
                 <Button
                   type="button"
                   variant="outline"
@@ -570,7 +526,7 @@ function SliceHistory({ slice, usersQ, onViewAll }: { slice: Slice; usersQ: User
               )}
             </div>
           )}
-        </LazyHistorySection>
+        </LazyQuerySection>
       </CardContent>
     </Card>
   );
@@ -629,22 +585,18 @@ function FullHistoryPage({ slice, usersQ, onBack }: { slice: Slice; usersQ: User
 
       <Card>
         <CardContent className="pt-4">
-          {historyQ.isPending ? (
-            <LoadingState />
-          ) : historyQ.error ? (
-            <ErrorState error={historyQ.error} onRetry={() => void historyQ.refetch()} />
-          ) : filtered.length === 0 ? (
-            <EmptyState label={ui.historyEmptyFull} />
-          ) : (
-            <ShowMore
-              items={filtered}
-              initial={30}
-              as="ul"
-              className="divide-y"
-              testIdPrefix={`khata-full-${slice}`}
-              renderItem={(t) => khataTransferRow(t, userName, locale)}
-            />
-          )}
+          <QueryBoundary query={historyQ} emptyLabel={ui.historyEmptyFull} isEmpty={() => filtered.length === 0}>
+            {() => (
+              <ShowMore
+                items={filtered}
+                initial={30}
+                as="ul"
+                className="divide-y"
+                testIdPrefix={`khata-full-${slice}`}
+                renderItem={(t) => khataTransferRow(t, userName, locale)}
+              />
+            )}
+          </QueryBoundary>
         </CardContent>
       </Card>
     </div>
@@ -657,12 +609,6 @@ function FullHistoryPage({ slice, usersQ, onBack }: { slice: Slice; usersQ: User
 
 function RollupSubPage({ title, subtitle, onClose }: { title: string; subtitle: string; onClose: () => void }) {
   const m = useMessages();
-  const { shown, show } = useLazySection();
-  const rollupQ = useQuery({
-    queryKey: ['ledger-rollup'],
-    queryFn: () => api<LedgerRollupRow[]>('GET', '/ledger/rollup'),
-    enabled: shown,
-  });
 
   return (
     <div className="grid gap-4" data-testid="khata-rollup-section">
@@ -672,24 +618,15 @@ function RollupSubPage({ title, subtitle, onClose }: { title: string; subtitle: 
           <CardDescription>{subtitle}</CardDescription>
         </CardHeader>
         <CardContent>
-          <LazyHistorySection
+          <LazyQuerySection
             title={m.LEDGER_UI.rollupTitle}
-            shown={shown}
-            onFirstShow={show}
-            onRefresh={() => void rollupQ.refetch()}
-            refreshing={rollupQ.isFetching}
             testId="khata-rollup-lazy"
+            queryKey={['ledger-rollup']}
+            queryFn={() => api<LedgerRollupRow[]>('GET', '/ledger/rollup')}
+            emptyLabel={m.LEDGER_UI.rollupEmpty}
           >
-            {rollupQ.isPending ? (
-              <LoadingState />
-            ) : rollupQ.error ? (
-              <ErrorState error={rollupQ.error} onRetry={() => void rollupQ.refetch()} />
-            ) : !rollupQ.data || rollupQ.data.length === 0 ? (
-              <EmptyState label={m.LEDGER_UI.rollupEmpty} />
-            ) : (
-              <RollupRows rows={rollupQ.data} testIdPrefix="khata-rollup" />
-            )}
-          </LazyHistorySection>
+            {(rows) => <RollupRows rows={rows} testIdPrefix="khata-rollup" />}
+          </LazyQuerySection>
         </CardContent>
       </Card>
     </div>

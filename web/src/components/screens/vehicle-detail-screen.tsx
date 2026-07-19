@@ -36,9 +36,9 @@ import {
   type VehicleDocument,
   type VehicleReminder,
 } from '@techbuilder/contracts';
-import { ApiClientError, api } from '@/lib/api-client';
+import { api } from '@/lib/api-client';
 import { addDays, formatBusinessDateShort, todayKolkata } from '@/lib/business-date';
-import { apiErrorMessage } from '@/lib/i18n/messages';
+import { apiErrorOf } from '@/lib/i18n/messages';
 import { useLocale, useMessages } from '@/lib/i18n/locale-context';
 import { uploadPhoto } from '@/lib/media-upload';
 import { formatPaise } from '@/lib/money';
@@ -473,7 +473,7 @@ function ResolveIssueInline({ issue, onResolved }: { issue: Issue; onResolved: (
   });
 
   const serverError =
-    resolve.error instanceof ApiClientError ? apiErrorMessage(m, resolve.error.code) : resolve.error ? apiErrorMessage(m) : null;
+    apiErrorOf(m, resolve.error);
 
   return (
     <div className="grid gap-2 rounded-lg bg-muted/40 p-2.5" data-testid={`resolve-issue-${issue.id}`}>
@@ -580,7 +580,7 @@ function VehicleDocumentsSection({ vehicleId }: { vehicleId: string }) {
   });
 
   const serverError =
-    create.error instanceof ApiClientError ? apiErrorMessage(m, create.error.code) : create.error ? apiErrorMessage(m) : null;
+    apiErrorOf(m, create.error);
   const today = todayKolkata();
   const soonCutoff = addDays(today, 30);
 
@@ -785,7 +785,7 @@ function VehicleRemindersSection({ vehicleId }: { vehicleId: string }) {
   });
 
   const serverError =
-    create.error instanceof ApiClientError ? apiErrorMessage(m, create.error.code) : create.error ? apiErrorMessage(m) : null;
+    apiErrorOf(m, create.error);
 
   return (
     <Section title={ui.remindersTitle}>

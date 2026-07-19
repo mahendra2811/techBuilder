@@ -16,8 +16,8 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import type { CloseIssueInput, Issue } from '@techbuilder/contracts';
-import { ApiClientError, api } from '@/lib/api-client';
-import { apiErrorMessage } from '@/lib/i18n/messages';
+import { api } from '@/lib/api-client';
+import { apiErrorOf } from '@/lib/i18n/messages';
 import { useMessages } from '@/lib/i18n/locale-context';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -40,7 +40,7 @@ export function CloseIssueInline({ issue, onClosed }: { issue: Issue; onClosed: 
   });
 
   const serverError =
-    close.error instanceof ApiClientError ? apiErrorMessage(m, close.error.code) : close.error ? apiErrorMessage(m) : null;
+    apiErrorOf(m, close.error);
 
   if (!open) {
     return (

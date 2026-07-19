@@ -22,9 +22,9 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { uuidv7 } from 'uuidv7';
 import type { CreateAdvanceInput, Person, SetWageRateInput, UUID, WageSummary } from '@techbuilder/contracts';
-import { ApiClientError, api } from '@/lib/api-client';
+import { api } from '@/lib/api-client';
 import { addDays, minEntryDate, todayKolkata } from '@/lib/business-date';
-import { apiErrorMessage } from '@/lib/i18n/messages';
+import { apiErrorOf } from '@/lib/i18n/messages';
 import { useMessages } from '@/lib/i18n/locale-context';
 import type { Messages } from '@/lib/i18n/messages';
 import { formatPaise, rupeesToPaise } from '@/lib/money';
@@ -236,7 +236,7 @@ function AdvanceForm({
   };
 
   const serverError =
-    create.error instanceof ApiClientError ? apiErrorMessage(m, create.error.code) : create.error ? apiErrorMessage(m) : null;
+    apiErrorOf(m, create.error);
 
   return (
     <Card data-testid="create-advance">
@@ -374,7 +374,7 @@ function RateForm({ people, peopleLoading, today }: { people: Person[]; peopleLo
   };
 
   const serverError =
-    create.error instanceof ApiClientError ? apiErrorMessage(m, create.error.code) : create.error ? apiErrorMessage(m) : null;
+    apiErrorOf(m, create.error);
 
   return (
     <Card data-testid="set-wage-rate">

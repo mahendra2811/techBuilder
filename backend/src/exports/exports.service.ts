@@ -1,7 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import nodemailer from 'nodemailer';
 import { uuidv7 } from 'uuidv7';
 import * as schema from '@techbuilder/contracts/db/schema';
+import { ApiException } from '../common/api-exception';
 import type {
   Attendance,
   Expense,
@@ -54,6 +55,7 @@ async function listTyped<T>(
  */
 @Injectable()
 export class ExportsService {
+  private readonly logger = new Logger('Exports');
   constructor(
     private readonly dbs: DbService,
     private readonly records: RecordsService,
@@ -71,8 +73,25 @@ export class ExportsService {
     return { emailEnabled: !!(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS && env.SMTP_FROM) };
   }
 
-  /** Kicks off the build+send in the background; the caller gets an immediate 202. */
+  /** Kicks off the build+send in the background; the caller gets an immediate 202.
+   * SECURITY (2026-07-19): a `report.export` holder (OWNER/SM) must not be able to exfiltrate the
+   * org's financials to an arbitrary inbox. The recipient must be on the allowlist — which
+   * DEFAULTS to just SMTP_FROM (the org's own configured mailbox) when EXPORT_ALLOWED_RECIPIENTS
+   * is unset — checked synchronously so a bad address 400s immediately instead of failing silently
+   * in the background job. Every attempt is logged with the actor + recipient. */
   email(p: Principal, input: ExportEmailInput): { accepted: true } {
+    const env = loadEnv();
+    const allow = (env.EXPORT_ALLOWED_RECIPIENTS ?? env.SMTP_FROM ?? '')
+      .split(',')
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
+    const requested = input.email.trim().toLowerCase();
+    this.logger.log(`export email requested by user=${p.userId} org=${p.orgId} → ${requested}`);
+    if (!allow.includes(requested)) {
+      throw new ApiException('VALIDATION_FAILED', 'That recipient is not an allowed export address', {
+        email: 'not allowed',
+      });
+    }
     void this.buildAndSend(p, input);
     return { accepted: true };
   }

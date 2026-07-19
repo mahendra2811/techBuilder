@@ -3,7 +3,7 @@ import { and, desc, eq, gte, isNull, lte, or, sql, type SQL } from 'drizzle-orm'
 import type { PgTable } from 'drizzle-orm/pg-core';
 import * as schema from '@techbuilder/contracts/db/schema';
 import { can, MaterialTypeConfigSchema, type Action } from '@techbuilder/contracts';
-import { loadExpenseLimits, loadOrgConfig } from '../common/org-config.util';
+import { loadOrgConfig } from '../common/org-config.util';
 import type {
   CreateProgressNoteInput,
   CreateExpenseInput,
@@ -87,6 +87,30 @@ const IMMUTABLE_PATCH_FIELDS = new Set([
   'deleted_at',
   'businessDate', // date moves would reopen/evade the edit window — void + re-create instead
   'business_date',
+  // P1 (2026-07-19): re-pointing a record's scope key stays in-org so RLS won't stop it — an SM
+  // could move an expense they created to a site they don't manage. Scope is fixed at create;
+  // to move a record, void + re-create it under the new scope.
+  'siteId',
+  'site_id',
+  'vehicleId',
+  'vehicle_id',
+  'personId',
+  'person_id',
+  // Round 2 two-tick: verification/void/match state is server-owned, never client-patchable.
+  'verifiedBy',
+  'verified_by',
+  'verifiedAt',
+  'verified_at',
+  'flagged',
+  'flagNote',
+  'flag_note',
+  'void',
+  'status',
+  'matchedIssuanceId',
+  'matched_issuance_id',
+  'finalized',
+  'enteredRole',
+  'entered_role',
 ]);
 
 function sanitizePatch(patch: Record<string, unknown>): Record<string, unknown> {
@@ -136,23 +160,21 @@ export class RecordsService {
   async createExpense(p: Principal, input: CreateExpenseInput): Promise<Expense> {
     return this.dbs.runInTenant(p.orgId, async (tx) => {
       const ctx = await loadScope(tx, p);
+      // SUP-9 (aligned to the web, 2026-07-19): the SUPERVISOR never books an expense directly —
+      // every supervisor spend is an EXPENSE_ADD request the ACCOUNTANT (or Owner) decides. The
+      // web supervisor page mounts the request-only form; the sync path forbids it identically
+      // (sync.service.ts assertPayloadScope). Any amount is a request — hence OVER_DIRECT_LIMIT
+      // so a client that still POSTs here converts it into a request rather than surfacing an error.
+      if (ctx.role === 'SUPERVISOR') {
+        throw new ApiException(
+          'VALIDATION_FAILED',
+          'Supervisors record spends as money requests — submit it for the accountant instead',
+          { amountPaise: 'OVER_DIRECT_LIMIT' },
+        );
+      }
       assertSiteInScope(ctx, 'record.enter', input.siteId);
       const cfg = await loadOrgConfig(tx);
       await assertBackdateWindow(tx, ctx.role, input.businessDate, RECORD_CREATE_BACKDATE_LIMIT_DAYS, cfg.completion.cutoffLocalTime);
-      // frozen.10 (SUP-9, replaces the Round-2 ₹0 rule): the SUPERVISOR books DIRECTLY up to his
-      // per-entry limit (site override → org default; still lands UNVERIFIED for the accountant's
-      // tick). Above the limit the web form converts it into an EXPENSE_ADD request that the
-      // ACCOUNTANT (or Owner) decides — same OVER_DIRECT_LIMIT field code the form converts on.
-      if (ctx.role === 'SUPERVISOR') {
-        const limits = await loadExpenseLimits(tx, input.siteId, cfg);
-        if (input.amountPaise > limits.thDirectLimitPaise) {
-          throw new ApiException(
-            'VALIDATION_FAILED',
-            'Amount is above your direct limit — submit it as a money request for the accountant instead',
-            { amountPaise: 'OVER_DIRECT_LIMIT' },
-          );
-        }
-      }
       // SM/Owner: any amount books directly — but it lands UNVERIFIED and waits for the
       // accountant's tick (the v1 ₹1L→Owner ladder is removed).
       const [row] = await tx
@@ -195,6 +217,9 @@ export class RecordsService {
       const ctx = await loadScope(tx, p);
       await assertVehicleInScope(tx, ctx, 'vehicleLog.enter', input.vehicleId);
       // frozen.10 (DRV-4/D1): the DRIVER files fuel the day it happens — today only, no backdating.
+      // (The 20:00-cutoff evening "dead zone" that used to reject legitimate today entries is fixed
+      // inside assertBackdateWindow, which measures the backward window against the CALENDAR day —
+      // see backdate.util.ts — so a 0-day window here still means "today", any time of day.)
       await assertBackdateWindow(tx, ctx.role, input.businessDate, {
         ...RECORD_CREATE_BACKDATE_LIMIT_DAYS,
         DRIVER: 0,

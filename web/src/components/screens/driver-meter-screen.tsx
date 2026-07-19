@@ -34,7 +34,7 @@ import type { CreateVehicleLogInput, UUID, VehicleLog, VehicleSnapshot } from '@
 import { ApiClientError, api, me } from '@/lib/api-client';
 import { addDays, todayKolkata } from '@/lib/business-date';
 import { uploadPhoto, uploadPhotos } from '@/lib/media-upload';
-import { apiErrorMessage, type Messages } from '@/lib/i18n/messages';
+import { apiErrorOf, type Messages } from '@/lib/i18n/messages';
 import { useLocale, useMessages } from '@/lib/i18n/locale-context';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -308,11 +308,7 @@ function MorningForm({
   });
 
   const serverError =
-    mutation.error instanceof ApiClientError
-      ? apiErrorMessage(m, mutation.error.code)
-      : mutation.error
-        ? apiErrorMessage(m)
-        : null;
+    apiErrorOf(m, mutation.error);
 
   return (
     <Card>
@@ -487,11 +483,7 @@ function EveningForm({
   });
 
   const serverError =
-    mutation.error instanceof ApiClientError
-      ? apiErrorMessage(m, mutation.error.code)
-      : mutation.error
-        ? apiErrorMessage(m)
-        : null;
+    apiErrorOf(m, mutation.error);
 
   return (
     <Card>

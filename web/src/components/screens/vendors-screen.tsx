@@ -37,9 +37,9 @@ import type {
   VendorLedger,
   VendorPaymentKind,
 } from "@techbuilder/contracts";
-import { ApiClientError, api } from "@/lib/api-client";
+import { api } from "@/lib/api-client";
 import { todayKolkata } from "@/lib/business-date";
-import { apiErrorMessage } from "@/lib/i18n/messages";
+import { apiErrorOf } from '@/lib/i18n/messages';
 import { useLocale, useMessages } from "@/lib/i18n/locale-context";
 import { formatPaise, formatSignedPaise, rupeesToPaise } from "@/lib/money";
 import { Button } from "@/components/ui/button";
@@ -248,11 +248,7 @@ function CreateVendorForm() {
   };
 
   const serverError =
-    create.error instanceof ApiClientError
-      ? apiErrorMessage(m, create.error.code)
-      : create.error
-        ? apiErrorMessage(m)
-        : null;
+    apiErrorOf(m, create.error);
 
   return (
     <Card data-testid="create-vendor">
@@ -484,11 +480,7 @@ function RecordPaymentForm({ vendorId }: { vendorId: UUID }) {
   };
 
   const serverError =
-    create.error instanceof ApiClientError
-      ? apiErrorMessage(m, create.error.code)
-      : create.error
-        ? apiErrorMessage(m)
-        : null;
+    apiErrorOf(m, create.error);
 
   return (
     <Card data-testid="vendor-record-payment">

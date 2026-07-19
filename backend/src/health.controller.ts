@@ -1,8 +1,10 @@
 import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import { sql } from 'drizzle-orm';
 import { DbService } from './db/db.service';
 
 /** Unauthenticated liveness probe for the host (Railway/uptime checks). No DB dependency on purpose. */
+@SkipThrottle() // orchestrator/uptime probes poll frequently — never rate-limit them
 @Controller('health')
 export class HealthController {
   constructor(private readonly dbs: DbService) {}

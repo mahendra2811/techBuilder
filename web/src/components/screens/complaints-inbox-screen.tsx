@@ -45,7 +45,7 @@ import type { Complaint, IssueStatus, User, UUID, CreateComplaintInput } from '@
 import { ApiClientError, api, me } from '@/lib/api-client';
 import { uploadPhotos } from '@/lib/media-upload';
 import { formatKolkataDateTime } from '@/lib/business-date';
-import { apiErrorMessage } from '@/lib/i18n/messages';
+import { apiErrorMessage, apiErrorOf, type UiStrings } from '@/lib/i18n/messages';
 import { useLocale, useMessages } from '@/lib/i18n/locale-context';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -145,7 +145,7 @@ const UI = {
   },
 } as const;
 
-type UiText = Record<keyof (typeof UI)['en'], string>;
+type UiText = UiStrings<typeof UI>;
 
 const STATUS_CLASS: Record<IssueStatus, string> = {
   OPEN: 'bg-amber-500/15 text-amber-800 dark:text-amber-400',
@@ -583,11 +583,7 @@ function RaiseComplaintForm({ ui, onSaved }: { ui: UiText; onSaved: () => void }
   };
 
   const serverError =
-    create.error instanceof ApiClientError
-      ? apiErrorMessage(m, create.error.code)
-      : create.error
-        ? apiErrorMessage(m)
-        : null;
+    apiErrorOf(m, create.error);
 
   return (
     <Card data-testid="complaint-raise-form">

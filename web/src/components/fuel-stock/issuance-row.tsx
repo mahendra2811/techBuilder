@@ -2,8 +2,8 @@
 
 import type { FuelIssuance } from '@techbuilder/contracts';
 import { formatBusinessDateShort } from '@/lib/business-date';
+import { Pill } from '@/components/ui/pill';
 import { materialTxnStatusBadge, type StatusBadgeLabels } from './status-badge';
-import { StatusPill } from './status-pill';
 
 /** One diesel issuance history row — shared by diesel-screen.tsx (Supervisor) and accountant-diesel-screen.tsx (read-only monitor). */
 export function IssuanceRow({
@@ -36,7 +36,7 @@ export function IssuanceRow({
         <span className="text-sm font-medium tabular-nums">
           {row.litres} {litresSuffix}
         </span>
-        <StatusPill tone={badge.tone}>{badge.label}</StatusPill>
+        <Pill tone={badge.tone}>{badge.label}</Pill>
       </div>
     </li>
   );

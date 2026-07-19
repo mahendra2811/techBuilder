@@ -19,8 +19,8 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { RefreshCw } from 'lucide-react';
 import type { MyMoney, Person, SetGuardianInput, Site } from '@techbuilder/contracts';
-import { ApiClientError, api, me } from '@/lib/api-client';
-import { apiErrorMessage } from '@/lib/i18n/messages';
+import { api, me } from '@/lib/api-client';
+import { apiErrorOf } from '@/lib/i18n/messages';
 import { useLocale, useMessages } from '@/lib/i18n/locale-context';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -189,7 +189,7 @@ function GuardianSection({ person, ui }: { person: Person; ui: Ui }) {
   });
 
   const serverError =
-    save.error instanceof ApiClientError ? apiErrorMessage(m, save.error.code) : save.error ? apiErrorMessage(m) : null;
+    apiErrorOf(m, save.error);
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();

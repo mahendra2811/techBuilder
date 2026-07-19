@@ -32,10 +32,13 @@ import { useQuery } from '@tanstack/react-query';
 import type { FuelIssuance, FuelMatchFlag, FuelStockPurchase, Site, UUID, Vehicle } from '@techbuilder/contracts';
 import { api } from '@/lib/api-client';
 import { formatBusinessDateShort } from '@/lib/business-date';
+import type { UiStrings } from '@/lib/i18n/messages';
 import { useLocale } from '@/lib/i18n/locale-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { LoadingState, EmptyState, ErrorState } from '@/components/entry/states';
-import { useLazySection, LazyHistorySection } from '@/components/ui/lazy-history';
+import { Pill } from '@/components/ui/pill';
+import { QueryBoundary } from '@/components/ui/query-boundary';
+import { LazyQuerySection } from '@/components/ui/lazy-history';
 import { PurchaseRow } from '@/components/fuel-stock/purchase-row';
 import { IssuanceRow } from '@/components/fuel-stock/issuance-row';
 
@@ -88,7 +91,7 @@ const UI = {
   },
 } as const;
 
-type UiText = Record<keyof (typeof UI)['en'], string>;
+type UiText = UiStrings<typeof UI>;
 
 export function AccountantDieselScreen({ role = 'ACCOUNTANT' }: { role?: 'ACCOUNTANT' | 'SITE_MANAGER' } = {}) {
   const locale = useLocale();
@@ -132,8 +135,6 @@ export function AccountantDieselScreen({ role = 'ACCOUNTANT' }: { role?: 'ACCOUN
     }));
   }, [sitesQ.data, purchasesQ.data, issuancesQ.data]);
 
-  const sortedPurchases = [...(purchasesQ.data ?? [])].sort((a, b) => b.businessDate.localeCompare(a.businessDate)).slice(0, 30);
-  const sortedIssuances = [...(issuancesQ.data ?? [])].sort((a, b) => b.businessDate.localeCompare(a.businessDate)).slice(0, 30);
   const sortedFlags = [...(flagsQ.data ?? [])].sort((a, b) => b.businessDate.localeCompare(a.businessDate));
 
   return (
@@ -186,93 +187,72 @@ export function AccountantDieselScreen({ role = 'ACCOUNTANT' }: { role?: 'ACCOUN
           <CardDescription>{ui.flagsSubtitle}</CardDescription>
         </CardHeader>
         <CardContent>
-          {flagsQ.isPending ? (
-            <LoadingState />
-          ) : flagsQ.error ? (
-            <ErrorState error={flagsQ.error} onRetry={() => void flagsQ.refetch()} />
-          ) : sortedFlags.length === 0 ? (
-            <EmptyState label={ui.flagsEmpty} />
-          ) : (
-            <ul className="divide-y">
-              {sortedFlags.map((f, i) => (
-                <li
-                  key={`${f.vehicleId}-${f.businessDate}-${i}`}
-                  className="grid gap-1 py-3 first:pt-0 last:pb-0"
-                  data-testid={`acc-diesel-flag-${i}`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="min-w-0 truncate text-sm font-medium">
-                      {regNoOf(f.vehicleId)}
-                      {multiSite ? ` · ${siteLabelOf(f.siteId)}` : ''}
-                    </span>
-                    <span className="inline-block w-fit shrink-0 rounded bg-destructive/10 px-1.5 py-0.5 text-[11px] font-medium text-destructive">
-                      {ui.mismatchBadge}
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {formatBusinessDateShort(f.businessDate)} · {ui.issuedLabel}{' '}
-                    {f.issuedLitres === null ? ui.litresMissing : `${f.issuedLitres} ${ui.litresSuffix}`} / {ui.receivedLabel}{' '}
-                    {f.receivedLitres === null ? ui.litresMissing : `${f.receivedLitres} ${ui.litresSuffix}`}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          )}
+          <QueryBoundary query={flagsQ} emptyLabel={ui.flagsEmpty} isEmpty={() => sortedFlags.length === 0}>
+            {() => (
+              <ul className="divide-y">
+                {sortedFlags.map((f, i) => (
+                  <li
+                    key={`${f.vehicleId}-${f.businessDate}-${i}`}
+                    className="grid gap-1 py-3 first:pt-0 last:pb-0"
+                    data-testid={`acc-diesel-flag-${i}`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="min-w-0 truncate text-sm font-medium">
+                        {regNoOf(f.vehicleId)}
+                        {multiSite ? ` · ${siteLabelOf(f.siteId)}` : ''}
+                      </span>
+                      <Pill tone="error">{ui.mismatchBadge}</Pill>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {formatBusinessDateShort(f.businessDate)} · {ui.issuedLabel}{' '}
+                      {f.issuedLitres === null ? ui.litresMissing : `${f.issuedLitres} ${ui.litresSuffix}`} / {ui.receivedLabel}{' '}
+                      {f.receivedLitres === null ? ui.litresMissing : `${f.receivedLitres} ${ui.litresSuffix}`}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </QueryBoundary>
         </CardContent>
       </Card>
 
-      <RecentPurchasesSection ui={ui} sorted={sortedPurchases} loading={purchasesQ.isPending} error={purchasesQ.error} onRetry={() => void purchasesQ.refetch()} refreshing={purchasesQ.isFetching} multiSite={multiSite} siteLabelOf={siteLabelOf} />
-      <RecentIssuancesSection ui={ui} sorted={sortedIssuances} loading={issuancesQ.isPending} error={issuancesQ.error} onRetry={() => void issuancesQ.refetch()} refreshing={issuancesQ.isFetching} multiSite={multiSite} siteLabelOf={siteLabelOf} regNoOf={regNoOf} />
+      <RecentPurchasesSection ui={ui} multiSite={multiSite} siteLabelOf={siteLabelOf} />
+      <RecentIssuancesSection ui={ui} multiSite={multiSite} siteLabelOf={siteLabelOf} regNoOf={regNoOf} />
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Lazy "recent" history sections — collapsed by default; the query below reuses
-// the SAME queryKey as the eager stock fetch above, so opening this is an
+// Lazy "recent" history sections — collapsed by default; each owns a query on
+// the SAME queryKey as the eager stock fetch above, so opening one is an
 // instant cache hit, never a second network round trip (diesel-screen.tsx idiom).
 // ---------------------------------------------------------------------------
 
+const recentThirty = <T extends { businessDate: string }>(rows: T[]): T[] =>
+  [...rows].sort((a, b) => b.businessDate.localeCompare(a.businessDate)).slice(0, 30);
+
 function RecentPurchasesSection({
   ui,
-  sorted,
-  loading,
-  error,
-  onRetry,
-  refreshing,
   multiSite,
   siteLabelOf,
 }: {
   ui: UiText;
-  sorted: FuelStockPurchase[];
-  loading: boolean;
-  error: unknown;
-  onRetry: () => void;
-  refreshing: boolean;
   multiSite: boolean;
   siteLabelOf: (id: UUID | null) => string;
 }) {
-  const { shown, show } = useLazySection();
   return (
     <Card size="sm" data-testid="acc-diesel-purchases-card">
       <CardContent>
-        <LazyHistorySection
+        <LazyQuerySection
           title={ui.purchasesTitle}
-          shown={shown}
-          onFirstShow={show}
-          onRefresh={onRetry}
-          refreshing={refreshing}
           testId="acc-diesel-purchases-history"
+          queryKey={['fuel-stock', 'purchases']}
+          queryFn={() => api<FuelStockPurchase[]>('GET', '/fuel-stock/purchases')}
+          emptyLabel={ui.purchasesEmpty}
         >
-          {loading ? (
-            <LoadingState />
-          ) : error ? (
-            <ErrorState error={error} onRetry={onRetry} />
-          ) : sorted.length === 0 ? (
-            <EmptyState label={ui.purchasesEmpty} />
-          ) : (
+          {(rows) => (
             <ul className="divide-y" data-testid="acc-diesel-purchases-list">
-              {sorted.map((row) => (
+              {recentThirty(rows).map((row) => (
                 <PurchaseRow
                   key={row.id}
                   row={row}
@@ -283,7 +263,7 @@ function RecentPurchasesSection({
               ))}
             </ul>
           )}
-        </LazyHistorySection>
+        </LazyQuerySection>
       </CardContent>
     </Card>
   );
@@ -291,46 +271,28 @@ function RecentPurchasesSection({
 
 function RecentIssuancesSection({
   ui,
-  sorted,
-  loading,
-  error,
-  onRetry,
-  refreshing,
   multiSite,
   siteLabelOf,
   regNoOf,
 }: {
   ui: UiText;
-  sorted: FuelIssuance[];
-  loading: boolean;
-  error: unknown;
-  onRetry: () => void;
-  refreshing: boolean;
   multiSite: boolean;
   siteLabelOf: (id: UUID | null) => string;
   regNoOf: (id: UUID) => string;
 }) {
-  const { shown, show } = useLazySection();
   return (
     <Card size="sm" data-testid="acc-diesel-issuances-card">
       <CardContent>
-        <LazyHistorySection
+        <LazyQuerySection
           title={ui.issuancesTitle}
-          shown={shown}
-          onFirstShow={show}
-          onRefresh={onRetry}
-          refreshing={refreshing}
           testId="acc-diesel-issuances-history"
+          queryKey={['fuel-stock', 'issuances']}
+          queryFn={() => api<FuelIssuance[]>('GET', '/fuel-stock/issuances')}
+          emptyLabel={ui.issuancesEmpty}
         >
-          {loading ? (
-            <LoadingState />
-          ) : error ? (
-            <ErrorState error={error} onRetry={onRetry} />
-          ) : sorted.length === 0 ? (
-            <EmptyState label={ui.issuancesEmpty} />
-          ) : (
+          {(rows) => (
             <ul className="divide-y" data-testid="acc-diesel-issuances-list">
-              {sorted.map((row) => (
+              {recentThirty(rows).map((row) => (
                 <IssuanceRow
                   key={row.id}
                   row={row}
@@ -343,7 +305,7 @@ function RecentIssuancesSection({
               ))}
             </ul>
           )}
-        </LazyHistorySection>
+        </LazyQuerySection>
       </CardContent>
     </Card>
   );

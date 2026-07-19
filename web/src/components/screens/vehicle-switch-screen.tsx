@@ -19,7 +19,7 @@ import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Vehicle, VehicleSnapshot } from '@techbuilder/contracts';
 import { ApiClientError, api, me } from '@/lib/api-client';
-import { apiErrorMessage } from '@/lib/i18n/messages';
+import { apiErrorOf } from '@/lib/i18n/messages';
 import { useLocale, useMessages } from '@/lib/i18n/locale-context';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -137,11 +137,7 @@ function SwitchVehicleRow({
   });
 
   const serverError =
-    doSwitch.error instanceof ApiClientError
-      ? apiErrorMessage(m, doSwitch.error.code)
-      : doSwitch.error
-        ? apiErrorMessage(m)
-        : null;
+    apiErrorOf(m, doSwitch.error);
 
   return (
     <li className="grid gap-1.5 py-3 first:pt-0 last:pb-0" data-testid={`switch-vehicle-${vehicle.id}`}>

@@ -10,9 +10,9 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import type { UUID } from '@techbuilder/contracts';
-import { ApiClientError, api } from '@/lib/api-client';
+import { api } from '@/lib/api-client';
 import { makeTempPassword } from '@/lib/cascade';
-import { apiErrorMessage } from '@/lib/i18n/messages';
+import { apiErrorOf } from '@/lib/i18n/messages';
 import { useMessages } from '@/lib/i18n/locale-context';
 import { Button } from '@/components/ui/button';
 import { Notice } from '@/components/entry/states';
@@ -33,7 +33,7 @@ export function ResetPasswordAction({ userId, testIdPrefix = 'reset-password' }:
   });
 
   const serverError =
-    mutation.error instanceof ApiClientError ? apiErrorMessage(m, mutation.error.code) : mutation.error ? apiErrorMessage(m) : null;
+    apiErrorOf(m, mutation.error);
 
   return (
     <div className="grid gap-2">

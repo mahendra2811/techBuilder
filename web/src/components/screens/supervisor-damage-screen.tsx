@@ -30,10 +30,10 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { uuidv7 } from 'uuidv7';
 import { ISSUE_SEVERITIES } from '@techbuilder/contracts';
 import type { CreateIssueInput, Issue, IssueSeverity, UUID, Vehicle } from '@techbuilder/contracts';
-import { ApiClientError, api, me } from '@/lib/api-client';
+import { api, me } from '@/lib/api-client';
 import { addDays, todayKolkata } from '@/lib/business-date';
 import { uploadPhotos, uploadVoice } from '@/lib/media-upload';
-import { apiErrorMessage } from '@/lib/i18n/messages';
+import { apiErrorOf, type UiStrings } from '@/lib/i18n/messages';
 import { useLocale, useMessages } from '@/lib/i18n/locale-context';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -43,6 +43,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { PhotoMultiField } from '@/components/entry/photo-multi-field';
 import { VoiceField } from '@/components/entry/voice-field';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
+import { FormStatus } from '@/components/entry/form-status';
 import { DamageTimeline } from '@/components/vehicle/damage-timeline';
 import { CloseIssueInline } from '@/components/vehicle/close-issue-inline';
 
@@ -81,7 +82,7 @@ const UI = {
   },
 } as const;
 
-type UiText = Record<keyof (typeof UI)['en'], string>;
+type UiText = UiStrings<typeof UI>;
 
 const vehicleLabel = (v: Vehicle) => (v.name ? `${v.regNo} · ${v.name}` : v.regNo);
 
@@ -211,7 +212,7 @@ function DamageReportForm({
   });
 
   const serverError =
-    submit.error instanceof ApiClientError ? apiErrorMessage(m, submit.error.code) : submit.error ? apiErrorMessage(m) : null;
+    apiErrorOf(m, submit.error);
 
   return (
     <Card data-testid="supervisor-damage-form">
@@ -296,16 +297,7 @@ function DamageReportForm({
 
             <VoiceField value={voice} onChange={setVoice} testId="supervisor-damage-voice" />
 
-            {serverError && (
-              <Notice tone="error" testId="supervisor-damage-error">
-                {serverError}
-              </Notice>
-            )}
-            {saved && (
-              <Notice tone="success" testId="supervisor-damage-saved">
-                {ui.saved}
-              </Notice>
-            )}
+                          <FormStatus error={serverError} saved={saved} savedLabel={ui.saved} testIdPrefix="supervisor-damage" />
             {mediaWarning && (
               <Notice tone="warning" testId="supervisor-damage-media-warning">
                 {m.ENTRY_UI.photoNotUploaded}

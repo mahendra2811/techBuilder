@@ -17,10 +17,10 @@ import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, ChevronDown, Pencil } from 'lucide-react';
 import type { MyMoney, Person, PersonInsights, UpdatePersonInput, User, UUID } from '@techbuilder/contracts';
-import { ApiClientError, api, me } from '@/lib/api-client';
+import { api, me } from '@/lib/api-client';
 import { CREATABLE_ROLES } from '@/lib/cascade';
 import { formatBusinessDate, todayKolkata } from '@/lib/business-date';
-import { apiErrorMessage } from '@/lib/i18n/messages';
+import { apiErrorOf, type UiStrings } from '@/lib/i18n/messages';
 import { useLocale, useMessages } from '@/lib/i18n/locale-context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -73,10 +73,7 @@ const ID_CARD_UI = {
     none: 'सेट नहीं है',
   },
 } as const;
-// Widened (plain `string` fields): `ID_CARD_UI[locale]` (locale: 'en' | 'hi') resolves to
-// the UNION of both branches' literal-object types, which isn't assignable to either
-// branch alone — components receiving it as a prop need this wider, non-literal shape.
-type IdCardUi = { [K in keyof (typeof ID_CARD_UI)['en']]: string };
+type IdCardUi = UiStrings<typeof ID_CARD_UI>;
 
 export function PersonInsightsScreen({ userId, backHref, role }: { userId: UUID; backHref: string; role: PeopleRole }) {
   const m = useMessages();
@@ -340,7 +337,7 @@ function PersonIdCardEditForm({
   });
 
   const serverError =
-    save.error instanceof ApiClientError ? apiErrorMessage(m, save.error.code) : save.error ? apiErrorMessage(m) : null;
+    apiErrorOf(m, save.error);
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();

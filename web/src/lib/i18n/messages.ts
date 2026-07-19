@@ -8,6 +8,7 @@
  *   the first client render always matches the SSR HTML).
  */
 import type { ErrorCode } from '@techbuilder/contracts';
+import { ApiClientError } from '@/lib/api-client';
 import type { Locale } from './locale';
 import { en, type Messages } from './messages.en';
 import { hi } from './messages.hi';
@@ -31,6 +32,25 @@ export function apiErrorMessage(m: Messages, code?: ErrorCode): string {
   const map: Partial<Record<ErrorCode, string>> & { DEFAULT: string } = m.API_MESSAGES;
   return (code && map[code]) || map.DEFAULT;
 }
+
+/**
+ * Unknown mutation/query error → user message, or null when there is no error.
+ * Encapsulates the `instanceof ApiClientError` narrowing every screen used to
+ * inline: a typed envelope error maps by its code, anything else falls back to
+ * the generic message.
+ */
+export function apiErrorOf(m: Messages, error: unknown): string | null {
+  if (error instanceof ApiClientError) return apiErrorMessage(m, error.code);
+  return error ? apiErrorMessage(m) : null;
+}
+
+/**
+ * Widen a module-local bilingual `const UI = { en: {...}, hi: {...} } as const`
+ * block to plain-`string` fields. `UI[locale]` is a UNION of the two branches'
+ * literal-object types, assignable to neither branch alone — helpers receiving
+ * it as a prop need this wider shape: `type MyUi = UiStrings<typeof UI>`.
+ */
+export type UiStrings<U extends { en: object }> = { [K in keyof U['en']]: string };
 
 /**
  * Literal progress text submitted by the “Nothing to report” quick action.

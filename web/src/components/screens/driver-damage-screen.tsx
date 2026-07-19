@@ -16,7 +16,7 @@ import type { CreateIssueInput, Issue, IssueSeverity, UUID, VehicleSnapshot } fr
 import { ApiClientError, api } from '@/lib/api-client';
 import { addDays, todayKolkata } from '@/lib/business-date';
 import { uploadPhotos, uploadVoice } from '@/lib/media-upload';
-import { apiErrorMessage } from '@/lib/i18n/messages';
+import { apiErrorOf } from '@/lib/i18n/messages';
 import { useMessages } from '@/lib/i18n/locale-context';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -161,7 +161,7 @@ function DamageReportForm({
   });
 
   const serverError =
-    submit.error instanceof ApiClientError ? apiErrorMessage(m, submit.error.code) : submit.error ? apiErrorMessage(m) : null;
+    apiErrorOf(m, submit.error);
 
   return (
     <Card data-testid="report-damage">

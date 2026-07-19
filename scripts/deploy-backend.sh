@@ -88,8 +88,10 @@ if [ "$APP" = "backend" ]; then
   echo "node_modules (no drizzle-kit config/source), and migrations should run against RDS"
   echo "deliberately, as a reviewed step, before code that depends on the new schema goes live."
   echo "If this release includes a new migration, run it FIRST from your own machine:"
-  echo "  (cd backend && npm run db:migrate)   # now defaults to DATABASE_URL_ADMIN, see drizzle.config.ts"
+  echo "  (cd backend && npm run db:deploy)   # = db:migrate THEN db:rls (defaults to DATABASE_URL_ADMIN)"
   echo "against the production RDS instance, then re-run this deploy. See docs/deployment/DATABASE_MIGRATION.md."
+  echo "IMPORTANT: use db:deploy (not bare db:migrate) so RLS + CHECK constraints are (re)applied to any"
+  echo "new tables — the backend now refuses to start in production if a tenant table is missing RLS."
   echo ""
 fi
 

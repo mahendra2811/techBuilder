@@ -44,7 +44,7 @@ import {
 import { ApiClientError, api, me } from '@/lib/api-client';
 import { addDays, minEntryDate, todayKolkata } from '@/lib/business-date';
 import { uploadPhotos, uploadVoice } from '@/lib/media-upload';
-import { apiErrorMessage } from '@/lib/i18n/messages';
+import { apiErrorOf } from '@/lib/i18n/messages';
 import { useLocale, useMessages } from '@/lib/i18n/locale-context';
 import { formatPaise, rupeesToPaise } from '@/lib/money';
 import { Button } from '@/components/ui/button';
@@ -60,7 +60,10 @@ import { VoiceField } from '@/components/entry/voice-field';
 import { RecentEntries } from '@/components/entry/recent-entries';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
 
-type EntryRole = 'SITE_MANAGER' | 'SUPERVISOR';
+// SUP-9 (2026-07-19): the SUPERVISOR was removed as a direct-entry role — supervisors submit
+// EXPENSE_ADD requests (ExpenseRequestScreen on /supervisor/expense), and the backend forbids a
+// supervisor direct booking. This direct-entry screen now serves the SITE_MANAGER only.
+type EntryRole = 'SITE_MANAGER';
 const MAX_BILL_PHOTOS = 1;
 const MAX_EXTRA_PHOTOS = 2;
 /** MISC is the "Other" category — its remark becomes required+emphasized (frozen.10 SUP-9). */
@@ -125,12 +128,10 @@ export function ExpenseScreen({ role }: { role: EntryRole }) {
   ).filter((s) => s.enabled);
   const subcategoryLabel = (s: ExpenseSubcategoryConfig) => (locale === 'hi' ? s.labelHi : s.labelEn);
 
-  // frozen.10 (SUP-9): the SUPERVISOR's per-entry DIRECT limit is UN-deprecated — site override,
-  // falling back to the org default (config.ts default ₹25,000 = 2_500_000 paise). Below it the
-  // entry books directly (still awaiting the accountant's verify tick); above it it routes as an
-  // EXPENSE_ADD request the ACCOUNTANT (or Owner) decides. The SM keeps booking any amount direct.
-  const directLimitPaise =
-    role === 'SUPERVISOR' ? (selectedSite?.expenseFormConfig?.thDirectLimitPaise ?? orgExpense?.thDirectLimitPaise) : undefined;
+  // The SITE_MANAGER books any amount directly (it lands unverified, awaiting the accountant's
+  // tick) — no per-entry direct limit applies to this screen. (The SUP-9 supervisor two-tier
+  // limit was removed with the supervisor's direct-entry path; see EntryRole above.)
+  const directLimitPaise: number | undefined = undefined;
 
   const recentWindow = { from: addDays(today, -7), to: today };
   const recentQs = siteId
@@ -380,11 +381,6 @@ function ExpenseForm({
 
   const busy = directMutation.isPending || requestMutation.isPending;
 
-  const errToMessage = (err: unknown): string | null => {
-    if (err instanceof ApiClientError) return apiErrorMessage(m, err.code);
-    return err ? apiErrorMessage(m) : null;
-  };
-
   // The direct mutation's error either offers the request fallback (over-limit / outside the
   // direct-entry date window) or is a plain error; only one of the two mutations is ever "live"
   // for a given submit, so it's safe to prefer whichever currently holds an error.
@@ -394,10 +390,10 @@ function ExpenseForm({
     (directErr.fields?.amountPaise === 'OVER_DIRECT_LIMIT' || directErr.code === 'FORBIDDEN');
 
   const plainError = requestMutation.error
-    ? errToMessage(requestMutation.error)
+    ? apiErrorOf(m, requestMutation.error)
     : fallbackEligible
       ? null
-      : errToMessage(directErr);
+      : apiErrorOf(m, directErr);
 
   return (
     <form className="grid gap-4" noValidate onSubmit={onSubmit}>

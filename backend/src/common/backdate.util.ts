@@ -8,7 +8,7 @@
 import type { Role } from '@techbuilder/contracts';
 import { ApiException } from './api-exception';
 import { forbidScope } from './scope.util';
-import { businessDateNow, daysBetween } from './business-date';
+import { businessDateNow, daysBetween, kolkataClock } from './business-date';
 import { loadEodCutoff } from './org-config.util';
 import type { Tx } from '../db/db.service';
 
@@ -30,7 +30,19 @@ export const RECORD_CREATE_BACKDATE_LIMIT_DAYS: Partial<Record<Role, number>> = 
   DRIVER: 2, // fuel narrows this to 0 (today only) at the call site — frozen.10 DRV-4
 };
 
-/** Reject future dates outright; reject past dates beyond the role's window. */
+/**
+ * Reject future dates outright; reject past dates beyond the role's window.
+ *
+ * Two DIFFERENT reference dates on purpose:
+ *  - FUTURE is judged against the current BUSINESS date (cutoff-aware). An entry can't be dated
+ *    past the business day it's being filed in.
+ *  - The BACKWARD WINDOW is judged against the CALENDAR date. This matters after the EOD cutoff
+ *    (default 20:00 IST): business-"today" has already rolled to the next calendar day, so a
+ *    naive `daysBetween(businessDate, businessToday)` counted a legitimate same-evening entry as
+ *    1 day of backdating — which made a 0-day window (driver fuel, DRV-4) reject EVERY entry
+ *    filed between 20:00 and midnight (the "dead zone"). Measuring backward from the calendar day
+ *    fixes that while keeping "today only" true during the day.
+ */
 export async function assertBackdateWindow(
   tx: Tx,
   role: Role,
@@ -39,13 +51,14 @@ export async function assertBackdateWindow(
   /** Pass the caller's already-loaded org cutoff to skip a redundant orgs SELECT + parse. */
   cutoff?: string,
 ): Promise<void> {
-  const today = businessDateNow(new Date(), cutoff ?? (await loadEodCutoff(tx)));
-  const back = daysBetween(businessDate, today); // >0 = past, <0 = future
-  if (back < 0) {
+  const now = new Date();
+  const businessToday = businessDateNow(now, cutoff ?? (await loadEodCutoff(tx)));
+  if (daysBetween(businessDate, businessToday) < 0) {
     throw new ApiException('VALIDATION_FAILED', 'Business date cannot be in the future', {
       businessDate: 'future date',
     });
   }
+  const back = daysBetween(businessDate, kolkataClock(now).date); // days before the CALENDAR day
   const limit = limits[role];
   if (role !== 'OWNER' && limit !== undefined && back > limit) {
     forbidScope(`Backdating window exceeded: ${role} may go up to ${limit} day(s) back (Owner override required)`);

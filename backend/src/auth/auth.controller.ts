@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { z } from 'zod';
 import type { AuthSession, ChangePasswordInput, ContactPanel, LoginInput } from '@techbuilder/contracts';
 import { AuthService } from './auth.service';
@@ -10,15 +11,25 @@ const LoginSchema = z.object({ username: z.string().min(1), password: z.string()
 const RefreshSchema = z.object({ refreshToken: z.string().min(1), deviceId: z.string().min(1) });
 const ChangePwSchema = z.object({ currentPassword: z.string().min(1), newPassword: z.string().min(8) });
 
+// Tighter than the global 120/min cap: blunts credential stuffing against these
+// unauthenticated routes. NOTE (architecture): the web talks to this API server-to-server
+// through the Next.js proxy, which does NOT forward the real client IP — so in normal
+// operation this caps LOGIN ATTEMPTS ORG-WIDE (everyone shares the proxy's IP), and caps a
+// direct-to-origin attacker by their own IP. 30/min is safe for pilot scale; the COMPLETE
+// per-client defense is edge rate-limiting (real IP) + a per-account lockout — tracked follow-up.
+const AUTH_THROTTLE = { default: { ttl: 60_000, limit: 30 } };
+
 @Controller('auth')
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
+  @Throttle(AUTH_THROTTLE)
   @Post('login')
   login(@Body(new ZodBody(LoginSchema)) body: LoginInput): Promise<AuthSession> {
     return this.auth.login(body);
   }
 
+  @Throttle(AUTH_THROTTLE)
   @Post('refresh')
   refresh(@Body(new ZodBody(RefreshSchema)) body: { refreshToken: string; deviceId: string }) {
     return this.auth.refresh(body.refreshToken, body.deviceId);

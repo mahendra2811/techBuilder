@@ -31,7 +31,7 @@ import type { CreateFuelLogInput, FuelLog, UUID, VehicleSnapshot } from '@techbu
 import { ApiClientError, api } from '@/lib/api-client';
 import { addDays, todayKolkata } from '@/lib/business-date';
 import { uploadPhoto } from '@/lib/media-upload';
-import { apiErrorMessage, type Messages } from '@/lib/i18n/messages';
+import { apiErrorOf, type Messages, type UiStrings } from '@/lib/i18n/messages';
 import { useLocale, useMessages } from '@/lib/i18n/locale-context';
 import { formatPaise, rupeesToPaise } from '@/lib/money';
 import { Button } from '@/components/ui/button';
@@ -71,9 +71,7 @@ const DRIVER_FUEL_PAGE_UI = {
   },
 } as const;
 
-// Widened to plain `string` per key, same reasoning as the shared fuel-screen.tsx:
-// `DRIVER_FUEL_PAGE_UI[locale]` is a union of the en/hi literal-string objects.
-type DriverFuelPageUi = Record<keyof (typeof DRIVER_FUEL_PAGE_UI)['en'], string>;
+type DriverFuelPageUi = UiStrings<typeof DRIVER_FUEL_PAGE_UI>;
 
 // `paid` is closed over (component `useState`, NOT a registered RHF field) — cross-field
 // "amount required only if paid" validation without needing react-hook-form's `watch()`
@@ -173,11 +171,7 @@ export function DriverFuelScreen() {
   });
 
   const serverError =
-    mutation.error instanceof ApiClientError
-      ? apiErrorMessage(m, mutation.error.code)
-      : mutation.error
-        ? apiErrorMessage(m)
-        : null;
+    apiErrorOf(m, mutation.error);
 
   return (
     <div className="grid gap-4" data-testid="driver-fuel-screen">

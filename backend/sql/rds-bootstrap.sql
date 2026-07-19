@@ -44,6 +44,13 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
 --    that some Postgres versions still apply to the public schema by default).
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 
+-- 4b) Audit log is APPEND-ONLY. The blanket grant in step 2 handed the app role
+--     UPDATE + DELETE on every table, which would let the runtime role rewrite or erase its own
+--     org's audit trail (the trail is supposed to be tamper-evident). Nothing in the backend ever
+--     updates or deletes audit_logs — it only INSERTs — so take those rights back. Re-run this
+--     after step 2 any time step 2 is re-run (step 2's blanket GRANT re-adds them).
+REVOKE UPDATE, DELETE ON audit_logs FROM "<APP_ROLE_NAME>";
+
 -- 5) Verification queries — run these as <APP_ROLE_NAME> (a separate psql connection) to prove
 --    the grants are exactly as intended, not broader:
 --

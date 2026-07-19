@@ -39,7 +39,7 @@ const CreateExpenseSchema = z.object({
   siteId: z.string().uuid(),
   category: z.enum(EXPENSE_CATEGORIES),
   subcategory: z.string().max(40).optional(), // frozen.10 (SM-2): config-driven subcategory key
-  amountPaise: z.number().int(),
+  amountPaise: z.number().int().positive(),
   vendorId: z.string().uuid().optional(),
   billNo: z.string().max(120).optional(),
   receiptMediaId: z.string().uuid().optional(),
@@ -53,8 +53,8 @@ const CreateFuelLogSchema = z.object({
   vehicleId: z.string().uuid(),
   amountPaise: z.number().int().positive().optional(), // frozen.10 (DRV-4): omitted = from store/khata
   paidByDriver: z.boolean().optional(),
-  litres: z.number(),
-  reading: z.number(),
+  litres: z.number().positive(),
+  reading: z.number().nonnegative(),
   receiptMediaId: z.string().uuid().optional(),
   businessDate: BusinessDateSchema,
 });
@@ -63,8 +63,8 @@ const CreateVehicleLogSchema = z.object({
   id: z.string().uuid(),
   vehicleId: z.string().uuid(),
   driverPersonId: z.string().uuid(),
-  startReading: z.number(),
-  endReading: z.number().optional(),
+  startReading: z.number().nonnegative(),
+  endReading: z.number().nonnegative().optional(),
   hoursWorked: z.number().nonnegative().optional(), // WO-0/D-3: driver evening update
   loadsCount: z.number().int().nonnegative().optional(),
   note: z.string().max(2000).optional(),
@@ -85,7 +85,7 @@ const CreateMaterialTxnSchema = z.object({
   id: z.string().uuid(),
   type: z.enum(['IN', 'CONSUME', 'DISPATCH', 'RECEIVE']),
   materialId: z.string().uuid(),
-  qty: z.number(),
+  qty: z.number().positive(),
   uom: z.enum(['BAG', 'KG', 'CFT', 'NOS', 'MT', 'LITRE']),
   siteId: z.string().uuid(),
   counterpartSiteId: z.string().uuid().optional(),

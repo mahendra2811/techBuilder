@@ -19,10 +19,10 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { uuidv7 } from 'uuidv7';
 import type { BusinessDate, CreateFuelLogInput, FuelLog, UUID, Vehicle } from '@techbuilder/contracts';
-import { ApiClientError, api } from '@/lib/api-client';
+import { api } from '@/lib/api-client';
 import { addDays, minEntryDate, todayKolkata } from '@/lib/business-date';
 import { uploadPhoto } from '@/lib/media-upload';
-import { apiErrorMessage, type Messages } from '@/lib/i18n/messages';
+import { apiErrorOf, type Messages } from '@/lib/i18n/messages';
 import { useMessages } from '@/lib/i18n/locale-context';
 import { formatPaise, rupeesToPaise } from '@/lib/money';
 import { Button } from '@/components/ui/button';
@@ -121,11 +121,7 @@ export function FuelScreen() {
   });
 
   const serverError =
-    mutation.error instanceof ApiClientError
-      ? apiErrorMessage(m, mutation.error.code)
-      : mutation.error
-        ? apiErrorMessage(m)
-        : null;
+    apiErrorOf(m, mutation.error);
 
   const vehicleLabel = (v: Vehicle) => (v.name ? `${v.regNo} · ${v.name}` : v.regNo);
   const regNoOf = (id: UUID) => {

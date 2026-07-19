@@ -46,8 +46,8 @@ import {
   type Site,
   type SiteExpenseFormConfig,
 } from '@techbuilder/contracts';
-import { ApiClientError, api, me } from '@/lib/api-client';
-import { apiErrorMessage } from '@/lib/i18n/messages';
+import { api, me } from '@/lib/api-client';
+import { apiErrorOf, type UiStrings } from '@/lib/i18n/messages';
 import { useLocale, useMessages } from '@/lib/i18n/locale-context';
 import { formatPaise, rupeesToPaise } from '@/lib/money';
 import { Button } from '@/components/ui/button';
@@ -55,8 +55,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
+import { SectionCard } from '@/components/ui/section-card';
 import { SubPageHeader, useSubPage } from '@/components/ui/sub-page';
-import { LoadingState, ErrorState, EmptyState, Notice } from '@/components/entry/states';
+import { LoadingState, ErrorState, EmptyState } from '@/components/entry/states';
+import { FormStatus } from '@/components/entry/form-status';
 
 type FieldsState = {
   billPhoto: boolean;
@@ -244,11 +246,7 @@ const UI = {
     fieldOptional: 'वैकल्पिक',
   },
 } as const;
-// Widened (plain `string` fields): `UI[locale]` (locale: 'en' | 'hi') resolves to the
-// UNION of both branches' literal-object types, which isn't assignable to either branch
-// alone — components receiving it as a prop need this wider, non-literal shape (same
-// pattern as people-screen.tsx's `IdCardUi`).
-type SettingsUi = { [K in keyof (typeof UI)['en']]: string };
+type SettingsUi = UiStrings<typeof UI>;
 
 export function SmSettingsScreen() {
   const m = useMessages();
@@ -415,17 +413,9 @@ export function SmSettingsScreen() {
   };
 
   const expenseServerError =
-    saveExpense.error instanceof ApiClientError
-      ? apiErrorMessage(m, saveExpense.error.code)
-      : saveExpense.error
-        ? apiErrorMessage(m)
-        : null;
+    apiErrorOf(m, saveExpense.error);
   const contactsServerError =
-    saveContacts.error instanceof ApiClientError
-      ? apiErrorMessage(m, saveContacts.error.code)
-      : saveContacts.error
-        ? apiErrorMessage(m)
-        : null;
+    apiErrorOf(m, saveContacts.error);
 
   if (meQ.isPending || sitesQ.isPending) {
     return (
@@ -464,11 +454,11 @@ export function SmSettingsScreen() {
             <CardDescription>{ui.landingSubtitle}</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-2">
-            <SectionCard title={ui.sectionLimits} hint={ui.sectionLimitsHint} testId="sm-settings-open-limits" onClick={() => openSection('limits')} />
-            <SectionCard title={ui.sectionCategories} hint={ui.sectionCategoriesHint} testId="sm-settings-open-categories" onClick={() => openSection('categories')} />
-            <SectionCard title={ui.sectionFields} hint={ui.sectionFieldsHint} testId="sm-settings-open-fields" onClick={() => openSection('fields')} />
-            <SectionCard title={ui.sectionForms} hint={ui.sectionFormsHint} testId="sm-settings-open-forms" onClick={() => openSection('forms')} />
-            <SectionCard title={ui.sectionContacts} hint={ui.sectionContactsHint} testId="sm-settings-open-contacts" onClick={() => openSection('contacts')} />
+            <SectionCard variant="row" title={ui.sectionLimits} subtitle={ui.sectionLimitsHint} testId="sm-settings-open-limits" onOpen={() => openSection('limits')} />
+            <SectionCard variant="row" title={ui.sectionCategories} subtitle={ui.sectionCategoriesHint} testId="sm-settings-open-categories" onOpen={() => openSection('categories')} />
+            <SectionCard variant="row" title={ui.sectionFields} subtitle={ui.sectionFieldsHint} testId="sm-settings-open-fields" onOpen={() => openSection('fields')} />
+            <SectionCard variant="row" title={ui.sectionForms} subtitle={ui.sectionFormsHint} testId="sm-settings-open-forms" onOpen={() => openSection('forms')} />
+            <SectionCard variant="row" title={ui.sectionContacts} subtitle={ui.sectionContactsHint} testId="sm-settings-open-contacts" onOpen={() => openSection('contacts')} />
           </CardContent>
         </Card>
       </div>
@@ -551,16 +541,7 @@ export function SmSettingsScreen() {
             </CardContent>
           </Card>
 
-          {expenseServerError && (
-            <Notice tone="error" testId="sm-settings-expense-error">
-              {expenseServerError}
-            </Notice>
-          )}
-          {expenseSaved && (
-            <Notice tone="success" testId="sm-settings-expense-saved">
-              {m.SM_SETTINGS_UI.expenseSettingsSaved}
-            </Notice>
-          )}
+                      <FormStatus error={expenseServerError} saved={expenseSaved} savedLabel={m.SM_SETTINGS_UI.expenseSettingsSaved} testIdPrefix="sm-settings-expense" />
           <Button type="submit" data-testid="sm-settings-save-expense" disabled={saveExpense.isPending}>
             {saveExpense.isPending ? m.SM_SETTINGS_UI.savingExpenseSettings : m.SM_SETTINGS_UI.saveExpenseSettings}
           </Button>
@@ -642,16 +623,7 @@ export function SmSettingsScreen() {
             </CardContent>
           </Card>
 
-          {expenseServerError && (
-            <Notice tone="error" testId="sm-settings-expense-error">
-              {expenseServerError}
-            </Notice>
-          )}
-          {expenseSaved && (
-            <Notice tone="success" testId="sm-settings-expense-saved">
-              {m.SM_SETTINGS_UI.expenseSettingsSaved}
-            </Notice>
-          )}
+                      <FormStatus error={expenseServerError} saved={expenseSaved} savedLabel={m.SM_SETTINGS_UI.expenseSettingsSaved} testIdPrefix="sm-settings-expense" />
           <Button type="submit" data-testid="sm-settings-save-expense" disabled={saveExpense.isPending}>
             {saveExpense.isPending ? m.SM_SETTINGS_UI.savingExpenseSettings : m.SM_SETTINGS_UI.saveExpenseSettings}
           </Button>
@@ -691,16 +663,7 @@ export function SmSettingsScreen() {
             </CardContent>
           </Card>
 
-          {expenseServerError && (
-            <Notice tone="error" testId="sm-settings-expense-error">
-              {expenseServerError}
-            </Notice>
-          )}
-          {expenseSaved && (
-            <Notice tone="success" testId="sm-settings-expense-saved">
-              {m.SM_SETTINGS_UI.expenseSettingsSaved}
-            </Notice>
-          )}
+                      <FormStatus error={expenseServerError} saved={expenseSaved} savedLabel={m.SM_SETTINGS_UI.expenseSettingsSaved} testIdPrefix="sm-settings-expense" />
           <Button type="submit" data-testid="sm-settings-save-expense" disabled={saveExpense.isPending}>
             {saveExpense.isPending ? m.SM_SETTINGS_UI.savingExpenseSettings : m.SM_SETTINGS_UI.saveExpenseSettings}
           </Button>
@@ -812,16 +775,7 @@ export function SmSettingsScreen() {
           </CardContent>
         </Card>
 
-        {contactsServerError && (
-          <Notice tone="error" testId="sm-settings-contacts-error">
-            {contactsServerError}
-          </Notice>
-        )}
-        {contactsSaved && (
-          <Notice tone="success" testId="sm-settings-contacts-saved">
-            {m.SM_SETTINGS_UI.contactsSaved}
-          </Notice>
-        )}
+                  <FormStatus error={contactsServerError} saved={contactsSaved} savedLabel={m.SM_SETTINGS_UI.contactsSaved} testIdPrefix="sm-settings-contacts" />
         <Button type="submit" data-testid="sm-settings-save-contacts" disabled={saveContacts.isPending}>
           {saveContacts.isPending ? m.SM_SETTINGS_UI.savingContacts : m.SM_SETTINGS_UI.saveContacts}
         </Button>
@@ -834,31 +788,6 @@ export function SmSettingsScreen() {
 // Landing section card
 // ---------------------------------------------------------------------------
 
-function SectionCard({
-  title,
-  hint,
-  testId,
-  onClick,
-}: {
-  title: string;
-  hint: string;
-  testId: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      className="flex w-full items-center justify-between gap-3 rounded-lg border border-input px-3.5 py-3 text-left hover:bg-accent"
-      data-testid={testId}
-      onClick={onClick}
-    >
-      <span className="grid min-w-0 gap-0.5">
-        <span className="text-sm font-medium">{title}</span>
-        <span className="truncate text-xs text-muted-foreground">{hint}</span>
-      </span>
-    </button>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Subcategory manager (frozen.10, SM-2) — lives inside the Categories sub-page
@@ -1089,16 +1018,7 @@ function FormsConfigSection({
             </CardContent>
           </Card>
 
-          {serverError && (
-            <Notice tone="error" testId="sm-settings-expense-error">
-              {serverError}
-            </Notice>
-          )}
-          {saved && (
-            <Notice tone="success" testId="sm-settings-expense-saved">
-              {m.SM_SETTINGS_UI.expenseSettingsSaved}
-            </Notice>
-          )}
+                      <FormStatus error={serverError} saved={saved} savedLabel={m.SM_SETTINGS_UI.expenseSettingsSaved} testIdPrefix="sm-settings-expense" />
           <Button type="submit" data-testid="sm-settings-save-expense" disabled={saving}>
             {saving ? m.SM_SETTINGS_UI.savingExpenseSettings : m.SM_SETTINGS_UI.saveExpenseSettings}
           </Button>
@@ -1118,10 +1038,11 @@ function FormsConfigSection({
           {FORM_CATALOG.map((f) => (
             <SectionCard
               key={f.key}
+              variant="row"
               title={locale === 'hi' ? f.labelHi : f.labelEn}
-              hint={`${f.fields.length}`}
+              subtitle={`${f.fields.length}`}
               testId={`sm-settings-form-open-${f.key}`}
-              onClick={() => openForm(f.key)}
+              onOpen={() => openForm(f.key)}
             />
           ))}
         </CardContent>

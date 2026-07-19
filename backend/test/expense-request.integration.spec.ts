@@ -1,7 +1,7 @@
 /**
  * Round-2 money engine (CW-2) — runs against the LIVE DB in backend/.env through the real
  * services (RLS app role). Proves the rewired flow:
- *   caps (worker ₹2,000 · supervisor NO CAP) · supervisor ₹0 direct · SM ladder removed
+ *   caps (worker ₹2,000 · supervisor NO CAP) · supervisor request-only (no direct, SUP-9) · SM ladder removed
  *   · decider map (accountant per-site / SM may approve / supervisor NEVER / owner override)
  *   · TWO-TICK verification (approve ≠ verify; accountant approval = both in one act)
  *   · verified = permanent (no edit/void, even Owner) · 🚩 flag → MONEY_FLAGGED to SM + Owners
@@ -288,14 +288,13 @@ describe.skipIf(!HAS_DB)('Round-2 money engine (live DB, RLS app role)', () => {
   });
 
   // ---- direct entries ----
-  // frozen.10 (SUP-9): the supervisor books DIRECTLY up to his per-entry limit (org default ₹25k);
-  // above it the entry must route as an accountant-decided EXPENSE_ADD request.
-  it('SUPERVISOR direct expense: under-limit books (unverified); over-limit refused with OVER_DIRECT_LIMIT', async () => {
-    const ok = await records.createExpense(SUP1(), {
-      id: uuidv7(), siteId: siteA, category: 'MISC', amountPaise: 5_000, businessDate: TODAY,
-    });
-    expect(ok.amountPaise).toBe(5_000);
-    expect(ok.verifiedAt).toBeNull();
+  // SUP-9 (aligned to the web 2026-07-19): the supervisor NEVER books an expense directly — every
+  // spend (any amount) is an accountant-decided EXPENSE_ADD request. Both a small and a large
+  // amount reject with OVER_DIRECT_LIMIT (the field code the web form converts on).
+  it('SUPERVISOR direct expense is refused at any amount (request-only)', async () => {
+    await expect(
+      records.createExpense(SUP1(), { id: uuidv7(), siteId: siteA, category: 'MISC', amountPaise: 5_000, businessDate: TODAY }),
+    ).rejects.toMatchObject({ code: 'VALIDATION_FAILED', fields: { amountPaise: 'OVER_DIRECT_LIMIT' } });
     await expect(
       records.createExpense(SUP1(), { id: uuidv7(), siteId: siteA, category: 'MISC', amountPaise: 3_000_000, businessDate: TODAY }),
     ).rejects.toMatchObject({ code: 'VALIDATION_FAILED', fields: { amountPaise: 'OVER_DIRECT_LIMIT' } });

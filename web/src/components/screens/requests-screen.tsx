@@ -37,8 +37,8 @@ import type {
   Vehicle,
   VehicleType,
 } from '@techbuilder/contracts';
-import { ApiClientError, api, me } from '@/lib/api-client';
-import { apiErrorMessage } from '@/lib/i18n/messages';
+import { api, me } from '@/lib/api-client';
+import { apiErrorOf } from '@/lib/i18n/messages';
 import { useMessages } from '@/lib/i18n/locale-context';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -135,7 +135,7 @@ export function RequestsScreen({ role }: { role: SubmitRole }) {
   };
 
   const serverError =
-    submit.error instanceof ApiClientError ? apiErrorMessage(m, submit.error.code) : submit.error ? apiErrorMessage(m) : null;
+    apiErrorOf(m, submit.error);
 
   const noVehicles = vehicles.length === 0;
   const submitDisabled = submit.isPending || (type === 'VEHICLE_SWITCH' && noVehicles);

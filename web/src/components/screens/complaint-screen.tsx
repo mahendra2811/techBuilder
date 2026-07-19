@@ -22,9 +22,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronDown, Paperclip, Video } from 'lucide-react';
 import { uuidv7 } from 'uuidv7';
 import type { Complaint, ComplaintTarget, CreateComplaintInput, UUID } from '@techbuilder/contracts';
-import { ApiClientError, api } from '@/lib/api-client';
+import { api } from '@/lib/api-client';
 import { uploadPhotos } from '@/lib/media-upload';
-import { apiErrorMessage } from '@/lib/i18n/messages';
+import { apiErrorOf, type UiStrings } from '@/lib/i18n/messages';
 import { useLocale, useMessages } from '@/lib/i18n/locale-context';
 import { formatKolkataDateTime } from '@/lib/business-date';
 import { Button } from '@/components/ui/button';
@@ -34,6 +34,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ShowMore } from '@/components/ui/show-more';
 import { PhotoMultiField } from '@/components/entry/photo-multi-field';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
+import { FormStatus } from '@/components/entry/form-status';
 import { cn } from '@/lib/utils';
 
 const MAX_PHOTOS = 3;
@@ -91,7 +92,7 @@ const UI = {
   },
 } as const;
 
-type UiText = Record<keyof (typeof UI)['en'], string>;
+type UiText = UiStrings<typeof UI>;
 
 const STATUS_CLASS: Record<Complaint['status'], string> = {
   OPEN: 'bg-amber-500/15 text-amber-800 dark:text-amber-400',
@@ -237,11 +238,7 @@ function ComplaintForm({ ui, onSaved }: { ui: UiText; onSaved: () => void }) {
   };
 
   const serverError =
-    create.error instanceof ApiClientError
-      ? apiErrorMessage(m, create.error.code)
-      : create.error
-        ? apiErrorMessage(m)
-        : null;
+    apiErrorOf(m, create.error);
 
   return (
     <form className="grid gap-4" noValidate onSubmit={onSubmit} data-testid="complaint-form">
@@ -300,16 +297,7 @@ function ComplaintForm({ ui, onSaved }: { ui: UiText; onSaved: () => void }) {
         {ui.videoHint}
       </div>
 
-      {serverError && (
-        <Notice tone="error" testId="complaint-error">
-          {serverError}
-        </Notice>
-      )}
-      {saved && (
-        <Notice tone="success" testId="complaint-saved">
-          {ui.saved}
-        </Notice>
-      )}
+              <FormStatus error={serverError} saved={saved} savedLabel={ui.saved} testIdPrefix="complaint" />
       {photoWarning && (
         <Notice tone="warning" testId="complaint-photo-warning">
           {ui.photoNotUploaded}

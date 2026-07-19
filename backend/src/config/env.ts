@@ -28,6 +28,9 @@ const EnvSchema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
   SMTP_FROM: z.string().optional(),
+  /** Comma-separated allowlist of addresses an emailed export may be sent to. Unset ⇒ exports may
+   * only go to SMTP_FROM (the org's own configured mailbox) — never an arbitrary recipient. */
+  EXPORT_ALLOWED_RECIPIENTS: z.string().optional(),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

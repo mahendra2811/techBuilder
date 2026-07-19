@@ -13,23 +13,20 @@ import { formatBusinessDate } from '@/lib/business-date';
 import { formatPaise } from '@/lib/money';
 import { useMessages } from '@/lib/i18n/locale-context';
 import type { Messages } from '@/lib/i18n/messages';
-import { cn } from '@/lib/utils';
+import { Pill, type PillTone } from '@/components/ui/pill';
 
-const STATUS_CLASS: Record<ApprovalStatus, string> = {
-  PENDING: 'bg-amber-500/15 text-amber-800 dark:text-amber-400',
-  APPROVED: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
-  REJECTED: 'bg-destructive/10 text-destructive',
+const STATUS_TONE: Record<ApprovalStatus, PillTone> = {
+  PENDING: 'warning',
+  APPROVED: 'success',
+  REJECTED: 'error',
 };
 
 export function RequestStatusBadge({ status }: { status: ApprovalStatus }) {
   const m = useMessages();
   return (
-    <span
-      data-testid={`request-status-${status}`}
-      className={cn('inline-block w-fit shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium', STATUS_CLASS[status])}
-    >
+    <Pill tone={STATUS_TONE[status]} testId={`request-status-${status}`}>
       {m.APPROVAL_STATUS_LABELS[status]}
-    </span>
+    </Pill>
   );
 }
 

@@ -33,17 +33,18 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronDown, ChevronRight, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import type { ApprovalRequest, ApprovalStatus, ExpenseCategory, MyMoney, Vendor } from '@techbuilder/contracts';
 import { api, me } from '@/lib/api-client';
 import { formatBusinessDate, formatBusinessDateShort } from '@/lib/business-date';
 import { formatPaise } from '@/lib/money';
 import { useLocale, useMessages } from '@/lib/i18n/locale-context';
 import type { Messages } from '@/lib/i18n/messages';
-import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Pill } from '@/components/ui/pill';
 import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
 import { RequestStatusBadge } from '@/components/requests/request-bits';
+import { SectionCard } from '@/components/ui/section-card';
 import { SubPageHeader, useSubPage } from '@/components/ui/sub-page';
 
 // Module-local — the frozen EXPENSE_REQUEST_UI catalog predates the three-section
@@ -257,43 +258,6 @@ export function ExpenseHistorySections() {
   );
 }
 
-/** Tappable hub card — title + a count once its underlying query has loaded. */
-function SectionCard({
-  testId,
-  title,
-  count,
-  onOpen,
-}: {
-  testId: string;
-  title: string;
-  count?: number;
-  onOpen: () => void;
-}) {
-  return (
-    <Card data-testid={testId}>
-      <button
-        type="button"
-        className="flex w-full items-center justify-between gap-3 p-4 text-left"
-        data-testid={`${testId}-open`}
-        onClick={onOpen}
-      >
-        <span className="text-sm font-medium">{title}</span>
-        <span className="flex items-center gap-2">
-          {count !== undefined && (
-            <span
-              className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground"
-              data-testid={`${testId}-count`}
-            >
-              {count}
-            </span>
-          )}
-          <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-        </span>
-      </button>
-    </Card>
-  );
-}
-
 /** Shared accordion list for the pending/rejected + approved sub-pages. */
 function ExpenseRequestListCard({
   requests,
@@ -395,17 +359,9 @@ function ExpenseRequestRow({
             {amount && <span className="text-sm font-medium">{amount}</span>}
             <RequestStatusBadge status={r.status} />
             {showTick && (
-              <span
-                data-testid={`my-expense-request-${r.id}-tick`}
-                className={cn(
-                  'inline-block w-fit shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium',
-                  r.flagged
-                    ? 'bg-destructive/10 text-destructive'
-                    : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
-                )}
-              >
+              <Pill tone={r.flagged ? 'error' : 'success'} testId={`my-expense-request-${r.id}-tick`}>
                 {r.flagged ? tickUi.flagged : tickUi.verified}
-              </span>
+              </Pill>
             )}
           </div>
           {date && <p className="text-xs text-muted-foreground">{date}</p>}

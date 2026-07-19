@@ -115,7 +115,7 @@ export const en = {
     people: "People",
     sites: "Sites",
     fleet: "Fleet",
-    vendors: "vendors",
+    vendors: "Vendors",
     ledger: "Khata",
     insights: "Insights",
     settings: "Settings",
@@ -1009,9 +1009,9 @@ export const en = {
   /** Vendor / shop accounts — udhaar khata (WO-10): SM shop list + ledger + payments,
    *  plus the shared "paid by cash / on credit" selector on both expense forms. */
   VENDOR_UI: {
-    title: "vendors",
-    subtitle: "vendors you buy from on credit — track what's owed and record payments.",
-    listTitle: "vendors",
+    title: "Vendors",
+    subtitle: "Vendors you buy from on credit — track what's owed and record payments.",
+    listTitle: "Vendors",
     listEmpty: "No vendors added yet.",
     sellsUnknown: "General store",
     phoneUnknown: "No phone",

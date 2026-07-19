@@ -35,9 +35,9 @@ import type {
   UUID,
   Vehicle,
 } from '@techbuilder/contracts';
-import { ApiClientError, api } from '@/lib/api-client';
+import { api } from '@/lib/api-client';
 import { minEntryDate, todayKolkata } from '@/lib/business-date';
-import { apiErrorMessage } from '@/lib/i18n/messages';
+import { apiErrorOf, type UiStrings } from '@/lib/i18n/messages';
 import { useLocale, useMessages } from '@/lib/i18n/locale-context';
 import { rupeesToPaise } from '@/lib/money';
 import { Button } from '@/components/ui/button';
@@ -46,9 +46,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
 import { DateField } from '@/components/entry/date-field';
-import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
+import { LoadingState, EmptyState, ErrorState } from '@/components/entry/states';
+import { FormStatus } from '@/components/entry/form-status';
 import { SubPageHeader, useSubPage } from '@/components/ui/sub-page';
-import { useLazySection, LazyHistorySection } from '@/components/ui/lazy-history';
+import { LazyQuerySection } from '@/components/ui/lazy-history';
 import { PurchaseRow } from '@/components/fuel-stock/purchase-row';
 import { IssuanceRow } from '@/components/fuel-stock/issuance-row';
 
@@ -125,9 +126,7 @@ const UI = {
   },
 } as const;
 
-// Widened to plain `string` per key — `UI[locale]` is a union of the `en`/`hi`
-// literal-string objects, and only the widened form is assignable from both.
-type UiText = Record<keyof (typeof UI)['en'], string>;
+type UiText = UiStrings<typeof UI>;
 
 type DieselSection = 'buy' | 'issue';
 
@@ -331,7 +330,7 @@ function BuyStockForm({
   });
 
   const serverError =
-    create.error instanceof ApiClientError ? apiErrorMessage(m, create.error.code) : create.error ? apiErrorMessage(m) : null;
+    apiErrorOf(m, create.error);
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -422,16 +421,7 @@ function BuyStockForm({
             <Input id="diesel-buy-note" data-testid="diesel-buy-note" value={note} onChange={(e) => setNote(e.target.value)} />
           </div>
 
-          {serverError && (
-            <Notice tone="error" testId="diesel-buy-error">
-              {serverError}
-            </Notice>
-          )}
-          {saved && (
-            <Notice tone="success" testId="diesel-buy-saved">
-              {ui.stockSaved}
-            </Notice>
-          )}
+                      <FormStatus error={serverError} saved={saved} savedLabel={ui.stockSaved} testIdPrefix="diesel-buy" />
 
           <Button type="submit" data-testid="diesel-buy-submit" disabled={create.isPending || !siteId}>
             {create.isPending ? ui.saving : ui.submit}
@@ -487,7 +477,7 @@ function IssueToVehicleForm({
   });
 
   const serverError =
-    create.error instanceof ApiClientError ? apiErrorMessage(m, create.error.code) : create.error ? apiErrorMessage(m) : null;
+    apiErrorOf(m, create.error);
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -576,16 +566,7 @@ function IssueToVehicleForm({
             <Input id="diesel-issue-note" data-testid="diesel-issue-note" value={note} onChange={(e) => setNote(e.target.value)} />
           </div>
 
-          {serverError && (
-            <Notice tone="error" testId="diesel-issue-error">
-              {serverError}
-            </Notice>
-          )}
-          {saved && (
-            <Notice tone="success" testId="diesel-issue-saved">
-              {ui.issueSaved}
-            </Notice>
-          )}
+                      <FormStatus error={serverError} saved={saved} savedLabel={ui.issueSaved} testIdPrefix="diesel-issue" />
 
           <Button type="submit" data-testid="diesel-issue-submit" disabled={create.isPending || !vehicleId}>
             {create.isPending ? ui.saving : ui.submit}
@@ -603,74 +584,47 @@ function IssueToVehicleForm({
 // second network round trip).
 // ---------------------------------------------------------------------------
 
-function RecentPurchasesSection({ ui }: { ui: UiText }) {
-  const { shown, show } = useLazySection();
-  const q = useQuery({
-    queryKey: ['fuel-stock', 'purchases'],
-    queryFn: () => api<FuelStockPurchase[]>('GET', '/fuel-stock/purchases'),
-    enabled: shown,
-  });
-  const sorted = [...(q.data ?? [])].sort((a, b) => b.businessDate.localeCompare(a.businessDate)).slice(0, 30);
+const recentThirty = <T extends { businessDate: string }>(rows: T[]): T[] =>
+  [...rows].sort((a, b) => b.businessDate.localeCompare(a.businessDate)).slice(0, 30);
 
+function RecentPurchasesSection({ ui }: { ui: UiText }) {
   return (
     <Card size="sm" data-testid="diesel-purchases-card">
       <CardContent>
-        <LazyHistorySection
+        <LazyQuerySection
           title={ui.purchasesTitle}
-          shown={shown}
-          onFirstShow={show}
-          onRefresh={() => void q.refetch()}
-          refreshing={q.isFetching}
           testId="diesel-purchases-history"
+          queryKey={['fuel-stock', 'purchases']}
+          queryFn={() => api<FuelStockPurchase[]>('GET', '/fuel-stock/purchases')}
+          emptyLabel={ui.purchasesEmpty}
         >
-          {q.isPending ? (
-            <LoadingState />
-          ) : q.error ? (
-            <ErrorState error={q.error} onRetry={() => void q.refetch()} />
-          ) : sorted.length === 0 ? (
-            <EmptyState label={ui.purchasesEmpty} />
-          ) : (
+          {(rows) => (
             <ul className="divide-y" data-testid="diesel-purchases-list">
-              {sorted.map((row) => (
+              {recentThirty(rows).map((row) => (
                 <PurchaseRow key={row.id} row={row} litresSuffix={ui.litresSuffix} testIdPrefix="diesel-purchase" />
               ))}
             </ul>
           )}
-        </LazyHistorySection>
+        </LazyQuerySection>
       </CardContent>
     </Card>
   );
 }
 
 function RecentIssuancesSection({ ui, regNoOf }: { ui: UiText; regNoOf: (id: UUID) => string }) {
-  const { shown, show } = useLazySection();
-  const q = useQuery({
-    queryKey: ['fuel-stock', 'issuances'],
-    queryFn: () => api<FuelIssuance[]>('GET', '/fuel-stock/issuances'),
-    enabled: shown,
-  });
-  const sorted = [...(q.data ?? [])].sort((a, b) => b.businessDate.localeCompare(a.businessDate)).slice(0, 30);
-
   return (
     <Card size="sm" data-testid="diesel-issuances-card">
       <CardContent>
-        <LazyHistorySection
+        <LazyQuerySection
           title={ui.issuancesTitle}
-          shown={shown}
-          onFirstShow={show}
-          onRefresh={() => void q.refetch()}
-          refreshing={q.isFetching}
           testId="diesel-issuances-history"
+          queryKey={['fuel-stock', 'issuances']}
+          queryFn={() => api<FuelIssuance[]>('GET', '/fuel-stock/issuances')}
+          emptyLabel={ui.issuancesEmpty}
         >
-          {q.isPending ? (
-            <LoadingState />
-          ) : q.error ? (
-            <ErrorState error={q.error} onRetry={() => void q.refetch()} />
-          ) : sorted.length === 0 ? (
-            <EmptyState label={ui.issuancesEmpty} />
-          ) : (
+          {(rows) => (
             <ul className="divide-y" data-testid="diesel-issuances-list">
-              {sorted.map((row) => (
+              {recentThirty(rows).map((row) => (
                 <IssuanceRow
                   key={row.id}
                   row={row}
@@ -682,7 +636,7 @@ function RecentIssuancesSection({ ui, regNoOf }: { ui: UiText; regNoOf: (id: UUI
               ))}
             </ul>
           )}
-        </LazyHistorySection>
+        </LazyQuerySection>
       </CardContent>
     </Card>
   );

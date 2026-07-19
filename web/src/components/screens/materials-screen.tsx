@@ -31,17 +31,17 @@
  */
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronRight } from 'lucide-react';
 import { uuidv7 } from 'uuidv7';
 import { UOMS, type CreateMaterialInput, type Material, type MaterialTypeConfig, type UpdateMaterialInput } from '@techbuilder/contracts';
-import { ApiClientError, api } from '@/lib/api-client';
-import { apiErrorMessage } from '@/lib/i18n/messages';
+import { api } from '@/lib/api-client';
+import { apiErrorOf, type UiStrings } from '@/lib/i18n/messages';
 import { useLocale, useMessages } from '@/lib/i18n/locale-context';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
+import { SectionCard } from '@/components/ui/section-card';
 import { SubPageHeader, useSubPage } from '@/components/ui/sub-page';
 import { LoadingState, ErrorState, EmptyState, Notice } from '@/components/entry/states';
 import { MaterialEntryScreen } from './material-entry-screen';
@@ -101,9 +101,7 @@ const UI = {
   },
 } as const;
 
-// Widened to plain `string` per key (not the literal `en` type) — `UI[locale]` is a union of
-// the `en`/`hi` literal-string objects, and only the widened form is assignable from both.
-type UiText = Record<keyof (typeof UI)['en'], string>;
+type UiText = UiStrings<typeof UI>;
 
 /** The three per-type toggles — locale-switched like everything else on the screen. */
 const CONFIG_TOGGLE_UI_KEY = {
@@ -163,41 +161,15 @@ export function MaterialsScreen({ role }: { role: MaterialsRole }) {
           <CardDescription>{ui.subtitle}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-2">
-          <SectionCard title={ui.listTitle} hint={ui.listHint} testId="materials-open-types" onClick={() => openSection('types')} />
-          <SectionCard title={ui.addTitle} hint={ui.addHint} testId="materials-open-add" onClick={() => openSection('add')} />
-          <SectionCard title={ui.entryTitle} hint={ui.entryHint} testId="materials-open-entry" onClick={() => openSection('entry')} />
+          <SectionCard variant="row" title={ui.listTitle} subtitle={ui.listHint} testId="materials-open-types" onOpen={() => openSection('types')} />
+          <SectionCard variant="row" title={ui.addTitle} subtitle={ui.addHint} testId="materials-open-add" onOpen={() => openSection('add')} />
+          <SectionCard variant="row" title={ui.entryTitle} subtitle={ui.entryHint} testId="materials-open-entry" onOpen={() => openSection('entry')} />
         </CardContent>
       </Card>
     </div>
   );
 }
 
-function SectionCard({
-  title,
-  hint,
-  testId,
-  onClick,
-}: {
-  title: string;
-  hint: string;
-  testId: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      className="flex w-full items-center justify-between gap-3 rounded-lg border border-input px-3.5 py-3 text-left hover:bg-accent"
-      data-testid={testId}
-      onClick={onClick}
-    >
-      <span className="grid min-w-0 gap-0.5">
-        <span className="text-sm font-medium">{title}</span>
-        <span className="truncate text-xs text-muted-foreground">{hint}</span>
-      </span>
-      <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-    </button>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // (a) Material types — read + inline edit (unchanged from before the restructure)
@@ -370,7 +342,7 @@ function CreateMaterialForm({ ui, onCreated }: { ui: UiText; onCreated: () => vo
   };
 
   const serverError =
-    create.error instanceof ApiClientError ? apiErrorMessage(m, create.error.code) : create.error ? apiErrorMessage(m) : null;
+    apiErrorOf(m, create.error);
 
   return (
     <Card data-testid="create-material">
@@ -472,7 +444,7 @@ function EditMaterialForm({
   };
 
   const serverError =
-    update.error instanceof ApiClientError ? apiErrorMessage(m, update.error.code) : update.error ? apiErrorMessage(m) : null;
+    apiErrorOf(m, update.error);
 
   return (
     <form className="grid gap-3 rounded-lg border border-input p-3" noValidate onSubmit={onSubmit} data-testid={`material-edit-${material.id}`}>

@@ -45,10 +45,10 @@ import type {
   UUID,
   Vendor,
 } from '@techbuilder/contracts';
-import { ApiClientError, api, me } from '@/lib/api-client';
+import { api, me } from '@/lib/api-client';
 import { addDays, formatBusinessDateShort, todayKolkata } from '@/lib/business-date';
 import { uploadPhotos, uploadVoice } from '@/lib/media-upload';
-import { apiErrorMessage } from '@/lib/i18n/messages';
+import { apiErrorOf } from '@/lib/i18n/messages';
 import { useLocale, useMessages } from '@/lib/i18n/locale-context';
 import { formatPaise, rupeesToPaise } from '@/lib/money';
 import { Button } from '@/components/ui/button';
@@ -227,11 +227,7 @@ function ExpenseRequestForm({
   };
 
   const serverError =
-    mutation.error instanceof ApiClientError
-      ? apiErrorMessage(m, mutation.error.code)
-      : mutation.error
-        ? apiErrorMessage(m)
-        : null;
+    apiErrorOf(m, mutation.error);
 
   const dateLabel = (d: BusinessDate, index: number): string => {
     if (index === 0) return m.EXPENSE_REQUEST_UI.dateToday;

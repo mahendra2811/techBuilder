@@ -37,9 +37,9 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { uuidv7 } from 'uuidv7';
 import type { CashTransfer, CashTransferKind, CreateCashTransferInput, LedgerRollupRow, MoneyTag, UUID, User } from '@techbuilder/contracts';
-import { ApiClientError, api, me } from '@/lib/api-client';
+import { api, me } from '@/lib/api-client';
 import { todayKolkata } from '@/lib/business-date';
-import { apiErrorMessage } from '@/lib/i18n/messages';
+import { apiErrorOf } from '@/lib/i18n/messages';
 import { useLocale, useMessages } from '@/lib/i18n/locale-context';
 import { rupeesToPaise } from '@/lib/money';
 import { Button } from '@/components/ui/button';
@@ -49,7 +49,9 @@ import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
 import { ShowMore } from '@/components/ui/show-more';
 import { DateField } from '@/components/entry/date-field';
-import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
+import { LoadingState, EmptyState, ErrorState } from '@/components/entry/states';
+import { FormStatus } from '@/components/entry/form-status';
+import { QueryBoundary } from '@/components/ui/query-boundary';
 import { candidateRoles, type MoneyGiverRole } from '@/components/khata/target-roles';
 import { resolveUserName } from '@/components/khata/resolve-user-name';
 import { TransferRow } from '@/components/khata/transfer-row';
@@ -188,7 +190,7 @@ function TransferForm({ role, usersQ }: { role: LedgerRole; usersQ: ReturnType<t
   };
 
   const serverError =
-    create.error instanceof ApiClientError ? apiErrorMessage(m, create.error.code) : create.error ? apiErrorMessage(m) : null;
+    apiErrorOf(m, create.error);
 
   return (
     <Card data-testid="cash-transfer-form">
@@ -322,16 +324,7 @@ function TransferForm({ role, usersQ }: { role: LedgerRole; usersQ: ReturnType<t
               <Input id="transfer-note" data-testid="transfer-note" value={note} onChange={(e) => setNote(e.target.value)} />
             </div>
 
-            {serverError && (
-              <Notice tone="error" testId="transfer-error">
-                {serverError}
-              </Notice>
-            )}
-            {saved && (
-              <Notice tone="success" testId="transfer-saved">
-                {m.LEDGER_UI.saved}
-              </Notice>
-            )}
+                          <FormStatus error={serverError} saved={saved} savedLabel={m.LEDGER_UI.saved} testIdPrefix="transfer" />
 
             <Button type="submit" data-testid="transfer-submit" disabled={create.isPending}>
               {create.isPending ? m.LEDGER_UI.submitting : m.LEDGER_UI.submit}
@@ -363,31 +356,27 @@ function TransfersHistory({ usersQ }: { usersQ: ReturnType<typeof useQuery<User[
         <CardTitle>{m.LEDGER_UI.historyTitle}</CardTitle>
       </CardHeader>
       <CardContent>
-        {transfersQ.isPending ? (
-          <LoadingState />
-        ) : transfersQ.error ? (
-          <ErrorState error={transfersQ.error} onRetry={() => void transfersQ.refetch()} />
-        ) : !transfersQ.data || transfersQ.data.length === 0 ? (
-          <EmptyState label={m.LEDGER_UI.historyEmpty} />
-        ) : (
-          <ShowMore
-            items={transfersQ.data}
-            initial={10}
-            as="ul"
-            className="divide-y"
-            testIdPrefix="cash-transfers-history"
-            renderItem={(t) => (
-              <TransferRow
-                key={t.id}
-                t={t}
-                userName={userName}
-                rowTestIdPrefix="transfer-row"
-                kindChipTestIdPrefix="transfer-kind-chip"
-                tagLabels={TAG_PICKER_UI[locale]}
-              />
-            )}
-          />
-        )}
+        <QueryBoundary query={transfersQ} emptyLabel={m.LEDGER_UI.historyEmpty}>
+          {(transfers) => (
+            <ShowMore
+              items={transfers}
+              initial={10}
+              as="ul"
+              className="divide-y"
+              testIdPrefix="cash-transfers-history"
+              renderItem={(t) => (
+                <TransferRow
+                  key={t.id}
+                  t={t}
+                  userName={userName}
+                  rowTestIdPrefix="transfer-row"
+                  kindChipTestIdPrefix="transfer-kind-chip"
+                  tagLabels={TAG_PICKER_UI[locale]}
+                />
+              )}
+            />
+          )}
+        </QueryBoundary>
       </CardContent>
     </Card>
   );
@@ -411,15 +400,9 @@ function RollupSection() {
         <CardDescription>{m.LEDGER_UI.rollupSubtitle}</CardDescription>
       </CardHeader>
       <CardContent>
-        {rollupQ.isPending ? (
-          <LoadingState />
-        ) : rollupQ.error ? (
-          <ErrorState error={rollupQ.error} onRetry={() => void rollupQ.refetch()} />
-        ) : !rollupQ.data || rollupQ.data.length === 0 ? (
-          <EmptyState label={m.LEDGER_UI.rollupEmpty} />
-        ) : (
-          <RollupRows rows={rollupQ.data} testIdPrefix="rollup" />
-        )}
+        <QueryBoundary query={rollupQ} emptyLabel={m.LEDGER_UI.rollupEmpty}>
+          {(rows) => <RollupRows rows={rows} testIdPrefix="rollup" />}
+        </QueryBoundary>
       </CardContent>
     </Card>
   );

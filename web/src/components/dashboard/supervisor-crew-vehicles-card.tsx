@@ -22,8 +22,8 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Truck } from 'lucide-react';
 import type { AssignDriverInput, User, UUID, Vehicle } from '@techbuilder/contracts';
-import { ApiClientError, api } from '@/lib/api-client';
-import { apiErrorMessage } from '@/lib/i18n/messages';
+import { api } from '@/lib/api-client';
+import { apiErrorOf, type UiStrings } from '@/lib/i18n/messages';
 import { useLocale, useMessages } from '@/lib/i18n/locale-context';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -59,7 +59,7 @@ const UI = {
   },
 } as const;
 
-type UiText = Record<keyof (typeof UI)['en'], string>;
+type UiText = UiStrings<typeof UI>;
 
 const vehicleLabel = (v: Vehicle) => (v.name ? `${v.regNo} · ${v.name}` : v.regNo);
 
@@ -143,7 +143,7 @@ function VehicleRow({
   });
 
   const serverError =
-    assign.error instanceof ApiClientError ? apiErrorMessage(m, assign.error.code) : assign.error ? apiErrorMessage(m) : null;
+    apiErrorOf(m, assign.error);
 
   return (
     <li className="grid gap-2 rounded-lg border border-input p-2.5" data-testid={`supervisor-crew-vehicle-${vehicle.id}`}>

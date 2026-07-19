@@ -62,7 +62,7 @@ import type {
 } from '@techbuilder/contracts';
 import { ApiClientError, api, me } from '@/lib/api-client';
 import { CREATABLE_ROLES, makeTempPassword } from '@/lib/cascade';
-import { apiErrorMessage } from '@/lib/i18n/messages';
+import { apiErrorOf, type UiStrings } from '@/lib/i18n/messages';
 import { useLocale, useMessages } from '@/lib/i18n/locale-context';
 import { rupeesToPaise } from '@/lib/money';
 import { roleHome } from '@/lib/roles';
@@ -72,8 +72,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
+import { Pill } from '@/components/ui/pill';
+import { QueryBoundary } from '@/components/ui/query-boundary';
+import { SectionCard } from '@/components/ui/section-card';
 import { SubPageHeader, useSubPage } from '@/components/ui/sub-page';
-import { LoadingState, EmptyState, ErrorState, Notice } from '@/components/entry/states';
+import { LoadingState, Notice } from '@/components/entry/states';
 import { ShowMore } from '@/components/ui/show-more';
 import { ResetPasswordAction } from '@/components/people/reset-password-action';
 
@@ -149,10 +152,7 @@ const ID_CARD_UI = {
     none: 'सेट नहीं है',
   },
 } as const;
-// Widened (plain `string` fields): `ID_CARD_UI[locale]` (locale: 'en' | 'hi') resolves to
-// the UNION of both branches' literal-object types, which isn't assignable to either
-// branch alone — components receiving it as a prop need this wider, non-literal shape.
-type IdCardUi = { [K in keyof (typeof ID_CARD_UI)['en']]: string };
+type IdCardUi = UiStrings<typeof ID_CARD_UI>;
 
 export function PeopleScreen({ role }: { role: PeopleRole }) {
   const m = useMessages();
@@ -196,41 +196,15 @@ export function PeopleScreen({ role }: { role: PeopleRole }) {
           <CardDescription>{m.PEOPLE_UI.subtitle}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-2">
-          <SectionCard title={m.PEOPLE_UI.usersTitle} hint={landing.loginsHint} testId="people-open-logins" onClick={() => openSection('logins')} />
-          <SectionCard title={addMemberUi.cardTitle} hint={addMemberUi.cardHint} testId="people-open-add-member" onClick={() => openSection('addMember')} />
-          <SectionCard title={idCardUi.sectionTitle} hint={landing.labourMasterHint} testId="people-open-labour-master" onClick={() => openSection('labourMaster')} />
+          <SectionCard variant="row" title={m.PEOPLE_UI.usersTitle} subtitle={landing.loginsHint} testId="people-open-logins" onOpen={() => openSection('logins')} />
+          <SectionCard variant="row" title={addMemberUi.cardTitle} subtitle={addMemberUi.cardHint} testId="people-open-add-member" onOpen={() => openSection('addMember')} />
+          <SectionCard variant="row" title={idCardUi.sectionTitle} subtitle={landing.labourMasterHint} testId="people-open-labour-master" onOpen={() => openSection('labourMaster')} />
         </CardContent>
       </Card>
     </div>
   );
 }
 
-function SectionCard({
-  title,
-  hint,
-  testId,
-  onClick,
-}: {
-  title: string;
-  hint: string;
-  testId: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      className="flex w-full items-center justify-between gap-3 rounded-lg border border-input px-3.5 py-3 text-left hover:bg-accent"
-      data-testid={testId}
-      onClick={onClick}
-    >
-      <span className="grid min-w-0 gap-0.5">
-        <span className="text-sm font-medium">{title}</span>
-        <span className="truncate text-xs text-muted-foreground">{hint}</span>
-      </span>
-      <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-    </button>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Labour master (Person) list + ID-card detail + edit (Round 2 / CW-4; frozen.11 detail split)
@@ -290,15 +264,10 @@ function PersonList({
         <CardTitle>{ui.sectionTitle}</CardTitle>
       </CardHeader>
       <CardContent className="grid gap-3">
-        {peopleQ.isPending ? (
-          <LoadingState />
-        ) : peopleQ.error ? (
-          <ErrorState error={peopleQ.error} onRetry={() => void peopleQ.refetch()} />
-        ) : !peopleQ.data || peopleQ.data.length === 0 ? (
-          <EmptyState label={ui.empty} />
-        ) : (
+        <QueryBoundary query={peopleQ} emptyLabel={ui.empty}>
+          {(people) => (
           <ShowMore
-            items={peopleQ.data}
+            items={people}
             initial={10}
             as="ul"
             className="divide-y"
@@ -323,7 +292,8 @@ function PersonList({
               </li>
             )}
           />
-        )}
+          )}
+        </QueryBoundary>
       </CardContent>
     </Card>
   );
@@ -419,7 +389,7 @@ function PersonIdCardEditForm({
   });
 
   const serverError =
-    save.error instanceof ApiClientError ? apiErrorMessage(m, save.error.code) : save.error ? apiErrorMessage(m) : null;
+    apiErrorOf(m, save.error);
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -554,7 +524,7 @@ function UserList({
   const canResetPassword = (u: User) => role !== 'SUPERVISOR' && u.id !== myUserId && (role === 'OWNER' || creatable.includes(u.role));
 
   const errorMessage = (err: unknown): string | null =>
-    err instanceof ApiClientError ? apiErrorMessage(m, err.code) : err ? apiErrorMessage(m) : null;
+    apiErrorOf(m, err);
   const serverError = errorMessage(deactivate.error) ?? errorMessage(activate.error);
 
   return (
@@ -563,15 +533,10 @@ function UserList({
         <CardTitle>{m.PEOPLE_UI.usersTitle}</CardTitle>
       </CardHeader>
       <CardContent className="grid gap-3">
-        {usersQ.isPending ? (
-          <LoadingState />
-        ) : usersQ.error ? (
-          <ErrorState error={usersQ.error} onRetry={() => void usersQ.refetch()} />
-        ) : !usersQ.data || usersQ.data.length === 0 ? (
-          <EmptyState label={m.PEOPLE_UI.usersEmpty} />
-        ) : (
+        <QueryBoundary query={usersQ} emptyLabel={m.PEOPLE_UI.usersEmpty}>
+          {(users) => (
           <ShowMore
-            items={usersQ.data}
+            items={users}
             initial={10}
             as="ul"
             className="divide-y"
@@ -601,15 +566,9 @@ function UserList({
                         </p>
                       </Link>
                     )}
-                    <span
-                      className={
-                        u.active
-                          ? 'shrink-0 rounded bg-emerald-500/15 px-1.5 py-0.5 text-[11px] text-emerald-700 dark:text-emerald-400'
-                          : 'shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground'
-                      }
-                    >
+                    <Pill tone={u.active ? 'success' : 'neutral'}>
                       {u.active ? m.PEOPLE_UI.activeYes : m.PEOPLE_UI.activeNo}
-                    </span>
+                    </Pill>
                   </div>
                   {(canDeactivate(u) || canActivate(u) || canResetPassword(u)) && (
                     <div className="flex flex-wrap gap-2">
@@ -665,7 +624,8 @@ function UserList({
               );
             }}
           />
-        )}
+          )}
+        </QueryBoundary>
         {serverError && (
           <Notice tone="error" testId="user-deactivate-error">
             {serverError}
@@ -826,12 +786,7 @@ function AddMemberForm({
   // Surface DUPLICATE (username taken) inline; everything else via the catalog.
   const dupUsername =
     submit.error instanceof ApiClientError && (submit.error.code === 'DUPLICATE' || submit.error.fields?.username);
-  const serverError =
-    !dupUsername && submit.error instanceof ApiClientError
-      ? apiErrorMessage(m, submit.error.code)
-      : !dupUsername && submit.error
-        ? apiErrorMessage(m)
-        : null;
+  const serverError = dupUsername ? null : apiErrorOf(m, submit.error);
 
   return (
     <Card data-testid="people-sub-add-member">
